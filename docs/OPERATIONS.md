@@ -137,3 +137,7 @@ Official Core and plugin manifest comparisons and local main-file evidence use b
 Review `checksum_findings` for `EXTRA_EXECUTABLE` results: they identify PHP-family files absent from an official plugin manifest for the installed version. Investigate plugin-specific generated code or custom extensions before deciding whether a finding is malicious. The auditor never removes the file.
 
 Checksum results are considered verified only when at least one valid checksum entry was actually evaluated. An empty or malformed manifest cannot produce a successful component integrity claim. Check `verified_files` / `checksum_verified_files` counters alongside comparison states.
+
+## Distinguishing repository absence from service outages
+
+For official component metadata lookups, HTTP 404 represents a component not found in the queried endpoint. API 5xx and network failures are `API_UNAVAILABLE`. Core checksum 404 does not establish WordPress Core absence; it means the requested checksum data could not be obtained. Review evidence before attributing component origin.
