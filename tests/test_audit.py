@@ -797,6 +797,30 @@ $table_prefix = 'wp_';
             with self.assertRaises(OSError):
                 cv.file_digest(link)
 
+    def test_official_plugin_extra_php_requires_review(self):
+        import component_versions as cv
+        import hashlib
+        import json
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            plugin = root / "wp-content/plugins/example"
+            plugin.mkdir(parents=True)
+            (plugin / "example.php").write_bytes(b"<?php // official")
+            (plugin / "rogue.php").write_bytes(b"<?php // extra")
+            expected = hashlib.md5((plugin / "example.php").read_bytes()).hexdigest()
+            manifest = json.dumps({"files": {"example.php": expected}}).encode()
+            class Response:
+                status = 200
+                def __enter__(self): return self
+                def __exit__(self, *args): return False
+                def geturl(self): return "https://downloads.wordpress.org/plugin-checksums/example/1.0.json"
+                def read(self, count): return manifest
+            item = {"slug": "example", "local_version": "1.0", "state": "PLUGIN_OFICIAL_ATUAL"}
+            with unittest.mock.patch.object(cv.urllib.request, "urlopen", return_value=Response()):
+                cv.official_plugin_checksums(item, root)
+            self.assertEqual(item["state"], "PLUGIN_COM_ARQUIVOS_MODIFICADOS")
+            self.assertIn({"path": "rogue.php", "reason": "EXTRA_EXECUTABLE"}, item["checksum_findings"])
+
     def test_secret_redaction(self):
         self.assertNotIn("example-secret", audit.redact("password=example-secret"))
         self.assertNotIn("192.168.1.20", audit.redact("192.168.1.20"))
