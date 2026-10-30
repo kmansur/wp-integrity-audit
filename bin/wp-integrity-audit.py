@@ -277,7 +277,7 @@ def akismet_access_guard(content: str) -> bool:
                 return False
             if re.search(r"php|phtml|phar|cgi|pl\b|sh\b|(?<!\\)\.\*", pattern, re.I):
                 return False
-            if re.search(r"[^A-Za-z0-9\\.^$|()?+*\[\]{}-]", pattern):
+            if re.search(r"[^A-Za-z0-9@\\.^$|()?+*\[\]{}-]", pattern):
                 return False
             stack.append("assets")
         elif line.lower() in ("</ifmodule>", "</filesmatch>"):
