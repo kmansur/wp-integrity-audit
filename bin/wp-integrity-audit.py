@@ -103,37 +103,54 @@ def iter_files(root: Path):
                 yield path
 
 def file_audit(target: Path, case: Path) -> list[dict]:
-    """IOC discovery with bounded snippets; results are clues, not proof."""
+    """Scan entire PHP-like files in bounded chunks and record IOC evidence.
+
+    A short overlap prevents missing patterns across chunk boundaries.
+    Results are heuristics; malware can evade these signatures.
+    """
     findings: list[dict] = []
     for path in iter_files(target):
         relative = path.relative_to(target).as_posix()
         name = path.name
         unusual = name.startswith(PATTERN_NAMES) or name == "trace-inspector-pad.php" or "cipher-feeder" in name
         upload_php = relative.startswith("wp-content/uploads/") and path.suffix.lower() in (".php", ".phtml", ".phar")
-        text = ""
-        if path.suffix.lower() in (".php", ".phtml", ".inc"):
+        match = None
+        snippet = ""
+        if path.suffix.lower() in (".php", ".phtml", ".inc", ".phar"):
             try:
                 with path.open("rb") as stream:
-                    text = stream.read(262144).decode("utf-8", "replace")
+                    overlap = b""
+                    while True:
+                        chunk = stream.read(65536)
+                        if not chunk:
+                            break
+                        sample = overlap + chunk
+                        decoded = sample.decode("utf-8", "replace")
+                        match = IOC.search(decoded)
+                        if match:
+                            snippet = redact(decoded[max(0, match.start() - 50):match.end() + 90])
+                            break
+                        overlap = sample[-256:]
             except OSError:
                 continue
-        match = IOC.search(text)
         if not (unusual or upload_php or match):
             continue
-        if "/wflogs/" in relative:
-            classification = "SECURITY_PLUGIN_REVIEW"
-        elif match or unusual:
-            classification = "IOC_REQUIRES_VALIDATION"
-        else:
-            classification = "UPLOAD_SCRIPT_REVIEW"
-        findings.append({
-            "path": relative, "sha256": sha256(path), "size": path.stat().st_size,
-            "classification": classification,
-            "indicator": match.group(0) if match else ("filename" if unusual else "upload PHP"),
-            "snippet": redact(text[max(0, match.start() - 50):match.end() + 90]) if match else ""
-        })
+        classification = ("SECURITY_PLUGIN_REVIEW" if "/wflogs/" in relative
+                          else "IOC_REQUIRES_VALIDATION" if match or unusual
+                          else "UPLOAD_SCRIPT_REVIEW")
+        try:
+            record = {
+                "path": relative, "sha256": sha256(path), "size": path.stat().st_size,
+                "classification": classification,
+                "indicator": match.group(0) if match else ("filename" if unusual else "upload PHP"),
+                "snippet": snippet
+            }
+        except OSError:
+            continue
+        findings.append(record)
     write_private(case / "file-evidence.json", json.dumps(findings, indent=2, ensure_ascii=False))
     return findings
+
 
 def process_audit(case: Path) -> list[str]:
     result = run(["ps", "-eo", "pid=,ppid=,user=,args="], capture_output=True).stdout
@@ -188,7 +205,7 @@ def database_audit(option_file: str, dbname: str, prefix: str, case: Path, post:
     options, users, meta = (sql_identifier(prefix + v) for v in ("options", "users", "usermeta"))
     statements = [
         ("suspicious_users", f"SELECT user_login, LENGTH(user_login) FROM {users} WHERE user_login REGEXP '^(admin|administrator|backup)_[0-9a-f]{{6}}$'"),
-        ("family_option", f"SELECT option_name, LENGTH(option_value) FROM {options} WHERE option_name LIKE 'sc#_%' ESCAPE '#' OR option_name LIKE '_transient_sc#_%' ESCAPE '#'"),
+        ("family_option", f"SELECT option_name, LENGTH(option_value) FROM {options} WHERE option_name LIKE 'sc#_%' ESCAPE '#' OR option_name LIKE '_transient_sc#_%' ESCAPE '#' OR option_name LIKE '_transient_timeout_sc#_%' ESCAPE '#'"),
         ("marker_option", f"SELECT option_name, LENGTH(option_value) FROM {options} WHERE option_value LIKE '%cipher-feeder%' OR option_value LIKE '%sc_cron_guard%' OR option_value LIKE '%sc_persist_manifest%' OR option_value LIKE '%trace-inspector-pad%'"),
         ("session_rows", f"SELECT meta_key, COUNT(*) FROM {meta} WHERE meta_key='session_tokens' GROUP BY meta_key"),
         ("application_password_rows", f"SELECT meta_key, COUNT(*) FROM {meta} WHERE meta_key LIKE '%application_passwords' GROUP BY meta_key"),
