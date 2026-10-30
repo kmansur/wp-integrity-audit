@@ -65,3 +65,9 @@ Use `--compare OLD_CASE NEW_CASE --compare-output PATH` on two prior complete au
 ## Read-only WordPress configuration inventory
 
 Every audit collects configuration file metadata within the target WordPress tree in `configuration-evidence.json`. This inventory omits raw contents, so a hash change requires contextual inspection. It does not extend to system-level Apache, PHP-FPM or cron persistence and is not a release approval.
+
+## Optional Core and Linux probes
+
+Run `--audit --check-core TARGET` for official checksum comparison. The tool obtains the version without executing PHP and currently uses the English-US checksum set. Localized distributions may have legitimate checksum differences; check `core-integrity.json` for `COMPLETE`, `INCOMPLETE`, or `UNAVAILABLE`. This does not verify themes, plugins, or every unexpected file outside the manifest.
+
+Run `--audit --host-persistence TARGET` to record selected Linux configuration metadata in `host-persistence.json`. Contents are not exported. These options do not change files, reload configuration, execute WP-CLI, or restart services. Host-level collection is not exhaustive and should be reviewed separately during incident response.
