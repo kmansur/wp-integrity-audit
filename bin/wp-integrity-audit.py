@@ -226,6 +226,105 @@ def configuration_audit(target: Path, case: Path) -> list[dict]:
     return findings
 
 
+
+def core_integrity_audit(target: Path, case: Path, checksum_manifest: dict | None = None) -> dict:
+    """Compare installed core files with official WordPress checksums.
+
+    The installation is never modified. A checksum manifest can be supplied
+    by synthetic tests; production retrieves from api.wordpress.org HTTPS.
+    """
+    version_file = target / "wp-includes" / "version.php"
+    if version_file.is_symlink() or not version_file.is_file():
+        result = {"status": "UNAVAILABLE", "reason": "Missing or linked version.php", "findings": []}
+        write_private(case / "core-integrity.json", json.dumps(result, indent=2))
+        return result
+    text = version_file.read_text(encoding="utf-8", errors="replace")[:65536]
+    version_match = re.search(r"\$wp_version\s*=\s*['\"]([0-9]+(?:\.[0-9]+){1,3})['\"]", text)
+    if not version_match:
+        result = {"status": "UNAVAILABLE", "reason": "Version cannot be safely parsed", "findings": []}
+        write_private(case / "core-integrity.json", json.dumps(result, indent=2))
+        return result
+    version = version_match.group(1)
+    if checksum_manifest is None:
+        params = urllib.parse.urlencode({"version": version, "locale": "en_US"})
+        request = urllib.request.Request(
+            "https://api.wordpress.org/core/checksums/1.0/?" + params,
+            headers={"User-Agent": "wp-integrity-audit/" + VERSION})
+        try:
+            with urllib.request.urlopen(request, timeout=20) as response:
+                if urllib.parse.urlparse(response.geturl()).hostname != "api.wordpress.org":
+                    raise AuditError("Untrusted core checksum endpoint")
+                checksum_manifest = json.load(response)
+        except (OSError, ValueError, AuditError) as exc:
+            result = {"status": "UNAVAILABLE", "version": version,
+                      "reason": "Official checksum retrieval failed", "findings": []}
+            write_private(case / "core-integrity.json", json.dumps(result, indent=2))
+            return result
+    checksums = checksum_manifest.get("checksums") if isinstance(checksum_manifest, dict) else None
+    if not isinstance(checksums, dict) or not checksums:
+        result = {"status": "UNAVAILABLE", "version": version, "reason": "Missing checksum manifest", "findings": []}
+        write_private(case / "core-integrity.json", json.dumps(result, indent=2))
+        return result
+    findings = []
+    checked = 0
+    for name, expected in sorted(checksums.items()):
+        # Plugins, local configs and content are never treated as core.
+        if (not isinstance(name, str) or not isinstance(expected, str)
+                or not re.fullmatch(r"[0-9a-fA-F]{32}", expected)):
+            continue
+        parts = Path(name).parts
+        if (Path(name).is_absolute() or ".." in parts or
+                name.startswith("wp-content/") or name == "wp-config.php"):
+            continue
+        path = target / name
+        if path.is_symlink() or not path.is_file():
+            findings.append({"path": name, "classification": "CORE_AUSENTE_REQUER_REVISAO"})
+            continue
+        digest = hashlib.md5()
+        try:
+            with path.open("rb") as stream:
+                for chunk in iter(lambda: stream.read(1048576), b""):
+                    digest.update(chunk)
+        except OSError:
+            findings.append({"path": name, "classification": "CORE_INACESSIVEL_REQUER_REVISAO"})
+            continue
+        checked += 1
+        if digest.hexdigest().lower() != expected.lower():
+            findings.append({"path": name, "classification": "CORE_MODIFICADO_REQUER_REVISAO",
+                             "sha256": sha256(path)})
+    result = {"status": "COMPLETE" if checked else "INCOMPLETE", "version": version,
+              "locale": "en_US", "algorithm": "MD5 (WordPress official checksums)",
+              "checked_files": checked, "findings": findings,
+              "note": "Locale-specific files or valid customizations may differ; a mismatch is not proof of compromise."}
+    write_private(case / "core-integrity.json", json.dumps(result, indent=2))
+    return result
+
+def host_persistence_inventory(case: Path, roots: list[Path]) -> list[dict]:
+    """Bounded Linux persistence metadata collection, without reading secrets."""
+    findings = []
+    allowed = ("/etc/cron", "/etc/systemd/system", "/etc/php",
+               "/etc/apache2", "/etc/profile", "/etc/bash.bashrc")
+    for root in roots:
+        root = Path(root)
+        if not any(str(root) == prefix or str(root).startswith(prefix + ".") or
+                   str(root).startswith(prefix + "/") for prefix in allowed):
+            raise AuditError("Disallowed host inventory root")
+        if root.is_symlink() or not root.exists():
+            continue
+        candidates = [root] if root.is_file() else iter_files(root)
+        for file in candidates:
+            try:
+                info = file.stat()
+                findings.append({"path": str(file), "size": info.st_size,
+                                 "mode": oct(stat.S_IMODE(info.st_mode)),
+                                 "sha256": sha256(file), "source": "host_metadata",
+                                 "classification": "HOST_PERSISTENCE_REQUIRES_CONTEXT"})
+            except OSError:
+                continue
+    write_private(case / "host-persistence.json", json.dumps(findings, indent=2))
+    return findings
+
+
 def process_audit(case: Path) -> list[str]:
     result = run(["ps", "-eo", "pid=,ppid=,user=,args="], capture_output=True).stdout
     matches = [redact(line) for line in result.splitlines() if any(x in line for x in ("--sc-cli", "--sc-succ", "cipher-feeder", ".gr_"))]
@@ -934,6 +1033,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--replace-plugins-themes", action="store_true")
     parser.add_argument("--official-sync", action="store_true")
     parser.add_argument("--case-root", type=Path, default=Path("/var/lib/wp-integrity-audit/cases"))
+    parser.add_argument("--check-core", action="store_true", help="Check core hashes against official WordPress checksum API")
+    parser.add_argument("--host-persistence", action="store_true", help="Inventory selected Linux persistence configuration metadata")
     parser.add_argument("--files-only", action="store_true", help="Skip SQL checks explicitly when using --audit")
     parser.add_argument("--compare", nargs=2, metavar=("OLD_CASE", "NEW_CASE"), type=Path,
                         help="Compare two existing case directories without scanning a live site")
@@ -982,6 +1083,12 @@ def main() -> int:
         print(f"Version {VERSION}; mode={args.mode}; case={case}")
         files = file_audit(target, case)
         configuration_audit(target, case)
+        if args.check_core:
+            core_integrity_audit(target, case)
+        if args.host_persistence:
+            if sys.platform != "linux":
+                raise AuditError("Host persistence inventory is supported only on Linux")
+            host_persistence_inventory(case, [Path(p) for p in ("/etc/crontab", "/etc/cron.d", "/etc/cron.daily", "/etc/cron.hourly", "/etc/systemd/system", "/etc/php", "/etc/apache2")])
         elementor_asset_audit(target, case)
         processes = process_audit(case)
         if args.mode == "audit" and args.files_only:
