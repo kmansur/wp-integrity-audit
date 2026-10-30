@@ -123,3 +123,8 @@ All project documentation and source commentary are in English. Versions follow 
 - Add opt-in `--host-persistence` metadata inventory of selected Linux cron, systemd, PHP and Apache configuration directories.
 - Treat unavailable checksum data, missing core files, and non-English locale differences as review items, never as evidence of confirmed compromise.
 - Restrict optional probes to read-only audit mode; add synthetic manifest and host-root validation tests.
+
+### Optional probe status integrity
+- Include incomplete/mismatching WordPress Core checksum results in `report.json` and the executive summary.
+- Assign exit `40` for otherwise clean cases with unresolved Core discrepancies, without overriding confirmed family residues (exit `10`).
+- Add regression tests for both status precedences.
