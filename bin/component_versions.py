@@ -175,18 +175,22 @@ def check_core(target: Path, record: dict, offline: bool) -> None:
 
 def audit(target: Path, case: Path, *, offline: bool = False,
           active_plugins: set[str] | None = None, template: str | None = None,
-          stylesheet: str | None = None) -> dict:
+          stylesheet: str | None = None, skip_core: bool = False) -> dict:
     core = local_core(target)
     plugins = local_components(target, "plugin", active_plugins, template, stylesheet)
     themes = local_components(target, "theme", active_plugins, template, stylesheet)
     online = not offline
     if online:
-        check_core(target, core, False)
+        if not skip_core:
+            check_core(target, core, False)
         for rec in plugins + themes:
             if rec["child_theme"] or rec["update_uri_present"]:
                 rec["query_status"] = "PREMIUM_OR_CUSTOM_COMPONENT"
                 continue
             compare_official(rec)
+    if skip_core:
+        core["state"] = "CORE_CHECKSUM_INDISPONIVEL"
+        core["query_status"] = "SKIPPED"
     records = [core] + plugins + themes
     coverage = {"local": "EXECUTED", "official": "SKIPPED" if offline else
                 "UNAVAILABLE" if any(r["query_status"] == "API_UNAVAILABLE" for r in records)
