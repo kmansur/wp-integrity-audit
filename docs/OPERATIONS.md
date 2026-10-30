@@ -141,3 +141,7 @@ Checksum results are considered verified only when at least one valid checksum e
 ## Distinguishing repository absence from service outages
 
 For official component metadata lookups, HTTP 404 represents a component not found in the queried endpoint. API 5xx and network failures are `API_UNAVAILABLE`. Core checksum 404 does not establish WordPress Core absence; it means the requested checksum data could not be obtained. Review evidence before attributing component origin.
+
+## Coverage reconciliation (0.12.0)
+
+Use the component evidence Core `verified_files` count and `coverage.core` field for actual checksum execution. A Core update being available does not itself indicate tampering or invalidate a checksum match. Plugin origin-unconfirmed and local-version-unidentified states require provenance review, not automatic malware determination. For Akismet and MetForm artifacts, verify complete content or trusted provenance before granting legitimacy exemptions.
