@@ -739,6 +739,21 @@ $table_prefix = 'wp_';
         self.assertEqual(stylesheet, "child")
         self.assertIsInstance(active, set)
 
+    def test_core_outdated_version_preserves_checksum_review(self):
+        import component_versions as cv
+        core = {"local_version": "6.7.1", "locale": "en_US",
+                "state": "CORE_VALIDADO", "official_version": "6.7.1"}
+        with unittest.mock.patch.object(cv, "api_json", return_value=(
+                "SUCCESS", {"offers": [{"current": "6.8.1"}]}, "https://api.wordpress.org/core/version-check/1.7/")):
+            cv.check_core_latest(core)
+        self.assertEqual(core["state"], "CORE_DESATUALIZADO")
+        self.assertEqual(core["official_version"], "6.8.1")
+        core["state"] = "CORE_MODIFICADO_REQUER_REVISAO"
+        with unittest.mock.patch.object(cv, "api_json", return_value=(
+                "SUCCESS", {"offers": [{"current": "6.8.1"}]}, "https://api.wordpress.org/core/version-check/1.7/")):
+            cv.check_core_latest(core)
+        self.assertEqual(core["state"], "CORE_MODIFICADO_REQUER_REVISAO")
+
     def test_secret_redaction(self):
         self.assertNotIn("example-secret", audit.redact("password=example-secret"))
         self.assertNotIn("192.168.1.20", audit.redact("192.168.1.20"))
