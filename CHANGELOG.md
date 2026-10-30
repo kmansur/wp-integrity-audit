@@ -137,3 +137,10 @@ All project documentation and source commentary are in English. Versions follow 
 - Preserve explicitly selected recovery workflows and interactive approval; no mutation in the normal audit path.
 - Track omitted scopes in reports and return exit 40 for otherwise clean but incomplete audits.
 - Add CLI-default and omitted-coverage regression tests.
+
+### Evidence-driven report reconciliation
+- Add detailed Core discrepancy and WordPress configuration inventory sections to Markdown, including priority review for wp-includes/version.php.
+- Expose Core, configuration and host-persistence counts in JSON and executive summary.
+- Separate domain and case_id in CSV and JSON.
+- Classify ordinary host configuration files as INVENTARIADO_SEM_INDICADOR rather than indiscriminately labeling them suspicious; flag only recognized IOC patterns for investigation.
+- Keep detailed host paths in internal JSON and omit infrastructure names from the Markdown host summary; add regression coverage.
