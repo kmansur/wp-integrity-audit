@@ -117,3 +117,7 @@ Do not operate `--apply-files`, `--apply-db`, or `--recover` on production until
 ## Recent changes and WordPress persistence
 
 Use `timeline.json` to correlate recent filesystem changes with incident timestamps, remembering that Unix ctime reflects metadata changes and that adversaries may alter mtime. Check `wordpress-persistence.json` for MU-plugins and drop-ins requiring independent provenance validation. The default timeline window is 30 days. Preserve the private case directory and do not distribute internal paths without review.
+
+## Component-version evidence
+
+Run a normal `--audit` for local and official checks, use `--offline` to prevent network calls during component checks or `--skip-version-check` for explicitly reduced component coverage. Inspect `component-version-evidence.json` for individual query states, local headers, theme parent relationships and Core checksum discrepancies. API-unavailable means connectivity/response uncertainty, **not** an unofficial package. Avoid interpreting absent metadata or premium/customized code as malware. No components are downloaded or executed in audit mode.
