@@ -183,3 +183,5 @@ All project documentation and source commentary are in English. Versions follow 
 - Match the observed guarded MetForm cache header with a generator comment and `ABSPATH` guard, preserving manual-review status.
 - Support nested `IfModule` blocks in strict Akismet `.htaccess` access-rule recognition.
 - Add synthetic regression tests for guarded headers, nested blocks and unsafe grants.
+
+- Strengthen MetForm regression coverage: a plausible generated-cache header containing a known IOC later in the file must retain IOC classification, never legitimate-cache status.
