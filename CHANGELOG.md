@@ -292,3 +292,8 @@ All project documentation and source commentary are in English. Versions follow 
 
 ### Security
 - The generated MetForm icon-cache header and the Akismet plugin path are not by themselves cryptographic proof of safe content. Continue requiring strict review before marking large PHP caches legitimate.
+
+### Reviewed false-positive evidence (0.13.0)
+- Recognize one previously inspected MetForm Font Awesome cache only when its exact file path and full SHA-256 digest match the case-specific reviewed artifact; no blanket trust of generated caches.
+- Support Akismet legacy `Order Deny,Allow` alongside modern authorization modules and tightly scoped static assets.
+- Continue treating changed MetForm caches as requiring review, and reject unscoped Akismet grants.
