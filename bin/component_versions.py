@@ -320,19 +320,19 @@ def append_management_section(case: Path) -> None:
     result = json.loads(source.read_text())
     coverage = result["coverage"]
     summary = result.get("summary", {})
-    body = ["", "## Versões e componentes", "",
-            f"- Status de cobertura: {coverage['status']}",
-            f"- Verificação local de versões: {coverage['local']}",
-            f"- Consulta oficial: {coverage['official']}",
-            f"- Motivo da omissão: {coverage.get('reason') or 'None'}",
-            f"- WordPress instalado: {summary.get('core_version') or 'Unknown'}",
-            f"- Plugins verificados: {summary.get('plugins_checked', 0)}",
-            f"- Plugins desatualizados: {summary.get('plugins_outdated', 0)}",
-            f"- Plugins premium/customizados: {summary.get('plugins_premium_custom', 0)}",
-            f"- Temas verificados: {summary.get('themes_checked', 0)}",
-            f"- Temas desatualizados: {summary.get('themes_outdated', 0)}",
-            f"- Temas premium/customizados: {summary.get('themes_premium_custom', 0)}",
-            f"- Componentes não encontrados no repositório: {summary.get('unlisted', 0)}",
+    body = ["", "## Versions and components", "",
+            f"- Coverage status: {coverage['status']}",
+            f"- Local version inspection: {coverage['local']}",
+            f"- Official consultation: {coverage['official']}",
+            f"- Omission reason: {coverage.get('reason') or 'None'}",
+            f"- Installed WordPress: {summary.get('core_version') or 'Unknown'}",
+            f"- Plugins checked: {summary.get('plugins_checked', 0)}",
+            f"- Outdated plugins: {summary.get('plugins_outdated', 0)}",
+            f"- Premium/custom plugins: {summary.get('plugins_premium_custom', 0)}",
+            f"- Themes checked: {summary.get('themes_checked', 0)}",
+            f"- Outdated themes: {summary.get('themes_outdated', 0)}",
+            f"- Premium/custom themes: {summary.get('themes_premium_custom', 0)}",
+            f"- Components not found in official repository: {summary.get('unlisted', 0)}",
             "- Component detail: component-version-report.md", ""]
     for path in (case / "report.md", case / "technical-report.md"):
         if path.is_file():
