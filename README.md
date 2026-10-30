@@ -200,3 +200,7 @@ When an official plugin checksum manifest is available, the component audit now 
 ## 0.10.0 manifest validation
 
 Checksum verification requires usable file entries. A retrieved but empty or invalid checksum manifest is classified as unavailable, not a verified match. Audit remains passive and destructive recovery modes remain disabled.
+
+## 0.11.0 official metadata API error classification
+
+WordPress.org plugin/theme lookup HTTP 404 is recorded as `NOT_FOUND_OFFICIAL_REPOSITORY`; service errors and Core checksum errors remain `API_UNAVAILABLE`. These states never prove maliciousness or authenticate a premium/custom component.
