@@ -275,7 +275,7 @@ def akismet_access_guard(content: str) -> bool:
             # Permit only patterns referencing static extensions, never PHP/CGI.
             if not re.search(r"css|js|png|jpe?g|gif|svg|webp", pattern, re.I):
                 return False
-            if re.search(r"php|phtml|phar|cgi|pl\b|sh\b|(?<!\\)\.\*", pattern, re.I):
+            if re.search(r"php|phtml|phar|cgi|\\\.pl\\b|\\\.sh\\b|(?<!\\)\.\*", pattern, re.I):
                 return False
             if re.search(r"[^A-Za-z0-9@\\.^$|()?+*\[\]{}-]", pattern):
                 return False
