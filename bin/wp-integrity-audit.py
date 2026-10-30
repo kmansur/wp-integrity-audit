@@ -380,17 +380,41 @@ def audit_status(files: list[dict], processes: list[str],
     return "SEM_MARCADOR_EXPLICITO", 0, summary
 
 
+def optional_probe_review(case: Path) -> list[str]:
+    """Surface failures of requested optional probes without overriding residues."""
+    issues = []
+    core = case / "core-integrity.json"
+    if core.is_file():
+        with core.open(encoding="utf-8") as stream:
+            record = json.load(stream)
+        if record.get("status") != "COMPLETE":
+            issues.append("Core checksum verification unavailable or incomplete")
+        if record.get("findings"):
+            issues.append(f"Core discrepancies requiring review: {len(record['findings'])}")
+    host = case / "host-persistence.json"
+    if host.is_file():
+        with host.open(encoding="utf-8") as stream:
+            records = json.load(stream)
+        if not isinstance(records, list):
+            issues.append("Invalid host persistence inventory")
+    return issues
+
+
 def make_report(case: Path, mode: str, findings: list[dict], processes: list[str],
                 database: list[dict] | None = None, db_name: str | None = None, db_prefix: str | None = None) -> None:
     """Generate a precise coverage statement and evidence-based technical opinion."""
     audited = database is not None
     attach_evidence_ids(findings, database, db_name, db_prefix)
     status, exit_code, summary = audit_status(findings, processes, database)
+    optional_issues = optional_probe_review(case)
+    if optional_issues and exit_code == 0:
+        status, exit_code = "AUDITORIA_INCOMPLETA", 40
     write_private(case / "report.json", json.dumps({
         "schema_version": 1, "tool_version": VERSION,
         "tool_sha256": sha256(Path(__file__)), "mode": mode,
         "collected_at_utc": dt.datetime.now(dt.timezone.utc).isoformat(),
         "status": status, "exit_code": exit_code, "summary": summary,
+        "optional_probe_review": optional_issues,
         "database": db_name if audited else None,
         "table_prefix": db_prefix if audited else None,
         "database_audited": audited,
@@ -429,6 +453,7 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
         f"- Validated legitimate file patterns: **{summary['validated_legitimate_files']}**",
         f"- Security configurations requiring validation: **{summary['security_configuration_review']}**",
         f"- Suspicious processes: **{summary['suspicious_processes']}**",
+        *[f"- Optional probe issue: {issue}" for issue in optional_issues],
         "- Release recommendation: **LIBERAÇÃO NÃO RECOMENDADA**",
         "", "## Audit metadata", "",
         f"- Version: `{VERSION}`", f"- Tool SHA-256: `{sha256(Path(__file__))}`", f"- Mode: `{mode}`",
@@ -1106,9 +1131,10 @@ def main() -> int:
             if args.mode in ("audit", "audit-db", "audit-db-post"):
                 database = database_audit(cnf, dbname, prefix, case, post=args.mode == "audit-db-post")
                 make_report(case, args.mode, files, processes, database, dbname, prefix)
-                status, code, summary = audit_status(files, processes, database)
-                print(f"Database audit complete: status={status}; exit={code}")
-                return code
+                with (case / "report.json").open(encoding="utf-8") as stream:
+                    outcome = json.load(stream)
+                print("Database audit complete: status=" + outcome["status"] + "; exit=" + str(outcome["exit_code"]))
+                return outcome["exit_code"]
             if os.geteuid() != 0:
                 raise AuditError("Recovery requires root; audit does not")
             if args.mode == "recover" and processes:
