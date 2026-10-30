@@ -256,3 +256,13 @@ All project documentation and source commentary are in English. Versions follow 
 - Explicitly reject symlink targets in file digest helpers.
 - Add large synthetic file and symlink regression tests.
 - Maintain read-only audit behavior and disabled destructive modes pending recovery safety validation.
+
+## [0.9.0] - 2026-10-30
+
+### Added
+- Detect additional executable PHP files absent from a successfully retrieved official WordPress.org plugin checksum manifest.
+- Preserve conservative `PLUGIN_COM_ARQUIVOS_MODIFICADOS` review classification rather than asserting malware.
+- Regression-test an official manifest with an unexpected executable file.
+
+### Limitations
+- The new extra-file detection applies only where a trustworthy official plugin manifest is available. Theme file provenance and complete disposable-site acceptance remain outstanding.
