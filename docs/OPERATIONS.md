@@ -61,3 +61,7 @@ Full scalar values are included only for `_transient_sc_spread_interval` and `_t
 ## Read-only case comparison
 
 Use `--compare OLD_CASE NEW_CASE --compare-output PATH` on two prior complete audit directories. Both must identify the same database; differences are based on relative file paths and option-name/kind pairs rather than run-local evidence IDs. The tool produces `comparison.md` and `comparison.json`, without contacting the production site. Changes in dynamic cron hashes require manual interpretation.
+
+## Read-only WordPress configuration inventory
+
+Every audit collects configuration file metadata within the target WordPress tree in `configuration-evidence.json`. This inventory omits raw contents, so a hash change requires contextual inspection. It does not extend to system-level Apache, PHP-FPM or cron persistence and is not a release approval.
