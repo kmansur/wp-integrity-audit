@@ -205,3 +205,16 @@ All project documentation and source commentary are in English. Versions follow 
 - Disable `--apply-files`, `--apply-db` and `--recover` until ownership, uploads preservation, exact package versions and rollback are verified end-to-end in disposable fixtures.
 - Extend read-only file inspection to `.php5`, `.php7`, `.php8`, `.pht` and `.phps` and add generic obfuscated/dynamic webshell heuristics. These remain review heuristics, not proof of compromise.
 - Add synthetic test of generic PHP5 detection and unchanged incomplete-audit exit-code semantics.
+
+## [0.6.0] - 2026-10-30
+
+### Added
+- Inventory WordPress mu-plugins and selected top-level drop-ins without executing code (`wordpress-persistence.json`).
+- Record a 30-day filesystem metadata timeline (`timeline.json`), showing mtime and ctime without treating ctime as creation time.
+- Add isolated regression tests for these inventories.
+
+### Fixed
+- Update the existing generic webshell test to expect the correct review classification for `eval($_GET[...])`.
+
+### Limitations
+- Timeline and persistence inventory are contextual evidence; their mere presence does not prove malicious activity. Recovery modes remain disabled pending safety homologation.
