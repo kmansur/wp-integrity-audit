@@ -117,3 +117,9 @@ All project documentation and source commentary are in English. Versions follow 
 - Add regression test to prevent config-content credential exposure.
 
 - Add heuristic review classification for PHP scripts in hidden WordPress directories, excluding `.well-known`; include a synthetic unit test.
+
+### Optional integrity and persistence probes
+- Add `--check-core` to compare selected installed WordPress Core files to the official checksum API; results written to `core-integrity.json`.
+- Add opt-in `--host-persistence` metadata inventory of selected Linux cron, systemd, PHP and Apache configuration directories.
+- Treat unavailable checksum data, missing core files, and non-English locale differences as review items, never as evidence of confirmed compromise.
+- Restrict optional probes to read-only audit mode; add synthetic manifest and host-root validation tests.
