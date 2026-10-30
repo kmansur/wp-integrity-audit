@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import contextlib
 import csv
+import component_versions
 import io
 import datetime as dt
 import fcntl
@@ -29,7 +30,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 
-VERSION = "0.6.0"
+VERSION = "0.7.0"
 IOC = re.compile(r"SC_ADV_BEGIN|--sc-cli|--sc-succ|trace-inspector-pad|cipher-feeder|_sc_fpc|sc_cron_guard|sc_persist_manifest|sc_own_manifest|function ceya")
 PATTERN_NAMES = (".sc_", ".gr_", ".gk_", ".kk_", ".wp-object-cache")
 SCRIPT_EXTENSIONS = {".php", ".phtml", ".phar", ".inc", ".php5", ".php7", ".php8", ".pht", ".phps"}
@@ -1374,6 +1375,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--case-root", type=Path, default=Path("/var/lib/wp-integrity-audit/cases"))
     # A normal audit enables every available passive probe.
     # Mutating operations always require separate explicit mode and confirmation.
+    parser.add_argument("--skip-version-check", action="store_true", help="Disable Core, plugin and theme version checks")
+    parser.add_argument("--offline", action="store_true", help="Disable external WordPress.org consultations")
+    parser.add_argument("--official-compare", action="store_true", help="Explicitly enable official comparison")
     parser.add_argument("--skip-core", action="store_true", help="Skip official WordPress Core checksum comparison")
     parser.add_argument("--skip-host-persistence", action="store_true", help="Skip Linux persistence metadata inventory")
     parser.add_argument("--skip-db", "--files-only", dest="skip_db", action="store_true",
@@ -1389,7 +1393,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--version", action="version", version=VERSION)
     args = parser.parse_args()
     if args.compare:
-        if args.target is not None or args.mode != "audit" or args.skip_db or args.source or args.core_source or args.skip_core or args.skip_host_persistence or args.skip_files or args.skip_config or args.skip_processes or args.skip_elementor:
+        if args.target is not None or args.mode != "audit" or args.skip_db or args.source or args.core_source or args.skip_core or args.skip_host_persistence or args.skip_files or args.skip_config or args.skip_processes or args.skip_elementor or args.skip_version_check or args.offline or args.official_compare:
             parser.error("--compare cannot be combined with a target or audit/recovery options")
         return args
     if args.compare_output:
@@ -1397,7 +1401,7 @@ def parse_args() -> argparse.Namespace:
     if args.target is None:
         parser.error("TARGET is required")
     disabled = (args.skip_db or args.skip_core or args.skip_host_persistence or
-                args.skip_files or args.skip_config or args.skip_processes or args.skip_elementor)
+                args.skip_files or args.skip_config or args.skip_processes or args.skip_elementor or args.skip_version_check)
     if disabled and args.mode != "audit":
         parser.error("--skip-* switches are valid only with --audit")
     if args.mode in ("apply-files", "recover") and not args.source:
@@ -1438,7 +1442,9 @@ def main() -> int:
             recent_file_timeline(target, case)
         if not (is_audit and args.skip_config):
             configuration_audit(target, case)
-        if is_audit and not args.skip_core:
+        if is_audit and not args.skip_version_check:
+            component_versions.audit(target, case, offline=args.offline)
+        if is_audit and not args.skip_core and args.skip_version_check:
             core_integrity_audit(target, case)
         if is_audit and not args.skip_host_persistence:
             if sys.platform != "linux":
@@ -1450,7 +1456,7 @@ def main() -> int:
         omitted = [name for name, skipped in (("files", args.skip_files), ("config", args.skip_config),
                    ("core", args.skip_core), ("host_persistence", args.skip_host_persistence),
                    ("elementor", args.skip_elementor), ("processes", args.skip_processes),
-                   ("database", args.skip_db)) if skipped]
+                   ("database", args.skip_db), ("version_check", args.skip_version_check)) if skipped]
         if is_audit and args.skip_db:
             make_report(case, args.mode, files, processes)
             mark_incomplete_case(case, omitted)
