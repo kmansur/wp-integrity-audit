@@ -358,7 +358,8 @@ def stage_files(target: Path, source: Path, case: Path, replace: bool, sync: boo
 
 def swap_files(target: Path, stage: Path, case: Path) -> Path:
     old = target / "wp-content"
-    quarantine = target / f"wp-content.quarantine-{case.name}"
+    # Quarantine MUST remain outside the HTTP document root.
+    quarantine = target.parent / f".{target.name}.wp-content-quarantine-{case.name}"
     if quarantine.exists():
         raise AuditError("Quarantine path already exists")
     old.rename(quarantine)
@@ -525,6 +526,8 @@ def main() -> int:
                 raise AuditError("Recovery requires root; audit does not")
             if args.mode == "recover" and processes:
                 raise AuditError("Matching suspicious processes are still active; isolate the host first")
+            if (target / "wp-content").is_symlink():
+                raise AuditError("Cannot safely replace symlinked wp-content")
             print("Recovery modifies files and/or database; independent verified backup is required.")
             ask("Confirm site isolation and independent backup")
             snapshot(target, case, cnf, dbname)
@@ -558,8 +561,23 @@ def main() -> int:
                         sync_core(args.core_source, target)
                     rotate_salts(target / "wp-config.php")
                 upload_permissions_audit(target, case)
+                # Perform an independent post-operation collection. Preserve
+                # pre-change evidence before file_audit replaces the JSON.
+                (case / "file-evidence.json").rename(case / "file-evidence-before.json")
+                post_files = file_audit(target, case)
+                post_processes = process_audit(case)
                 database = database_audit(cnf, dbname, prefix, case, post=True)
-                make_report(case, args.mode, files, processes, database)
+                make_report(case, args.mode, post_files, post_processes, database)
+                if args.mode == "recover":
+                    # Findings remain findings, not proof; require manual
+                    # containment review before declaring recovery complete.
+                    unresolved = [x for x in database if x["kind"] in
+                                  ("family_option", "marker_option", "session_rows",
+                                   "application_password_rows")]
+                    outstanding = [x for x in post_files if
+                                   x["classification"] == "IOC_REQUIRES_VALIDATION"]
+                    if unresolved or outstanding or post_processes:
+                        raise AuditError("Post-recovery indicators remain; keep the site isolated")
             except BaseException:
                 # File rollback is safe only before any database modification.
                 # Once the DB was changed, retain evidence and require an
@@ -567,7 +585,7 @@ def main() -> int:
                 if quarantine is not None and not database_changed:
                     current = target / "wp-content"
                     if current.exists():
-                        failed = target / ("wp-content.failed-" + case.name)
+                        failed = target.parent / ("." + target.name + ".wp-content.failed-" + case.name)
                         current.rename(failed)
                     quarantine.rename(current)
                 raise
