@@ -84,7 +84,7 @@ $table_prefix = 'wp_';
             (root / "wp-content" / "sample.php").write_text("<?php // cipher-feeder")
             import subprocess
             result = subprocess.run(
-                ["python3", str(SCRIPT), "--audit", str(root), "--case-root", str(case_root)],
+                ["python3", str(SCRIPT), "--audit", "--files-only", str(root), "--case-root", str(case_root)],
                 capture_output=True, text=True
             )
             self.assertEqual(result.returncode, 0, result.stderr)
@@ -212,6 +212,40 @@ $table_prefix = 'wp_';
             audit.write_private(case / "evidence.txt", "synthetic private report")
             self.assertEqual(stat.S_IMODE(case.stat().st_mode), 0o700)
             self.assertEqual(stat.S_IMODE((case / "evidence.txt").stat().st_mode), 0o600)
+
+    def test_guard_classification_and_relative_paths(self):
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory) / "site"
+            case = Path(directory) / "case"
+            case.mkdir()
+            paths = {
+                "wp-content/uploads/sucuri/index.php": "<?php exit(0); // datastore=",
+                "wp-content/uploads/simple-history-logs-example/index.php": "<?php // Silence is golden",
+                "wp-content/uploads/wpforms/cache/index.php": "<?php // 404 Not Found",
+                "wp-content/wflogs/config-synced.php": "<?php // trace-inspector-pad historical reference",
+            }
+            for name, content in paths.items():
+                p = target / name
+                p.parent.mkdir(parents=True, exist_ok=True)
+                p.write_text(content)
+            results = {item["path"]: item for item in audit.file_audit(target, case)}
+            for name in list(paths)[:3]:
+                self.assertEqual(results[name]["classification"], "LEGITIMO_VALIDADO")
+            wordfence = results["wp-content/wflogs/config-synced.php"]
+            self.assertEqual(wordfence["classification"], "CONFIGURACAO_PLUGIN_SEGURANCA_REQUER_VALIDACAO")
+            self.assertEqual(wordfence["snippet"], "")
+
+    def test_report_distinguishes_skipped_database_and_keeps_long_paths(self):
+        with tempfile.TemporaryDirectory() as directory:
+            case = Path(directory)
+            path = "wp-content/uploads/" + "x" * 60 + "/index.php"
+            finding = {"path": path, "classification": "PHP_UPLOAD_REQUER_VALIDACAO", "sha256": "a" * 64}
+            audit.make_report(case, "audit", [finding], [], None)
+            report = (case / "report.md").read_text()
+            self.assertIn(path, report)
+            self.assertIn("NOT EXECUTED", report)
+            self.assertIn("NOT EVALUATED", report)
+            self.assertNotIn("[LONG_VALUE_REDACTED]", report)
 
     def test_secret_redaction(self):
         self.assertNotIn("example-secret", audit.redact("password=example-secret"))
