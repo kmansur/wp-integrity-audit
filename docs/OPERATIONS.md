@@ -49,3 +49,7 @@ The summary includes the literal DB name and physical `options` and `usermeta` t
 ## Numeric transient evidence
 
 Full scalar values are included only for `_transient_sc_spread_interval` and `_transient_timeout_sc_spread_interval` when they are short decimal-digit strings and the complete original value length is verified. Every other option's raw value remains protected. SQL records appear under individual Markdown evidence subsections after the summary table.
+
+## Exit codes and evidence coverage
+
+`0` targeted checks complete with no explicit known markers; `10` family residue requiring remediation; `20` reserved for independently confirmed compromise; `30` error; `40` incomplete evidence. Use the `status` and `exit_code` fields in `report.json`, and preserve the same case directory for all detailed evidence. A non-zero detection result does not mean the audit failed. A result of 0 does not authorize reopening a WordPress installation.
