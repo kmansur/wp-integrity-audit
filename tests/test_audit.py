@@ -557,6 +557,29 @@ $table_prefix = 'wp_';
             self.assertEqual(code, 40)
             self.assertEqual(summary["file_indicators_requiring_review"], 2)
 
+    def test_akismet_guard_rejects_unscoped_grants(self):
+        valid = '<FilesMatch "\.(css|js|png)$">\nRequire all granted\n</FilesMatch>\nRequire all denied\n'
+        self.assertTrue(audit.akismet_access_guard(valid))
+        self.assertFalse(audit.akismet_access_guard("Require all granted\nRequire all denied\n"))
+        self.assertFalse(audit.akismet_access_guard(
+            '<FilesMatch "\.(php|css)$">\nRequire all granted\n</FilesMatch>\nRequire all denied\n'))
+        self.assertFalse(audit.akismet_access_guard(valid + "AddHandler application/x-httpd-php .png\n"))
+
+    def test_akismet_config_count_not_double_counted(self):
+        import json
+        with tempfile.TemporaryDirectory() as directory:
+            case = Path(directory)
+            audit.write_private(case / "configuration-evidence.json", json.dumps([
+                {"path": "wp-content/plugins/akismet/.htaccess", "classification": "LEGITIMO_VALIDADO",
+                 "sha256": "a" * 64},
+                {"path": ".htaccess", "classification": "CONFIGURACAO_REQUER_VALIDACAO",
+                 "sha256": "b" * 64}]))
+            audit.make_report(case, "audit", [], [], [], "fixture", "wp_")
+            result = json.loads((case / "report.json").read_text())
+            self.assertEqual(result["configuration_review_count"], 1)
+            self.assertEqual(result["summary"]["security_configuration_review"], 1)
+            self.assertIn("LOW — no selected database IOC", (case / "report.md").read_text())
+
     def test_secret_redaction(self):
         self.assertNotIn("example-secret", audit.redact("password=example-secret"))
         self.assertNotIn("192.168.1.20", audit.redact("192.168.1.20"))
