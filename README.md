@@ -82,3 +82,9 @@ For candidate option values, the tool collects full-value SHA-256, exact byte le
 ### Scalar IOC evidence and Markdown layout
 
 Two exact, known family transient keys (`_transient_sc_spread_interval` and `_transient_timeout_sc_spread_interval`) can expose their complete value only when it consists exclusively of 1–20 decimal digits and the SQL byte length matches the extracted value. They receive `ESCALAR_TEXTO_NUMERO_NAO_CODIFICADO`. Other values, including arbitrary `sc_*` content, remain masked. Database findings are displayed as one intact summary table followed by separate per-record Markdown sections; no list entries are inserted inside a table.
+
+## Audit-report release constraints
+
+A completed targeted scan is **not** a production-release authorization. A dynamic WordPress cron entry is recorded as informational evidence (SHA-256, byte count, UTC collection time and recognized marker count) without treating ordinary hash changes as malware. The report displays the tool's own SHA-256 to tie output to a specific installed version. Values from non-allowlisted options remain masked.
+
+Planned but not yet implemented: optional independently validated forensic dump, broader posts/postmeta and host-persistence collection, structured process/network inventory, CSV export, stable dedicated exit codes, module split and automated release decision. Until these features are validated, retain isolation and use human sign-off for site release.
