@@ -260,7 +260,7 @@ $table_prefix = 'wp_';
             path = "wp-content/uploads/" + "x" * 60 + "/index.php"
             finding = {"path": path, "classification": "PHP_UPLOAD_REQUER_VALIDACAO", "sha256": "a" * 64}
             audit.make_report(case, "audit", [finding], [], None)
-            report = (case / "report.md").read_text()
+            report = (case / "technical-report.md").read_text()
             self.assertIn(path, report)
             self.assertIn("NOT EXECUTED", report)
             self.assertIn("NOT EVALUATED", report)
@@ -501,7 +501,7 @@ $table_prefix = 'wp_';
             self.assertEqual(doc["configuration_review_count"], 1)
             self.assertEqual(doc["core_discrepancies"], 2)
             self.assertEqual(doc["host_persistence_indicators"], 1)
-            md = (case / "report.md").read_text()
+            md = (case / "technical-report.md").read_text()
             self.assertIn("wp-includes/version.php", md)
             self.assertIn("CORE_MODIFICADO_REQUER_REVISAO", md)
             self.assertIn("| `.htaccess` |", md)
