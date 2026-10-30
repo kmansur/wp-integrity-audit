@@ -219,6 +219,27 @@ def check_core(target: Path, record: dict, offline: bool) -> None:
     record["state"] = ("CORE_AUSENTE_REQUER_REVISAO" if any(f["reason"] == "MISSING" for f in mismatch) else
                        "CORE_MODIFICADO_REQUER_REVISAO" if mismatch else "CORE_VALIDADO")
 
+def check_core_latest(record: dict) -> None:
+    """Compare against advertised upstream version without changing local Core."""
+    status, data, url = api_json("/core/version-check/1.7/", {"locale": record["locale"]})
+    record["version_query_url"] = url
+    if status != "SUCCESS" or not data or not isinstance(data.get("offers"), list):
+        record["version_query_status"] = "API_UNAVAILABLE"
+        return
+    offers = [x for x in data["offers"] if isinstance(x, dict) and isinstance(x.get("current"), str)]
+    if not offers or not VERSION_RE.fullmatch(offers[0]["current"]):
+        record["version_query_status"] = "API_UNAVAILABLE"
+        return
+    newest = offers[0]["current"]
+    record["official_version"] = newest
+    if record["local_version"] and version_tuple(record["local_version"]) < version_tuple(newest):
+        record["version_query_status"] = "OFFICIAL_OUTDATED"
+        if record["state"] == "CORE_VALIDADO":
+            record["state"] = "CORE_DESATUALIZADO"
+    else:
+        record["version_query_status"] = "OFFICIAL_MATCH"
+
+
 def audit(target: Path, case: Path, *, offline: bool = False,
           active_plugins: set[str] | None = None, template: str | None = None,
           stylesheet: str | None = None, skip_core: bool = False) -> dict:
@@ -229,6 +250,7 @@ def audit(target: Path, case: Path, *, offline: bool = False,
     if online:
         if not skip_core:
             check_core(target, core, False)
+            check_core_latest(core)
         for rec in plugins + themes:
             if rec["child_theme"] or rec["update_uri_present"]:
                 rec["query_status"] = "PREMIUM_OR_CUSTOM_COMPONENT"
