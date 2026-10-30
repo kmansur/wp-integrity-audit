@@ -83,3 +83,7 @@ Official Core mismatch or checksum retrieval failure is reported in `optional_pr
 ## Interpreting supplementary audit evidence
 
 The WordPress Core section in report.md shows each reference discrepancy, and the WordPress configuration section contains relative paths and hashes without configuration content. The external persistence section displays counts only; system paths and security product names remain in the private host-persistence.json. A recognized IOC is not necessarily proof of execution. The CSV includes separate domain and case_id fields; store case IDs alongside domain names to correlate executions.
+
+## Report distribution boundaries
+
+`report.md` is intended for managerial review; `technical-report.md`, `database-evidence.json`, `configuration-evidence.json`, and `host-persistence.json` are internal technical evidence and require restricted access. `report.json` and `report.csv` are machine-readable summaries. Check every file before distributing it to a client: field names and WordPress site names may still reveal contextual details. Host IOC matching is heuristic and classification `INVENTARIADO_SEM_INDICADOR` is not proof that a system component is trustworthy.
