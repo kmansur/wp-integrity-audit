@@ -96,7 +96,7 @@ def local_components(target: Path, kind: str, active_plugins: set[str] | None = 
             default_state = "PLUGIN_PREMIUM_REQUER_FONTE_CONFIAVEL" if kind == "plugin" else "TEMA_PREMIUM_REQUER_FONTE_CONFIAVEL"
         record = {"component_id": f'{"PLUGIN" if kind == "plugin" else "THEME"}-{len(result)+1:03d}',
                   "type": kind, "slug": slug, "name": name, "local_version": local_version,
-                  "official_version": None, "source": "unknown", "state": default_state,
+                  "official_version": None, "source": "declared-custom-update-uri" if custom_uri else "unknown", "state": default_state,
                   "query_status": "SKIPPED", "query_url": None,
                   "main_file": main.relative_to(target).as_posix() if main else None,
                   "main_file_sha256": hashlib.sha256(main.read_bytes()).hexdigest() if main and main.is_file() and not main.is_symlink() else None,
@@ -257,15 +257,15 @@ def audit(target: Path, case: Path, *, offline: bool = False,
              f"- Plugins outdated: {result['summary']['plugins_outdated']}",
              f"- Themes checked: {len(themes)}", f"- Themes outdated: {result['summary']['themes_outdated']}",
              f"- Official consultation: {coverage['official']}", "",
-             "| ID | Type | Name | Local | Official | Origin | Active | State |",
-             "|---|---|---|---|---|---|---|---|"]
+             "| ID | Type | Name | Local | Official | Origin | Active | Parent | Query | State |",
+             "|---|---|---|---|---|---|---|---|---|---|"]
     for item in records:
         lines.append("| " + " | ".join(str(item.get(k) or "-").replace("|", "\\|").replace("\n", " ") for k in
-                                     ("component_id", "type", "name", "local_version", "official_version", "source", "active", "state")) + " |")
+                                     ("component_id", "type", "name", "local_version", "official_version", "source", "active", "parent_theme", "query_status", "state")) + " |")
     (case / "component-version-report.md").write_text("\n".join(lines) + "\n")
     with (case / "component-version-report.csv").open("w", newline="") as stream:
         writer = csv.DictWriter(stream, fieldnames=("component_id", "type", "slug", "name", "local_version",
-                                                     "official_version", "source", "active", "state", "query_status"))
+                                                     "official_version", "source", "active", "parent_theme", "main_file", "main_file_sha256", "state", "query_status", "query_url", "checksum_status"))
         writer.writeheader()
         writer.writerows({key: item.get(key) for key in writer.fieldnames} for item in records)
     return result
