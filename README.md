@@ -39,7 +39,7 @@ Mutating modes require interactive confirmations; no `--yes` bypass exists. Repo
 - Read-only database audits no longer create complete SQL/site backups; recovery does.
 - MySQL secrets are stored in a temporary `0600` client configuration rather than placed on the command line or in environment variables.
 - `active_plugins` and `cron` are **not deleted wholesale** if malicious markers are found. Recovery stops and requires specific manual remediation.
-- ZIP packages are validated for path traversal, special entries and size limits.
+- ZIP packages are validated for path traversal, special entries and size limits. Package download redirects must remain on trusted HTTPS WordPress.org hosts.
 - Automatic guessed ownership/permission mutations of uploads are replaced with metadata reporting.
 - The original script-specific media path is not retained.
 - Quarantined WordPress content is moved outside the site's document root, while confidential backups remain under the private case directory. Recovery re-scans files/processes/database and refuses to declare success if recognized indicators remain. Operators still must independently verify backups and site operation.
