@@ -91,3 +91,10 @@ All project documentation and source commentary are in English. Versions follow 
 - Render SQL evidence details as individual Markdown sections after the completed summary table instead of breaking table layout.
 
 - Remove duplicated database audit status from the client report and explicitly state whether SQL dump and file snapshot evidence were generated.
+
+### Standardized operational results
+- Add final result statuses, return codes, an executive Markdown summary, and a privacy-conscious `report.json`.
+- Separate family, historical, informational, file-classification and process counters.
+- Reserve `COMPROMETIMENTO_CONFIRMADO` / exit 20 for independently confirmed evidence; heuristic markers alone are incomplete investigations.
+- Return 10 for family residues and 40 when the user intentionally omits database checks.
+- Introduce regression coverage for the status contract, JSON summary and read-only CLI return codes.
