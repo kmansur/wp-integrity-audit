@@ -71,3 +71,7 @@ Every audit collects configuration file metadata within the target WordPress tre
 Run `--audit --check-core TARGET` for official checksum comparison. The tool obtains the version without executing PHP and currently uses the English-US checksum set. Localized distributions may have legitimate checksum differences; check `core-integrity.json` for `COMPLETE`, `INCOMPLETE`, or `UNAVAILABLE`. This does not verify themes, plugins, or every unexpected file outside the manifest.
 
 Run `--audit --host-persistence TARGET` to record selected Linux configuration metadata in `host-persistence.json`. Contents are not exported. These options do not change files, reload configuration, execute WP-CLI, or restart services. Host-level collection is not exhaustive and should be reviewed separately during incident response.
+
+## Optional probe exit-status precedence
+
+Official Core mismatch or checksum retrieval failure is reported in `optional_probe_review`. If the primary targeted audit has no markers, the status becomes `AUDITORIA_INCOMPLETA` (40). Confirmed family residues continue to return `RESIDUOS_REQUEREM_LIMPEZA` (10), while also listing Core review issues. Check `report.json`, not only the shell exit status, before taking action.
