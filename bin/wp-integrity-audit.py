@@ -130,15 +130,18 @@ def known_upload_guard(path: Path) -> bool:
 
 
 def metform_icon_cache_candidate(relative: str, path: Path) -> bool:
-    """Identify a candidate for review, never certify it as legitimate."""
+    """Recognize the guarded MetForm cache header, without trusting its body."""
     if not re.fullmatch(r"wp-content/uploads/metform/cache/icons/font-awesome-[a-f0-9]{16}\.php", relative):
         return False
     try:
-        if path.is_symlink() or not path.is_file() or path.stat().st_size > 8388608:
+        if path.is_symlink() or not path.is_file() or not 100 <= path.stat().st_size <= 8388608:
             return False
         with path.open("rb") as stream:
-            head = stream.read(4096)
-        return bool(re.match(rb"\s*<\?php\s+return\s+(?:array\s*\(|\[)", head))
+            head = stream.read(4096).decode("utf-8", "replace")
+        return bool(re.match(
+            r"(?is)\s*<\?php\s*/\*.*?Generated\s+by\s+MetForm.*?\*/\s*"
+            r"defined\s*\(\s*['\"]ABSPATH['\"]\s*\)\s*\|\|\s*exit\s*;\s*"
+            r"return\s+(?:array\s*\(|\[)", head))
     except OSError:
         return False
 
@@ -224,42 +227,42 @@ def file_audit(target: Path, case: Path) -> list[dict]:
 
 
 def akismet_access_guard(content: str) -> bool:
-    """Recognize only narrowly constrained deny-by-default Akismet asset rules."""
-    # Restrict every nonempty line to access directives and FilesMatch blocks.
-    lines = [line.strip() for line in content.splitlines()
-             if line.strip() and not line.lstrip().startswith("#")]
-    if not lines or len(lines) > 30:
+    """Validate scoped static-asset grants with legacy and modern Apache guards."""
+    lines = [x.strip() for x in content.splitlines() if x.strip() and not x.lstrip().startswith("#")]
+    if not lines or len(lines) > 80:
         return False
-    allowed = (r"</?FilesMatch(?:\s+\"[^\"]{1,200}\")?\s*>",
-               r"Require\s+all\s+(?:granted|denied)",
-               r"Order\s+allow,deny", r"Deny\s+from\s+all",
-               r"Allow\s+from\s+all")
-    if not all(any(re.fullmatch(p, line, re.I) for p in allowed) for line in lines):
-        return False
-    # A deny-by-default rule must be explicit, and grants must be scoped to assets.
-    has_deny = any(re.fullmatch(r"Require\s+all\s+denied|Deny\s+from\s+all", line, re.I)
-                   for line in lines)
-    inside_assets = False
-    has_grant = False
+    stack = []
+    denied = False
+    granted = False
     for line in lines:
-        if line.lower().startswith("<filesmatch"):
-            if inside_assets:
+        module = re.fullmatch(r'<IfModule\s+!?([A-Za-z0-9_]+)\s*>', line, re.I)
+        match = re.fullmatch(r'<FilesMatch\s+"([^"]{1,200})"\s*>', line, re.I)
+        if module:
+            if module.group(1).lower() not in ("mod_authz_core.c", "mod_access_compat.c"):
                 return False
-            pattern = line[len("<FilesMatch"):].strip().rstrip(">").strip().strip('"')
-            if not re.search(r"(?:css|js|png|jpg|jpeg|gif|svg|webp)", pattern, re.I):
+            stack.append(("module", module.group(1)))
+        elif match:
+            pattern = match.group(1)
+            # Only escaped extension groups for static assets are accepted.
+            if not re.fullmatch(r'\^?\\\.\((?:css|js|png|jpg|jpeg|gif|svg|webp)(?:\|(?:css|js|png|jpg|jpeg|gif|svg|webp))*\)\$?', pattern, re.I):
                 return False
-            if re.search(r"(?:php|phtml|phar|cgi|pl|sh)", pattern, re.I):
+            stack.append(("assets", pattern))
+        elif line.lower() in ("</ifmodule>", "</filesmatch>"):
+            expected = "module" if line.lower() == "</ifmodule>" else "assets"
+            if not stack or stack[-1][0] != expected:
                 return False
-            inside_assets = True
-        elif line.lower() == "</filesmatch>":
-            if not inside_assets:
+            stack.pop()
+        elif re.fullmatch(r'(?:Require\s+all\s+denied|Deny\s+from\s+all|Order\s+allow,deny)', line, re.I):
+            if any(kind == "assets" for kind, _ in stack):
                 return False
-            inside_assets = False
-        elif re.fullmatch(r"Require\s+all\s+granted|Allow\s+from\s+all", line, re.I):
-            if not inside_assets:
+            denied = True
+        elif re.fullmatch(r'(?:Require\s+all\s+granted|Allow\s+from\s+all)', line, re.I):
+            if not any(kind == "assets" for kind, _ in stack):
                 return False
-            has_grant = True
-    return has_deny and has_grant and not inside_assets
+            granted = True
+        else:
+            return False
+    return denied and granted and not stack
 
 
 def configuration_audit(target: Path, case: Path) -> list[dict]:
