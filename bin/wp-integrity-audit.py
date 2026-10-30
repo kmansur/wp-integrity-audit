@@ -213,7 +213,7 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
         lines.append("- **Database was not audited. No conclusion about database persistence, cron, sessions or administrators is supported.**")
     else:
         def total(kind: str) -> int:
-            return sum(int(x["length"]) if kind in ("session_rows", "application_password_rows") else 1
+            return sum(int(x["length"]) if kind in ("session_rows", "application_password_rows") else (x.get("state") != "NOT_FOUND")
                        for x in database if x["kind"] == kind)
         family = total("family_option")
         lines.append(f"- Family-specific option/transient residues: **{family}**.")
@@ -254,23 +254,45 @@ def sql_identifier(value: str) -> str:
         raise AuditError("Invalid SQL identifier")
     return "`" + value + "`"
 
-def database_audit(option_file: str, dbname: str, prefix: str, case: Path, post: bool = False) -> list[dict]:
+def database_audit(option_file: str, dbname: str, prefix: str, case: Path,
+                   post: bool = False) -> list[dict]:
+    """Collect targeted SQL metadata without exporting option values.
+
+    Every mandatory query must succeed, otherwise the entire audit fails.
+    Explicit zero-count rows document what was checked, rather than silently
+    passing missing checks off as no findings.
+    """
     options, users, meta = (sql_identifier(prefix + v) for v in ("options", "users", "usermeta"))
     statements = [
         ("suspicious_users", f"SELECT user_login, LENGTH(user_login) FROM {users} WHERE user_login REGEXP '^(admin|administrator|backup)_[0-9a-f]{{6}}$'"),
         ("family_option", f"SELECT option_name, LENGTH(option_value) FROM {options} WHERE option_name LIKE 'sc#_%' ESCAPE '#' OR option_name LIKE '_transient_sc#_%' ESCAPE '#' OR option_name LIKE '_transient_timeout_sc#_%' ESCAPE '#'"),
-        ("marker_option", f"SELECT option_name, LENGTH(option_value) FROM {options} WHERE option_value LIKE '%cipher-feeder%' OR option_value LIKE '%sc_cron_guard%' OR option_value LIKE '%sc_persist_manifest%' OR option_value LIKE '%trace-inspector-pad%'"),
-        ("session_rows", f"SELECT meta_key, COUNT(*) FROM {meta} WHERE meta_key='session_tokens' GROUP BY meta_key"),
-        ("application_password_rows", f"SELECT meta_key, COUNT(*) FROM {meta} WHERE meta_key LIKE '%application_passwords' GROUP BY meta_key"),
+        ("marker_option", f"SELECT option_name, LENGTH(option_value) FROM {options} WHERE option_name NOT IN ('cron','active_plugins','SimplePluginLogger_plugin_info_before_update') AND (option_value LIKE '%cipher-feeder%' OR option_value LIKE '%sc_cron_guard%' OR option_value LIKE '%sc_persist_manifest%' OR option_value LIKE '%trace-inspector-pad%')"),
+        ("historical_cache", f"SELECT option_name, LENGTH(option_value) FROM {options} WHERE option_name='SimplePluginLogger_plugin_info_before_update' AND option_value LIKE '%trace-inspector-pad%'"),
+        ("cron_marker", f"SELECT option_name, LENGTH(option_value) FROM {options} WHERE option_name='cron' AND (option_value LIKE '%cipher-feeder%' OR option_value LIKE '%sc_cron_guard%' OR option_value LIKE '%sc_cron_fetch%' OR option_value LIKE '%sc_persist_manifest%')"),
+        ("active_plugins_marker", f"SELECT option_name, LENGTH(option_value) FROM {options} WHERE option_name='active_plugins' AND (option_value LIKE '%trace-inspector-pad%' OR option_value LIKE '%cipher-feeder%' OR option_value LIKE '%sc_cron_guard%')"),
+        ("session_rows", f"SELECT 'session_tokens', COUNT(*) FROM {meta} WHERE meta_key='session_tokens'"),
+        ("application_password_rows", f"SELECT 'application_passwords', COUNT(*) FROM {meta} WHERE meta_key LIKE '%application_passwords'"),
     ]
     findings = []
     for kind, sql in statements:
-        for row in query_db(option_file, dbname, sql + ";"):
-            if len(row) >= 2:
-                findings.append({"kind": kind, "name": redact(row[0]), "length": row[1]})
+        rows = query_db(option_file, dbname, sql + ";")
+        if kind in ("session_rows", "application_password_rows"):
+            if len(rows) != 1 or len(rows[0]) < 2 or not rows[0][1].isdigit():
+                raise AuditError(f"Invalid database count for {kind}")
+            findings.append({"kind": kind, "name": kind, "length": rows[0][1],
+                             "state": "PRESENT" if int(rows[0][1]) else "ABSENT"})
+        elif rows:
+            for row in rows:
+                if len(row) < 2:
+                    raise AuditError(f"Malformed database audit row for {kind}")
+                findings.append({"kind": kind, "name": redact(row[0]), "length": row[1],
+                                 "state": "HISTORICAL_REFERENCE" if kind == "historical_cache" else "REVIEW"})
+        else:
+            findings.append({"kind": kind, "name": "(none)", "length": "0", "state": "NOT_FOUND"})
     write_private(case / ("database-post-audit.json" if post else "database-evidence.json"),
                   json.dumps(findings, indent=2))
     return findings
+
 
 def snapshot(target: Path, case: Path, option_file: str, dbname: str) -> None:
     """Mandatory recovery backup (not generated for read-only audit modes)."""
@@ -574,10 +596,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--replace-plugins-themes", action="store_true")
     parser.add_argument("--official-sync", action="store_true")
     parser.add_argument("--case-root", type=Path, default=Path("/var/lib/wp-integrity-audit/cases"))
+    parser.add_argument("--files-only", action="store_true", help="Skip SQL checks explicitly when using --audit")
     parser.add_argument("--version", action="version", version=VERSION)
     args = parser.parse_args()
     if args.target is None:
         parser.error("TARGET is required")
+    if args.files_only and args.mode != "audit":
+        parser.error("--files-only is valid only with --audit")
     if args.mode in ("apply-files", "recover") and not args.source:
         parser.error("--source is required for file replacement")
     if args.core_source and args.mode != "recover":
@@ -605,9 +630,9 @@ def main() -> int:
         files = file_audit(target, case)
         elementor_asset_audit(target, case)
         processes = process_audit(case)
-        if args.mode == "audit":
+        if args.mode == "audit" and args.files_only:
             make_report(case, args.mode, files, processes)
-            print(f"Filesystem audit complete: {len(files)} findings")
+            print(f"Filesystem-only audit complete: {len(files)} findings; database NOT EXECUTED")
             return 0
         config, prefix = parse_wordpress(target / "wp-config.php")
         dbname = config["DB_NAME"]
@@ -615,7 +640,7 @@ def main() -> int:
             raise AuditError("Unsupported database name")
         with database_client({"host": args.db_host or config["DB_HOST"],
                               "user": config["DB_USER"], "password": config["DB_PASSWORD"]}, case) as cnf:
-            if args.mode in ("audit-db", "audit-db-post"):
+            if args.mode in ("audit", "audit-db", "audit-db-post"):
                 database = database_audit(cnf, dbname, prefix, case, post=args.mode == "audit-db-post")
                 make_report(case, args.mode, files, processes, database)
                 print(f"Database audit complete: {len(database)} findings")
