@@ -135,10 +135,12 @@ def compare_official(record: dict) -> None:
     if status == "NOT_FOUND_OFFICIAL_REPOSITORY" or not data or not data.get("version"):
         record["query_status"] = "NOT_FOUND_OFFICIAL_REPOSITORY"
         record["state"] = "PLUGIN_ORIGEM_NAO_CONFIRMADA_REQUER_REVISAO" if kind == "plugin" else "TEMA_NAO_ENCONTRADO_NO_REPOSITORIO"
+        record["review_guidance"] = "Not listed on WordPress.org; this is not malware evidence. Verify vendor, license, package source, and hash with the site owner."
         return
     official = str(data["version"])
     if kind == "plugin" and not record.get("local_version"):
         record["state"] = "PLUGIN_VERSAO_NAO_IDENTIFICADA"
+        record["review_guidance"] = "Local version could not be read from the installed plugin header. Validate installed files and version manually, especially if active."
         record["official_version"] = official
         record["source"] = "wordpress.org"
         record["query_status"] = "OFFICIAL_MATCH"
@@ -336,10 +338,15 @@ def audit(target: Path, case: Path, *, offline: bool = False,
     for item in records:
         lines.append("| " + " | ".join(str(item.get(k) or "-").replace("|", "\\|").replace("\n", " ") for k in
                                      ("component_id", "type", "name", "local_version", "official_version", "source", "active", "parent_theme", "query_status", "state")) + " |")
+    review_items = [r for r in records if r.get("review_guidance")]
+    if review_items:
+        lines.extend(["", "## Components requiring manual validation", ""])
+        for item in review_items:
+            lines.append(f"- {item['component_id']} ({item['slug']}): {item['review_guidance']}")
     (case / "component-version-report.md").write_text("\n".join(lines) + "\n")
     with (case / "component-version-report.csv").open("w", newline="") as stream:
         writer = csv.DictWriter(stream, fieldnames=("component_id", "type", "slug", "name", "local_version",
-                                                     "official_version", "source", "active", "parent_theme", "main_file", "main_file_sha256", "state", "query_status", "query_url", "checksum_status"))
+                                                     "official_version", "source", "active", "parent_theme", "main_file", "main_file_sha256", "state", "query_status", "query_url", "checksum_status", "review_guidance"))
         writer.writeheader()
         writer.writerows({key: item.get(key) for key in writer.fieldnames} for item in records)
     return result
