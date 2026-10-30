@@ -1449,8 +1449,8 @@ def main() -> int:
             configuration_audit(target, case)
         if is_audit and not args.skip_version_check:
             component_versions.audit(target, case, offline=args.offline)
-        if is_audit and not args.skip_core and args.skip_version_check:
-            core_integrity_audit(target, case)
+        elif is_audit:
+            component_versions.write_skipped(case)
         if is_audit and not args.skip_host_persistence:
             if sys.platform != "linux":
                 raise AuditError("Host persistence inventory is supported only on Linux")
@@ -1464,6 +1464,7 @@ def main() -> int:
                    ("database", args.skip_db), ("version_check", args.skip_version_check)) if skipped]
         if is_audit and args.skip_db:
             make_report(case, args.mode, files, processes)
+            component_versions.append_management_section(case)
             mark_incomplete_case(case, omitted)
             print("Partial audit complete; database NOT EXECUTED")
             return 40
@@ -1476,6 +1477,8 @@ def main() -> int:
             if args.mode in ("audit", "audit-db", "audit-db-post"):
                 database = database_audit(cnf, dbname, prefix, case, post=args.mode == "audit-db-post")
                 make_report(case, args.mode, files, processes, database, dbname, prefix)
+                if is_audit:
+                    component_versions.append_management_section(case)
                 if omitted:
                     mark_incomplete_case(case, omitted)
                 with (case / "report.json").open(encoding="utf-8") as stream:
