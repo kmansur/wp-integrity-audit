@@ -754,6 +754,35 @@ $table_prefix = 'wp_';
             cv.check_core_latest(core)
         self.assertEqual(core["state"], "CORE_MODIFICADO_REQUER_REVISAO")
 
+    def test_official_plugin_current_and_outdated_classifications(self):
+        import component_versions as cv
+        item = {"type": "plugin", "slug": "akismet", "local_version": "5.7.2",
+                "official_version": None, "source": "unknown",
+                "state": "PLUGIN_REQUER_REVISAO", "query_status": "SKIPPED"}
+        with unittest.mock.patch.object(cv, "api_json", return_value=(
+                "SUCCESS", {"version": "5.7.2"}, "https://api.wordpress.org/plugins/info/1.2/")):
+            cv.compare_official(item)
+        self.assertEqual(item["state"], "PLUGIN_OFICIAL_ATUAL")
+        self.assertEqual(item["query_status"], "OFFICIAL_MATCH")
+        item["local_version"] = "5.7.1"
+        with unittest.mock.patch.object(cv, "api_json", return_value=(
+                "SUCCESS", {"version": "5.7.2"}, "https://api.wordpress.org/plugins/info/1.2/")):
+            cv.compare_official(item)
+        self.assertEqual(item["state"], "PLUGIN_OFICIAL_DESATUALIZADO")
+
+    def test_official_plugin_without_checksum_not_assumed_modified(self):
+        import component_versions as cv
+        import urllib.error
+        with tempfile.TemporaryDirectory() as folder:
+            item = {"type": "plugin", "slug": "akismet", "local_version": "5.7.2",
+                    "official_version": "5.7.2", "source": "wordpress.org",
+                    "state": "PLUGIN_OFICIAL_ATUAL", "query_status": "OFFICIAL_MATCH"}
+            error = urllib.error.HTTPError("https://downloads.wordpress.org/", 404, "Not found", {}, None)
+            with unittest.mock.patch.object(cv.urllib.request, "urlopen", side_effect=error):
+                cv.official_plugin_checksums(item, Path(folder))
+            self.assertEqual(item["state"], "PLUGIN_OFICIAL_SEM_CHECKSUM")
+            self.assertEqual(item["checksum_status"], "UNAVAILABLE")
+
     def test_secret_redaction(self):
         self.assertNotIn("example-secret", audit.redact("password=example-secret"))
         self.assertNotIn("192.168.1.20", audit.redact("192.168.1.20"))
