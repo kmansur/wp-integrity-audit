@@ -1044,6 +1044,35 @@ def compare_cases(old_case: Path, new_case: Path, output: Path) -> dict:
     return report
 
 
+def mark_incomplete_case(case: Path, skipped: list[str]) -> None:
+    """Never report zero explicit markers as complete after requested omissions."""
+    report_file = case / "report.json"
+    document = json.loads(report_file.read_text(encoding="utf-8"))
+    document["omitted_checks"] = skipped
+    if document.get("exit_code") == 0:
+        document["status"] = "AUDITORIA_INCOMPLETA"
+        document["exit_code"] = 40
+    write_private(report_file, json.dumps(document, indent=2, ensure_ascii=False))
+    markdown = case / "report.md"
+    previous = markdown.read_text(encoding="utf-8")
+    previous = previous.replace("## Audit metadata", "## Omitted checks\n\n" +
+                                "\n".join(f"- {name}" for name in skipped) +
+                                "\n\n## Audit metadata", 1)
+    if document["exit_code"] == 40:
+        previous = previous.replace("Final status: **SEM_MARCADOR_EXPLICITO**",
+                                    "Final status: **AUDITORIA_INCOMPLETA**", 1)
+        previous = previous.replace("Exit code: **0**", "Exit code: **40**", 1)
+    write_private(markdown, previous)
+    csv_file = case / "report.csv"
+    rows = list(csv.reader(csv_file.read_text(encoding="utf-8").splitlines()))
+    if len(rows) == 2 and "status" in rows[0]:
+        rows[1][rows[0].index("status")] = document["status"]
+        rows[1][rows[0].index("exit_code")] = str(document["exit_code"])
+        data = io.StringIO()
+        csv.writer(data).writerows(rows)
+        write_private(csv_file, data.getvalue())
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="WordPress Integrity Audit (Python)")
     modes = parser.add_mutually_exclusive_group()
@@ -1058,9 +1087,16 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--replace-plugins-themes", action="store_true")
     parser.add_argument("--official-sync", action="store_true")
     parser.add_argument("--case-root", type=Path, default=Path("/var/lib/wp-integrity-audit/cases"))
-    parser.add_argument("--check-core", action="store_true", help="Check core hashes against official WordPress checksum API")
-    parser.add_argument("--host-persistence", action="store_true", help="Inventory selected Linux persistence configuration metadata")
-    parser.add_argument("--files-only", action="store_true", help="Skip SQL checks explicitly when using --audit")
+    # A normal audit enables every available passive probe.
+    # Mutating operations always require separate explicit mode and confirmation.
+    parser.add_argument("--skip-core", action="store_true", help="Skip official WordPress Core checksum comparison")
+    parser.add_argument("--skip-host-persistence", action="store_true", help="Skip Linux persistence metadata inventory")
+    parser.add_argument("--skip-db", "--files-only", dest="skip_db", action="store_true",
+                        help="Skip database checks; produces an incomplete audit")
+    parser.add_argument("--skip-files", action="store_true", help="Skip WordPress file scanning")
+    parser.add_argument("--skip-config", action="store_true", help="Skip configuration metadata scanning")
+    parser.add_argument("--skip-processes", action="store_true", help="Skip process indicator scanning")
+    parser.add_argument("--skip-elementor", action="store_true", help="Skip Elementor asset checks")
     parser.add_argument("--compare", nargs=2, metavar=("OLD_CASE", "NEW_CASE"), type=Path,
                         help="Compare two existing case directories without scanning a live site")
     parser.add_argument("--compare-output", type=Path,
@@ -1068,17 +1104,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--version", action="version", version=VERSION)
     args = parser.parse_args()
     if args.compare:
-        if args.target is not None or args.mode != "audit" or args.files_only or args.source or args.core_source or args.check_core or args.host_persistence:
+        if args.target is not None or args.mode != "audit" or args.skip_db or args.source or args.core_source or args.skip_core or args.skip_host_persistence or args.skip_files or args.skip_config or args.skip_processes or args.skip_elementor:
             parser.error("--compare cannot be combined with a target or audit/recovery options")
         return args
     if args.compare_output:
         parser.error("--compare-output requires --compare")
     if args.target is None:
         parser.error("TARGET is required")
-    if (args.check_core or args.host_persistence) and args.mode != "audit":
-        parser.error("--check-core and --host-persistence require --audit")
-    if args.files_only and args.mode != "audit":
-        parser.error("--files-only is valid only with --audit")
+    disabled = (args.skip_db or args.skip_core or args.skip_host_persistence or
+                args.skip_files or args.skip_config or args.skip_processes or args.skip_elementor)
+    if disabled and args.mode != "audit":
+        parser.error("--skip-* switches are valid only with --audit")
     if args.mode in ("apply-files", "recover") and not args.source:
         parser.error("--source is required for file replacement")
     if args.core_source and args.mode != "recover":
@@ -1108,19 +1144,27 @@ def main() -> int:
         label = re.sub(r"[^A-Za-z0-9._-]", "_", args.domain_label or target.parent.name)
         case = ensure_private_dir(case_root / f"{label}-{timestamp}-{secrets.token_hex(3)}")
         print(f"Version {VERSION}; mode={args.mode}; case={case}")
-        files = file_audit(target, case)
-        configuration_audit(target, case)
-        if args.check_core:
+        is_audit = args.mode == "audit"
+        files = [] if is_audit and args.skip_files else file_audit(target, case)
+        if not (is_audit and args.skip_config):
+            configuration_audit(target, case)
+        if not (is_audit and args.skip_core):
             core_integrity_audit(target, case)
-        if args.host_persistence:
+        if not (is_audit and args.skip_host_persistence):
             if sys.platform != "linux":
                 raise AuditError("Host persistence inventory is supported only on Linux")
             host_persistence_inventory(case, [Path(p) for p in ("/etc/crontab", "/etc/cron.d", "/etc/cron.daily", "/etc/cron.hourly", "/etc/systemd/system", "/etc/php", "/etc/apache2")])
-        elementor_asset_audit(target, case)
-        processes = process_audit(case)
-        if args.mode == "audit" and args.files_only:
+        if not (is_audit and args.skip_elementor):
+            elementor_asset_audit(target, case)
+        processes = [] if is_audit and args.skip_processes else process_audit(case)
+        omitted = [name for name, skipped in (("files", args.skip_files), ("config", args.skip_config),
+                   ("core", args.skip_core), ("host_persistence", args.skip_host_persistence),
+                   ("elementor", args.skip_elementor), ("processes", args.skip_processes),
+                   ("database", args.skip_db)) if skipped]
+        if is_audit and args.skip_db:
             make_report(case, args.mode, files, processes)
-            print(f"Filesystem-only audit complete: {len(files)} findings; database NOT EXECUTED")
+            mark_incomplete_case(case, omitted)
+            print("Partial audit complete; database NOT EXECUTED")
             return 40
         config, prefix = parse_wordpress(target / "wp-config.php")
         dbname = config["DB_NAME"]
@@ -1131,6 +1175,8 @@ def main() -> int:
             if args.mode in ("audit", "audit-db", "audit-db-post"):
                 database = database_audit(cnf, dbname, prefix, case, post=args.mode == "audit-db-post")
                 make_report(case, args.mode, files, processes, database, dbname, prefix)
+                if omitted:
+                    mark_incomplete_case(case, omitted)
                 with (case / "report.json").open(encoding="utf-8") as stream:
                     outcome = json.load(stream)
                 print("Database audit complete: status=" + outcome["status"] + "; exit=" + str(outcome["exit_code"]))
