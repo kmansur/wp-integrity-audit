@@ -56,6 +56,11 @@ def sanitize_relative_path(path: str) -> str:
 
 
 
+def safe_option_name(value: str) -> str:
+    """Preserve exact WordPress option identifiers without entropy masking."""
+    return value.replace("\n", " ").replace("\r", " ").replace("|", "/")
+
+
 def sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as stream:
@@ -189,7 +194,7 @@ def process_audit(case: Path) -> list[str]:
     return matches
 
 def make_report(case: Path, mode: str, findings: list[dict], processes: list[str],
-                database: list[dict] | None = None) -> None:
+                database: list[dict] | None = None, db_name: str | None = None, db_prefix: str | None = None) -> None:
     """Generate a precise coverage statement and evidence-based technical opinion."""
     audited = database is not None
     lines = [
@@ -208,13 +213,25 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
         path = sanitize_relative_path(finding["path"])
         lines.append(f"| `{path}` | {finding['classification']} | {finding['sha256']} |")
     if audited:
-        lines.extend(["", "## Database evidence (metadata only)", "",
+        lines.extend(["", "## Database evidence", "",
+                      f"- Database: `{safe_option_name(db_name or 'UNKNOWN')}`",
+                      f"- Options table: `{(db_prefix or '')}options`",
+                      f"- User metadata table: `{(db_prefix or '')}usermeta`", "",
                       "| Kind | Name | Count/size | State |",
                       "|---|---|---|---|"])
         for item in database:
             lines.append(f"| {item['kind']} | {item['name']} | {item['length']} | {item.get('state','')} |")
     lines.extend(["", "## Technical opinion", ""])
     critical = [x for x in findings if x["classification"] == "IOC_REQUER_VALIDACAO"]
+    if audited:
+        def positive(kind: str) -> int:
+            return sum(item.get("state") not in ("NOT_FOUND", "ABSENT")
+                       for item in database if item["kind"] == kind)
+        lines.extend([
+            f"- Confirmed family residues: **{positive('family_option')}**.",
+            f"- Historical references: **{positive('historical_cache')}**.",
+            f"- Informational session records: **{sum(int(item['length']) for item in database if item['kind'] == 'session_rows')}**.",
+        ])
     lines.append(f"- Files requiring IOC investigation: **{len(critical)}**.")
     lines.append(f"- Matching process indicators: **{len(processes)}**.")
     if not audited:
@@ -293,8 +310,8 @@ def database_audit(option_file: str, dbname: str, prefix: str, case: Path,
             for row in rows:
                 if len(row) < 2:
                     raise AuditError(f"Malformed database audit row for {kind}")
-                findings.append({"kind": kind, "name": redact(row[0]), "length": row[1],
-                                 "state": "HISTORICAL_REFERENCE" if kind == "historical_cache" else "REVIEW"})
+                findings.append({"kind": kind, "name": safe_option_name(row[0]), "length": row[1],
+                                 "state": ("HISTORICAL_REFERENCE" if kind == "historical_cache" else "RESIDUO_FAMILIA_REQUER_LIMPEZA" if kind == "family_option" else "REVIEW")})
         else:
             findings.append({"kind": kind, "name": "(none)", "length": "0", "state": "NOT_FOUND"})
     write_private(case / ("database-post-audit.json" if post else "database-evidence.json"),
@@ -650,7 +667,7 @@ def main() -> int:
                               "user": config["DB_USER"], "password": config["DB_PASSWORD"]}, case) as cnf:
             if args.mode in ("audit", "audit-db", "audit-db-post"):
                 database = database_audit(cnf, dbname, prefix, case, post=args.mode == "audit-db-post")
-                make_report(case, args.mode, files, processes, database)
+                make_report(case, args.mode, files, processes, database, dbname, prefix)
                 print(f"Database audit complete: {len(database)} findings")
                 return 0
             if os.geteuid() != 0:
@@ -708,7 +725,7 @@ def main() -> int:
                 post_files = file_audit(target, case)
                 post_processes = process_audit(case)
                 database = database_audit(cnf, dbname, prefix, case, post=True)
-                make_report(case, args.mode, post_files, post_processes, database)
+                make_report(case, args.mode, post_files, post_processes, database, dbname, prefix)
                 if args.mode == "recover":
                     # Findings remain findings, not proof; require manual
                     # containment review before declaring recovery complete.
