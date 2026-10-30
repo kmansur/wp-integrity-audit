@@ -32,6 +32,13 @@ import zipfile
 VERSION = "0.5.0"
 IOC = re.compile(r"SC_ADV_BEGIN|--sc-cli|--sc-succ|trace-inspector-pad|cipher-feeder|_sc_fpc|sc_cron_guard|sc_persist_manifest|sc_own_manifest|function ceya")
 PATTERN_NAMES = (".sc_", ".gr_", ".gk_", ".kk_", ".wp-object-cache")
+SCRIPT_EXTENSIONS = {".php", ".phtml", ".phar", ".inc", ".php5", ".php7", ".php8", ".pht", ".phps"}
+GENERIC_WEB_SHELL = re.compile(
+    rb"eval\s*\(\s*base64_decode\s*\(|gzinflate\s*\(\s*base64_decode\s*\("
+    rb"|(?:assert|eval)\s*\(\s*\$_(?:GET|POST|REQUEST|COOKIE)\b"
+    rb"|(?:system|shell_exec|passthru)\s*\(\s*\$_(?:GET|POST|REQUEST)\b",
+    re.I)
+
 SENSITIVE = re.compile(r"(?i)(password|passwd|secret|token|api[_-]?key)\s*[:=]\s*[^\s,;]+")
 LONG_VALUE = re.compile(r"(?<![\w])[A-Za-z0-9_/-]{40,}(?![\w])")
 # Never apply arbitrary high-entropy redaction to filesystem paths: it
@@ -178,14 +185,15 @@ def file_audit(target: Path, case: Path) -> list[dict]:
         relative = path.relative_to(target).as_posix()
         name = path.name
         unusual = name.startswith(PATTERN_NAMES) or name == "trace-inspector-pad.php" or "cipher-feeder" in name
-        upload_php = relative.startswith("wp-content/uploads/") and path.suffix.lower() in (".php", ".phtml", ".phar")
+        upload_php = relative.startswith("wp-content/uploads/") and path.suffix.lower() in SCRIPT_EXTENSIONS
         hidden_php = (path.suffix.lower() in (".php", ".phtml", ".phar") and
                       any(part.startswith(".") and part not in (".", "..", ".well-known")
                           for part in Path(relative).parts[:-1]))
         match = None
         snippet = ""
         safe_text = ""
-        if path.suffix.lower() in (".php", ".phtml", ".inc", ".phar"):
+        generic_match = False
+        if path.suffix.lower() in SCRIPT_EXTENSIONS:
             try:
                 with path.open("rb") as stream:
                     overlap = b""
@@ -195,20 +203,24 @@ def file_audit(target: Path, case: Path) -> list[dict]:
                         if not safe_text:
                             safe_text = decoded[:4096]
                         match = IOC.search(decoded)
+                        if GENERIC_WEB_SHELL.search(sample):
+                            generic_match = True
                         if match:
                             snippet = redact(decoded[max(0, match.start() - 40):match.end() + 60])
                             break
                         overlap = sample[-256:]
             except OSError:
                 continue
-        if not (unusual or upload_php or hidden_php or match):
+        if not (unusual or upload_php or hidden_php or match or generic_match):
             continue
         classification, reason = classify_file(relative, name, safe_text, match.group(0) if match else None)
         if upload_php and not match and name == "index.php" and known_upload_guard(path):
             classification, reason = "LEGITIMO_VALIDADO", "Exact WordPress directory-listing guard content"
         elif upload_php and not match and metform_icon_cache_candidate(relative, path):
             classification, reason = "CACHE_PLUGIN_REQUER_VALIDACAO", "MetForm icon cache candidate; origin and complete content not verified"
-        if hidden_php and not match and classification == "ARQUIVO_SUSPEITO_REQUER_VALIDACAO":
+        if generic_match and not match:
+            classification, reason = "WEB_SHELL_HEURISTIC_REQUIRES_REVIEW", "Potential dynamic execution or obfuscation pattern"
+        if hidden_php and not match and not generic_match and classification == "ARQUIVO_SUSPEITO_REQUER_VALIDACAO":
             classification, reason = "PHP_DIRETORIO_OCULTO_REQUER_VALIDACAO", "PHP within hidden directory"
         if relative.startswith("wp-content/wflogs/"):
             snippet = ""  # Wordfence configuration may contain secrets.
@@ -463,7 +475,7 @@ def audit_status(files: list[dict], processes: list[str],
         "validated_legitimate_files": sum(x.get("classification") == "LEGITIMO_VALIDADO" for x in files),
         "security_configuration_review": sum(x.get("classification") == "CONFIGURACAO_PLUGIN_SEGURANCA_REQUER_VALIDACAO" for x in files),
         "confirmed_compromised_files": 0,  # Heuristic file matches are not forensic confirmation.
-        "file_indicators_requiring_review": sum(x.get("classification") in ("IOC_REQUER_VALIDACAO", "ARQUIVO_SUSPEITO_REQUER_VALIDACAO", "PHP_UPLOAD_REQUER_VALIDACAO", "PHP_DIRETORIO_OCULTO_REQUER_VALIDACAO", "CACHE_PLUGIN_REQUER_VALIDACAO") for x in files),
+        "file_indicators_requiring_review": sum(x.get("classification") in ("IOC_REQUER_VALIDACAO", "ARQUIVO_SUSPEITO_REQUER_VALIDACAO", "PHP_UPLOAD_REQUER_VALIDACAO", "PHP_DIRETORIO_OCULTO_REQUER_VALIDACAO", "CACHE_PLUGIN_REQUER_VALIDACAO", "WEB_SHELL_HEURISTIC_REQUIRES_REVIEW") for x in files),
         "suspicious_processes": len(processes),
     }
     if database is None:
