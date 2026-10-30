@@ -29,7 +29,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 
-VERSION = "0.5.0"
+VERSION = "0.6.0"
 IOC = re.compile(r"SC_ADV_BEGIN|--sc-cli|--sc-succ|trace-inspector-pad|cipher-feeder|_sc_fpc|sc_cron_guard|sc_persist_manifest|sc_own_manifest|function ceya")
 PATTERN_NAMES = (".sc_", ".gr_", ".gk_", ".kk_", ".wp-object-cache")
 SCRIPT_EXTENSIONS = {".php", ".phtml", ".phar", ".inc", ".php5", ".php7", ".php8", ".pht", ".phps"}
@@ -434,6 +434,53 @@ def host_persistence_inventory(case: Path, roots: list[Path]) -> list[dict]:
                 continue
     write_private(case / "host-persistence.json", json.dumps(findings, indent=2))
     return findings
+
+
+def wordpress_persistence_inventory(target: Path, case: Path) -> list[dict]:
+    """Inventory mu-plugins and WordPress drop-ins without executing PHP."""
+    dropins = {"advanced-cache.php", "db.php", "object-cache.php", "sunrise.php",
+               "maintenance.php", "fatal-error-handler.php", "php-error.php"}
+    records = []
+    content = target / "wp-content"
+    for path in iter_files(content):
+        relative = path.relative_to(target).as_posix()
+        if not (relative.startswith("wp-content/mu-plugins/") or
+                (path.parent == content and path.name in dropins)):
+            continue
+        try:
+            records.append({"path": relative, "sha256": sha256(path),
+                            "size": path.stat().st_size,
+                            "classification": "WORDPRESS_PERSISTENCE_REQUIRES_CONTEXT",
+                            "reason": "MU-plugin or drop-in inventory; not proof of compromise"})
+        except OSError:
+            continue
+    write_private(case / "wordpress-persistence.json",
+                  json.dumps(records, indent=2, ensure_ascii=False))
+    return records
+
+
+def recent_file_timeline(target: Path, case: Path, days: int = 30) -> list[dict]:
+    """Metadata-only timeline, bounded to files changed in the last N days."""
+    now = dt.datetime.now(dt.timezone.utc).timestamp()
+    cutoff = now - days * 86400
+    records = []
+    for path in iter_files(target):
+        try:
+            info = path.stat()
+            if max(info.st_mtime, info.st_ctime) < cutoff:
+                continue
+            records.append({"path": path.relative_to(target).as_posix(),
+                            "mtime_utc": dt.datetime.fromtimestamp(info.st_mtime, dt.timezone.utc).isoformat(),
+                            "ctime_utc": dt.datetime.fromtimestamp(info.st_ctime, dt.timezone.utc).isoformat(),
+                            "size": info.st_size,
+                            "classification": "RECENT_FILE_METADATA"})
+        except (OSError, OverflowError, ValueError):
+            continue
+    records.sort(key=lambda x: x["mtime_utc"], reverse=True)
+    write_private(case / "timeline.json", json.dumps({"window_days": days,
+        "timestamp_note": "ctime is metadata-change time, not creation time",
+        "records": records}, indent=2, ensure_ascii=False))
+    return records
 
 
 def process_audit(case: Path) -> list[str]:
@@ -1386,6 +1433,9 @@ def main() -> int:
         print(f"Version {VERSION}; mode={args.mode}; case={case}")
         is_audit = args.mode == "audit"
         files = [] if is_audit and args.skip_files else file_audit(target, case)
+        if is_audit:
+            wordpress_persistence_inventory(target, case)
+            recent_file_timeline(target, case)
         if not (is_audit and args.skip_config):
             configuration_audit(target, case)
         if is_audit and not args.skip_core:
