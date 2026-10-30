@@ -217,3 +217,41 @@ def audit(target: Path, case: Path, *, offline: bool = False,
         writer.writeheader()
         writer.writerows({key: item.get(key) for key in writer.fieldnames} for item in records)
     return result
+
+
+def write_skipped(case: Path) -> None:
+    """Record explicitly reduced coverage without network or component access."""
+    result = {"coverage": {"local": "SKIPPED", "official": "SKIPPED",
+                           "reason": "--skip-version-check",
+                           "status": "AUDITORIA_COM_COBERTURA_REDUZIDA"},
+              "components": [], "summary": {}}
+    (case / "component-version-evidence.json").write_text(json.dumps(result, indent=2))
+    (case / "component-version-report.md").write_text(
+        "# Component versions and provenance\n\nCoverage: AUDITORIA_COM_COBERTURA_REDUZIDA\n")
+    (case / "component-version-report.csv").write_text(
+        "component_id,type,slug,name,local_version,official_version,source,active,state,query_status\n")
+
+
+def append_management_section(case: Path) -> None:
+    """Keep the management overview consistent with detailed component evidence."""
+    source = case / "component-version-evidence.json"
+    if not source.is_file():
+        return
+    result = json.loads(source.read_text())
+    coverage = result["coverage"]
+    summary = result.get("summary", {})
+    body = ["", "## Versões e componentes", "",
+            f"- Status de cobertura: {coverage['status']}",
+            f"- Verificação local de versões: {coverage['local']}",
+            f"- Consulta oficial: {coverage['official']}",
+            f"- Motivo da omissão: {coverage.get('reason') or 'None'}",
+            f"- WordPress instalado: {summary.get('core_version') or 'Unknown'}",
+            f"- Plugins verificados: {summary.get('plugins_checked', 0)}",
+            f"- Plugins desatualizados: {summary.get('plugins_outdated', 0)}",
+            f"- Temas verificados: {summary.get('themes_checked', 0)}",
+            f"- Temas desatualizados: {summary.get('themes_outdated', 0)}",
+            f"- Componentes não encontrados no repositório: {summary.get('unlisted', 0)}",
+            "- Component detail: component-version-report.md", ""]
+    for path in (case / "report.md", case / "technical-report.md"):
+        if path.is_file():
+            path.write_text(path.read_text() + "\n".join(body) + "\n")
