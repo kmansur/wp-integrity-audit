@@ -115,3 +115,5 @@ All project documentation and source commentary are in English. Versions follow 
 - Audit WordPress-tree `.htaccess`, `.user.ini`, `php.ini`, `web.config` and related files without executing or revealing their contents.
 - Write `configuration-evidence.json` with relative paths, byte sizes, permissions and hashes.
 - Add regression test to prevent config-content credential exposure.
+
+- Add heuristic review classification for PHP scripts in hidden WordPress directories, excluding `.well-known`; include a synthetic unit test.
