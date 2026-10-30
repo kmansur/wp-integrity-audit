@@ -18,6 +18,7 @@ All project documentation and source commentary are in English. Versions follow 
 - Post-recovery file/process/database IOC scanning blocks a clean completion status when indicators remain.
 - Password and salt rewriting refuses symlinked WordPress configuration and restricts file permissions.
 - Tests cover synthetic database backups, full-file scanning, symlink handling and salt rotation.
+- Forensic case roots inside a WordPress document root are rejected.
 - File scans read full PHP-like file content in bounded chunks, rather than checking only the first portion.
 
 ### Known limitations
