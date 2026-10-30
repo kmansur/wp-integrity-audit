@@ -844,6 +844,29 @@ def query_db(option_file: str, dbname: str, sql: str) -> list[list[str]]:
                input=sql, capture_output=True)
     return [line.split("\t") for line in proc.stdout.splitlines()]
 
+def component_db_metadata(option_file: str, dbname: str, prefix: str):
+    """Read only plugin/theme selection options, never execute serialized data."""
+    options = sql_identifier(prefix + "options")
+    sql = (f"SELECT option_name, HEX(option_value) FROM {options} "
+           "WHERE option_name IN ('active_plugins','template','stylesheet') "
+           "AND LENGTH(option_value) < 65536;")
+    rows = query_db(option_file, dbname, sql)
+    values = {}
+    for row in rows:
+        if len(row) == 2:
+            try:
+                values[row[0]] = bytes.fromhex(row[1]).decode("utf-8")
+            except (ValueError, UnicodeDecodeError):
+                continue
+    encoded = values.get("active_plugins", "")
+    # Serialized PHP string slots only; never use eval or unserialize.
+    active = set()
+    for length, name in re.findall(r's:(\d+):"([^"]{1,300})";', encoded):
+        if len(name.encode("utf-8")) == int(length) and "/" in name and ".." not in name:
+            active.add(name)
+    return active, values.get("template"), values.get("stylesheet")
+
+
 def sql_identifier(value: str) -> str:
     if not re.fullmatch(r"[A-Za-z0-9_]+", value):
         raise AuditError("Invalid SQL identifier")
@@ -1447,10 +1470,6 @@ def main() -> int:
             recent_file_timeline(target, case)
         if not (is_audit and args.skip_config):
             configuration_audit(target, case)
-        if is_audit and not args.skip_version_check:
-            component_versions.audit(target, case, offline=args.offline)
-        elif is_audit:
-            component_versions.write_skipped(case)
         if is_audit and not args.skip_host_persistence:
             if sys.platform != "linux":
                 raise AuditError("Host persistence inventory is supported only on Linux")
@@ -1463,6 +1482,10 @@ def main() -> int:
                    ("elementor", args.skip_elementor), ("processes", args.skip_processes),
                    ("database", args.skip_db), ("version_check", args.skip_version_check)) if skipped]
         if is_audit and args.skip_db:
+            if args.skip_version_check:
+                component_versions.write_skipped(case)
+            else:
+                component_versions.audit(target, case, offline=args.offline, skip_core=args.skip_core)
             make_report(case, args.mode, files, processes)
             component_versions.append_management_section(case)
             mark_incomplete_case(case, omitted)
@@ -1476,6 +1499,14 @@ def main() -> int:
                               "user": config["DB_USER"], "password": config["DB_PASSWORD"]}, case) as cnf:
             if args.mode in ("audit", "audit-db", "audit-db-post"):
                 database = database_audit(cnf, dbname, prefix, case, post=args.mode == "audit-db-post")
+                if is_audit:
+                    if args.skip_version_check:
+                        component_versions.write_skipped(case)
+                    else:
+                        installed_plugins, template, stylesheet = component_db_metadata(cnf, dbname, prefix)
+                        component_versions.audit(target, case, offline=args.offline, skip_core=args.skip_core,
+                                                 active_plugins=installed_plugins, template=template,
+                                                 stylesheet=stylesheet)
                 make_report(case, args.mode, files, processes, database, dbname, prefix)
                 if is_audit:
                     component_versions.append_management_section(case)
