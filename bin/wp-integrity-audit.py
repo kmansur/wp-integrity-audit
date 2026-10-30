@@ -584,16 +584,23 @@ def main() -> int:
                 compare_components(target, source, case)
                 stage = stage_files(target, source, case,
                                     args.replace_plugins_themes or args.official_sync, args.official_sync)
-            if args.mode in ("apply-db", "recover"):
-                # Preflight serialized database options before modifying filesystem.
-                opt = sql_identifier(prefix + "options")
-                sql = (f"SELECT option_name FROM {opt} WHERE option_name IN ('active_plugins','cron') "
-                       "AND (option_value LIKE '%cipher-feeder%' OR option_value LIKE '%trace-inspector-pad%' "
-                       "OR option_value LIKE '%sc_cron_guard%' OR option_value LIKE '%sc_persist_manifest%' "
-                       "OR option_value LIKE '%sc_cron_fetch%');")
-                if query_db(cnf, dbname, sql):
-                    raise AuditError("Serialized WordPress options require manual, targeted remediation")
-            ask("Confirm all planned site/database modifications")
+            try:
+                if args.mode in ("apply-db", "recover"):
+                    # Preflight serialized database options before changing files.
+                    opt = sql_identifier(prefix + "options")
+                    sql = (f"SELECT option_name FROM {opt} WHERE option_name IN ('active_plugins','cron') "
+                           "AND (option_value LIKE '%cipher-feeder%' OR option_value LIKE '%trace-inspector-pad%' "
+                           "OR option_value LIKE '%sc_cron_guard%' OR option_value LIKE '%sc_persist_manifest%' "
+                           "OR option_value LIKE '%sc_cron_fetch%');")
+                    if query_db(cnf, dbname, sql):
+                        raise AuditError("Serialized WordPress options require manual, targeted remediation")
+                ask("Confirm all planned site/database modifications")
+            except BaseException:
+                # Staging may already exist when operator declines or SQL
+                # preflight fails. Never abandon an untracked working copy.
+                if stage is not None:
+                    shutil.rmtree(stage, ignore_errors=True)
+                raise
             quarantine = None
             database_started = False
             try:
