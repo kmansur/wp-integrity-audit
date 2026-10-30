@@ -221,6 +221,12 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
                       "|---|---|---|---|"])
         for item in database:
             lines.append(f"| {item['kind']} | {item['name']} | {item['length']} | {item.get('state','')} |")
+            if item.get("sha256"):
+                lines.append(f"\n- `{item['name']}`: SHA-256 `{item['sha256']}`; "
+                             f"length `{item['value_length_bytes']}` bytes; "
+                             f"classification `{item['value_classification']}`; "
+                             f"safe IOC excerpt `{item['safe_excerpt']}`; "
+                             f"decoded excerpt `{item['decoded_excerpt']}`")
     lines.extend(["", "## Technical opinion", ""])
     critical = [x for x in findings if x["classification"] == "IOC_REQUER_VALIDACAO"]
     if audited:
@@ -298,6 +304,27 @@ def database_audit(option_file: str, dbname: str, prefix: str, case: Path,
         ("session_rows", f"SELECT 'session_tokens', COUNT(*) FROM {meta} WHERE meta_key='session_tokens'"),
         ("application_password_rows", f"SELECT 'application_passwords', COUNT(*) FROM {meta} WHERE meta_key LIKE '%application_passwords'"),
     ]
+    # Fetch SHA-256, exact byte length, and a bounded HEX-encoded prefix.
+    # Hex keeps tabs/newlines out of the MySQL batch protocol.
+    # No unmasked database values are persisted in generated reports.
+    detail_query = (f"SELECT option_name, OCTET_LENGTH(option_value), "
+                    f"SHA2(option_value,256), HEX(LEFT(option_value,2048)) FROM {options} "
+                    f"WHERE option_name LIKE 'sc#_%' ESCAPE '#' "
+                    f"OR option_name LIKE '_transient_sc#_%' ESCAPE '#' "
+                    f"OR option_name LIKE '_transient_timeout_sc#_%' ESCAPE '#' "
+                    f"OR option_name IN ('SimplePluginLogger_plugin_info_before_update','cron','active_plugins') "
+                    f"OR option_value LIKE '%cipher-feeder%' OR option_value LIKE '%sc_cron_guard%' "
+                    f"OR option_value LIKE '%sc_persist_manifest%' OR option_value LIKE '%trace-inspector-pad%';")
+    details = {}
+    for row in query_db(option_file, dbname, detail_query):
+        if len(row) != 4 or not re.fullmatch(r"[0-9a-fA-F]{64}", row[2]):
+            raise AuditError("Invalid evidence hash row returned by MySQL")
+        try:
+            excerpt = bytes.fromhex(row[3]).decode("utf-8", "replace")
+        except ValueError as error:
+            raise AuditError("Malformed encoded database evidence") from error
+        details[row[0]] = {"sha256": row[2], "value_length_bytes": int(row[1]),
+                           "value_prefix": excerpt}
     findings = []
     for kind, sql in statements:
         rows = query_db(option_file, dbname, sql + ";")
@@ -310,8 +337,35 @@ def database_audit(option_file: str, dbname: str, prefix: str, case: Path,
             for row in rows:
                 if len(row) < 2:
                     raise AuditError(f"Malformed database audit row for {kind}")
-                findings.append({"kind": kind, "name": safe_option_name(row[0]), "length": row[1],
-                                 "state": ("HISTORICAL_REFERENCE" if kind == "historical_cache" else "RESIDUO_FAMILIA_REQUER_LIMPEZA" if kind == "family_option" else "REVIEW")})
+                name = row[0]
+                meta = details.get(name, {})
+                prefix_value = meta.get("value_prefix", "")
+                if prefix_value.startswith(("a:", "s:", "O:", "i:", "b:", "d:")):
+                    classification = "PHP_SERIALIZED_NOT_DESERIALIZED"
+                elif prefix_value.startswith(("{", "[")):
+                    classification = "JSON_OR_STRUCTURED_TEXT"
+                elif re.fullmatch(r"[0-9A-Fa-f]{12,}", prefix_value):
+                    classification = "HEX_CANDIDATE"
+                elif re.fullmatch(r"[A-Za-z0-9+/]{12,}={0,2}", prefix_value):
+                    classification = "BASE64_CANDIDATE"
+                else:
+                    classification = "PLAIN_OR_UNKNOWN"
+                # Only approved IOC tokens may be displayed; regex redaction
+                # of arbitrary database data is not a sufficient security boundary.
+                known_tokens = ("cipher-feeder", "sc_cron_guard", "sc_cron_fetch",
+                                "sc_persist_manifest", "trace-inspector-pad")
+                safe_tokens = [token for token in known_tokens if token in prefix_value]
+                findings.append({
+                    "kind": kind, "name": safe_option_name(name), "length": row[1],
+                    "state": ("HISTORICAL_REFERENCE" if kind == "historical_cache"
+                              else "RESIDUO_FAMILIA_REQUER_LIMPEZA" if kind == "family_option"
+                              else "REVIEW"),
+                    "sha256": meta.get("sha256"),
+                    "value_length_bytes": meta.get("value_length_bytes"),
+                    "value_classification": classification if meta else "NOT_AVAILABLE",
+                    "safe_excerpt": ", ".join(safe_tokens) if safe_tokens else "[OMITTED_BY_POLICY]",
+                    "decoded_excerpt": "[OMITTED_BY_POLICY]",
+                })
         else:
             findings.append({"kind": kind, "name": "(none)", "length": "0", "state": "NOT_FOUND"})
     write_private(case / ("database-post-audit.json" if post else "database-evidence.json"),
