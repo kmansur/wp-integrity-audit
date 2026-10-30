@@ -552,7 +552,7 @@ $table_prefix = 'wp_';
             self.assertEqual(records["font-awesome-38edd54e30815111.php"]["classification"],
                              "CACHE_PLUGIN_REQUER_VALIDACAO")
             self.assertEqual(records["other.php"]["classification"],
-                             "PHP_UPLOAD_REQUER_VALIDACAO")
+                             "WEB_SHELL_HEURISTIC_REQUIRES_REVIEW")
             status, code, summary = audit.audit_status(list(records.values()), [], [])
             self.assertEqual(code, 40)
             self.assertEqual(summary["file_indicators_requiring_review"], 2)
