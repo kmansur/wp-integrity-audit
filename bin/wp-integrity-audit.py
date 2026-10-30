@@ -193,12 +193,65 @@ def process_audit(case: Path) -> list[str]:
     write_private(case / "process-evidence.json", json.dumps(matches, indent=2))
     return matches
 
+def audit_status(files: list[dict], processes: list[str],
+                 database: list[dict] | None) -> tuple[str, int, dict]:
+    """Conservative audit outcomes; do not interpret historical references as activity."""
+    count = lambda kind: sum(
+        int(x["length"]) if kind in ("session_rows", "application_password_rows")
+        else int(x.get("state") not in ("ABSENT", "NOT_FOUND"))
+        for x in (database or []) if x.get("kind") == kind)
+    summary = {
+        "confirmed_family_residues": count("family_option"),
+        "historical_references": count("historical_cache"),
+        "informational_records": count("session_rows") + count("application_password_rows"),
+        "active_database_markers": sum(count(k) for k in ("marker_option", "cron_marker", "active_plugins_marker")),
+        "validated_legitimate_files": sum(x.get("classification") == "LEGITIMO_VALIDADO" for x in files),
+        "security_configuration_review": sum(x.get("classification") == "CONFIGURACAO_PLUGIN_SEGURANCA_REQUER_VALIDACAO" for x in files),
+        "confirmed_compromised_files": 0,  # Heuristic file matches are not forensic confirmation.
+        "file_indicators_requiring_review": sum(x.get("classification") in ("IOC_REQUER_VALIDACAO", "ARQUIVO_SUSPEITO_REQUER_VALIDACAO", "PHP_UPLOAD_REQUER_VALIDACAO") for x in files),
+        "suspicious_processes": len(processes),
+    }
+    if database is None:
+        return "AUDITORIA_INCOMPLETA", 40, summary
+    if summary["active_database_markers"] or summary["suspicious_processes"]:
+        return "COMPROMETIMENTO_CONFIRMADO", 20, summary
+    if summary["confirmed_family_residues"]:
+        return "RESIDUOS_REQUEREM_LIMPEZA", 10, summary
+    if summary["file_indicators_requiring_review"]:
+        return "AUDITORIA_INCOMPLETA", 40, summary
+    return "SEM_MARCADOR_EXPLICITO", 0, summary
+
+
 def make_report(case: Path, mode: str, findings: list[dict], processes: list[str],
                 database: list[dict] | None = None, db_name: str | None = None, db_prefix: str | None = None) -> None:
     """Generate a precise coverage statement and evidence-based technical opinion."""
     audited = database is not None
+    status, exit_code, summary = audit_status(findings, processes, database)
+    write_private(case / "report.json", json.dumps({
+        "schema_version": 1, "tool_version": VERSION,
+        "tool_sha256": sha256(Path(__file__)), "mode": mode,
+        "collected_at_utc": dt.datetime.now(dt.timezone.utc).isoformat(),
+        "status": status, "exit_code": exit_code, "summary": summary,
+        "database": db_name if audited else None,
+        "table_prefix": db_prefix if audited else None,
+        "database_audited": audited,
+        "database_credentials_exposed": False,
+    }, indent=2, ensure_ascii=False))
     lines = [
         "# WordPress Integrity Audit", "",
+        "## Executive summary", "",
+        f"- Final status: **{status}**",
+        f"- Exit code: **{exit_code}**",
+        f"- Confirmed family residues: **{summary['confirmed_family_residues']}**",
+        f"- Historical references: **{summary['historical_references']}**",
+        f"- Informational records: **{summary['informational_records']}**",
+        f"- Active database markers: **{summary['active_database_markers']}**",
+        f"- Confirmed compromised files: **{summary['confirmed_compromised_files']}**",
+        f"- Validated legitimate file patterns: **{summary['validated_legitimate_files']}**",
+        f"- Security configurations requiring validation: **{summary['security_configuration_review']}**",
+        f"- Suspicious processes: **{summary['suspicious_processes']}**",
+        "- Release recommendation: **LIBERAÇÃO NÃO RECOMENDADA**",
+        "", "## Audit metadata", "",
         f"- Version: `{VERSION}`", f"- Tool SHA-256: `{sha256(Path(__file__))}`", f"- Mode: `{mode}`",
         f"- Timestamp (UTC): {dt.datetime.now(dt.timezone.utc).isoformat()}",
         f"- File findings: {len(findings)}", f"- Process findings: {len(processes)}",
@@ -764,7 +817,7 @@ def main() -> int:
         if args.mode == "audit" and args.files_only:
             make_report(case, args.mode, files, processes)
             print(f"Filesystem-only audit complete: {len(files)} findings; database NOT EXECUTED")
-            return 0
+            return 40
         config, prefix = parse_wordpress(target / "wp-config.php")
         dbname = config["DB_NAME"]
         if not re.fullmatch(r"[A-Za-z0-9_]+", dbname):
@@ -774,8 +827,9 @@ def main() -> int:
             if args.mode in ("audit", "audit-db", "audit-db-post"):
                 database = database_audit(cnf, dbname, prefix, case, post=args.mode == "audit-db-post")
                 make_report(case, args.mode, files, processes, database, dbname, prefix)
-                print(f"Database audit complete: {len(database)} findings")
-                return 0
+                status, code, summary = audit_status(files, processes, database)
+                print(f"Database audit complete: status={status}; exit={code}")
+                return code
             if os.geteuid() != 0:
                 raise AuditError("Recovery requires root; audit does not")
             if args.mode == "recover" and processes:
@@ -864,4 +918,4 @@ if __name__ == "__main__":
         sys.exit(main())
     except (AuditError, OSError, subprocess.CalledProcessError, ValueError, EOFError) as error:
         print(f"ERROR: {redact(error)}", file=sys.stderr)
-        sys.exit(1)
+        sys.exit(30)
