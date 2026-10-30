@@ -32,7 +32,7 @@ IOC = re.compile(r"SC_ADV_BEGIN|--sc-cli|--sc-succ|trace-inspector-pad|cipher-fe
 PATTERN_NAMES = (".sc_", ".gr_", ".gk_", ".kk_", ".wp-object-cache")
 SENSITIVE = re.compile(r"(?i)(password|passwd|secret|token|api[_-]?key)\s*[:=]\s*[^\s,;]+")
 LONG_VALUE = re.compile(r"(?<![\w])[A-Za-z0-9_/-]{40,}(?![\w])")
-DB_KEY = re.compile(r"define\s*\(\s*['\"](?P<name>DB_NAME|DB_USER|DB_PASSWORD|DB_HOST)['\"]\s*,\s*(?P<quote>['\"])(?P<value>(?:\\\\.|[^'\"\\\\])*)(?P=quote)\s*\)", re.S)
+DB_KEY = re.compile(r"""define\s*\(\s*['"](?P<name>DB_NAME|DB_USER|DB_PASSWORD|DB_HOST)['"]\s*,\s*(?P<quote>['"])(?P<value>(?:\\.|(?!(?P=quote)).)*) (?P=quote)\s*\)""".replace(" *)", "*)"), re.S)
 SQL_TABLE_PREFIX = re.compile(r"\$table_prefix\s*=\s*['\"]([A-Za-z0-9_]+)['\"]")
 
 class AuditError(RuntimeError):
@@ -397,6 +397,37 @@ def sync_core(source: Path, target: Path) -> None:
         if path.is_file() and (path.suffix == ".php" or path.name in ("license.txt", "readme.html")):
             shutil.copy2(path, target / path.name)
 
+def compare_components(target: Path, source: Path, case: Path) -> None:
+    """Compare production and incoming component directories by category."""
+    report = {}
+    for name in ("plugins", "themes"):
+        production = target / "wp-content" / name
+        incoming = source / name
+        a = {p.name for p in production.iterdir() if p.is_dir()} if production.is_dir() else set()
+        b = {p.name for p in incoming.iterdir() if p.is_dir()} if incoming.is_dir() else set()
+        report[name] = {"production_only": sorted(a - b), "source_only": sorted(b - a), "shared": sorted(a & b)}
+    write_private(case / "components-comparison.json", json.dumps(report, indent=2))
+
+
+def elementor_asset_audit(target: Path, case: Path) -> None:
+    """Inventory generated CSS/font assets without modifying site content."""
+    root = target / "wp-content" / "uploads" / "elementor"
+    results = {}
+    for name, extensions in (("css", (".css",)), ("google-fonts", (".css", ".woff", ".woff2"))):
+        folder = root / name
+        results[name] = sum(p.suffix.lower() in extensions for p in iter_files(folder)) if folder.is_dir() else 0
+    write_private(case / "elementor-assets.json", json.dumps(results, indent=2))
+
+
+def upload_permissions_audit(target: Path, case: Path) -> None:
+    """Record owner/mode; unsafe guessed recursive ownership changes are omitted."""
+    root = target / "wp-content" / "uploads"
+    if root.is_dir():
+        st = root.stat()
+        write_private(case / "uploads-metadata.json",
+                      json.dumps({"uid": st.st_uid, "gid": st.st_gid, "mode": oct(stat.S_IMODE(st.st_mode))}, indent=2))
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="WordPress Integrity Audit (Python)")
     modes = parser.add_mutually_exclusive_group()
@@ -435,6 +466,7 @@ def main() -> int:
         case = ensure_private_dir(case_root / f"{label}-{timestamp}-{secrets.token_hex(3)}")
         print(f"Version {VERSION}; mode={args.mode}; case={case}")
         files = file_audit(target, case)
+        elementor_asset_audit(target, case)
         processes = process_audit(case)
         if args.mode == "audit":
             make_report(case, args.mode, files, processes)
@@ -459,6 +491,7 @@ def main() -> int:
             stage = None
             if args.mode in ("apply-files", "recover"):
                 source = validate_source(args.source, target)
+                compare_components(target, source, case)
                 stage = stage_files(target, source, case,
                                     args.replace_plugins_themes or args.official_sync, args.official_sync)
             if args.mode in ("apply-db", "recover"):
@@ -481,6 +514,7 @@ def main() -> int:
                     if args.core_source:
                         sync_core(args.core_source, target)
                     rotate_salts(target / "wp-config.php")
+                upload_permissions_audit(target, case)
                 database = database_audit(cnf, dbname, prefix, case, post=True)
                 make_report(case, args.mode, files, processes, database)
             finally:
