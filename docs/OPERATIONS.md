@@ -109,3 +109,7 @@ For MetForm candidates, first verify the installed plugin generator and the full
 ## Recovery release gate (0.4.0)
 
 Do not operate `--apply-files`, `--apply-db`, or `--recover` on production until staging and rollback are homologated. Post-recovery blocker checks evaluate active database states and known file/process IOCs, not merely the presence of result objects. Explicitly verify the original `wp-content/uploads` media and WordPress ownership in a disposable fixture. Keep the existing site backups immutable before any recovery experiment.
+
+## Mandatory recovery gate (0.5.0)
+
+`--apply-files`, `--apply-db`, and `--recover` fail closed and perform no modification. Re-enable these only after disposable acceptance tests prove ownership and media preservation, source-version correctness, and rollback under injected failures. Default audit remains read-only for the target site and emits private case artifacts. Generic webshell signatures require operator confirmation and must not be treated as forensic proof.
