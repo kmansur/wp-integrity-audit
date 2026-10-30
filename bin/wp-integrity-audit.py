@@ -491,6 +491,8 @@ def parse_args() -> argparse.Namespace:
     return args
 
 def main() -> int:
+    # Protect backup and report files from their first byte of creation.
+    os.umask(0o077)
     args = parse_args()
     target = validate_site(args.target)
     case_root = ensure_private_dir(args.case_root)
