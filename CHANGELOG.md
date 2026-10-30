@@ -248,3 +248,11 @@ All project documentation and source commentary are in English. Versions follow 
 - Add regression tests for current and outdated WordPress.org plugin versions and unavailable plugin checksum manifests.
 
 - Standardize generated component-management report headings and labels in English.
+
+## [0.8.0] - 2026-10-30
+
+### Security and reliability
+- Stream SHA-256 and MD5 checksum validation in fixed-size chunks instead of reading whole WordPress component files into memory.
+- Explicitly reject symlink targets in file digest helpers.
+- Add large synthetic file and symlink regression tests.
+- Maintain read-only audit behavior and disabled destructive modes pending recovery safety validation.
