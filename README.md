@@ -204,3 +204,7 @@ Checksum verification requires usable file entries. A retrieved but empty or inv
 ## 0.11.0 official metadata API error classification
 
 WordPress.org plugin/theme lookup HTTP 404 is recorded as `NOT_FOUND_OFFICIAL_REPOSITORY`; service errors and Core checksum errors remain `API_UNAVAILABLE`. These states never prove maliciousness or authenticate a premium/custom component.
+
+## 0.12.0 coverage and provenance corrections
+
+The technical Core coverage field now reflects `component-version-evidence.json`, and Core outdated counts are separate from plugin/theme counts. An officially unlisted plugin is recorded as `PLUGIN_ORIGEM_NAO_CONFIRMADA_REQUER_REVISAO`, not malware. Where the main plugin header has no readable version, the inventory preserves the version-unidentified condition rather than inventing a local release. `LEGITIMO_VALIDADO` for large PHP caches requires full trusted-source or structural verification; a plausible header alone is not enough.
