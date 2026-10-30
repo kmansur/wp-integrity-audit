@@ -18,7 +18,7 @@ All project documentation and source commentary are in English. Versions follow 
 - No production WordPress/MySQL integration validation or restore rehearsal completed.
 - File and DB operations cannot form one atomic transaction; an operator-controlled restore remains necessary.
 - The signature corpus is incident-specific; clean results do not certify a clean WordPress installation.
-- Legacy Bash remains in the repository for reference, not as the Python runtime.
+- Legacy Bash is retained in Git history on `main`; this branch has only the Python runtime.
 
 ## [Legacy baseline] - 2026-10-30
 
