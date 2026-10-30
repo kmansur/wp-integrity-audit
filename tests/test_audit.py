@@ -132,6 +132,23 @@ $table_prefix = 'wp_';
             self.assertTrue((quarantine / "old.txt").exists())
             self.assertTrue((site / "wp-content" / "new.txt").exists())
 
+    def test_recovery_preflight_rejects_missing_salts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            site = Path(directory)
+            (site / "wp-config.php").write_text("<?php")
+            with self.assertRaises(audit.AuditError):
+                audit.preflight_recovery_sources(site, None)
+
+    def test_recovery_preflight_accepts_literal_salts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            site = Path(directory)
+            keys = ("AUTH_KEY", "SECURE_AUTH_KEY", "LOGGED_IN_KEY", "NONCE_KEY",
+                    "AUTH_SALT", "SECURE_AUTH_SALT", "LOGGED_IN_SALT", "NONCE_SALT")
+            (site / "wp-config.php").write_text(
+                "<?php\n" + "".join("define('" + key + "', 'synthetic');\n" for key in keys)
+            )
+            audit.preflight_recovery_sources(site, None)
+
     def test_salt_rotation_preserves_other_configuration(self):
         with tempfile.TemporaryDirectory() as directory:
             config = Path(directory) / "wp-config.php"
