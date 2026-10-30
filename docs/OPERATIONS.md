@@ -95,3 +95,7 @@ The WordPress Core section in report.md shows each reference discrepancy, and th
 ## MetForm cache review
 
 `CACHE_PLUGIN_REQUER_VALIDACAO` is a preliminary classification: validate the local MetForm plugin source and entire cache file before claiming it is legitimate. This heuristic neither executes PHP nor evaluates the returned array. `index.php` uploads guard recognition requires exact source contents and excludes files containing extra code. Preserve any known malicious artifacts outside the served document root as internal evidence, and verify web-server aliases separately.
+
+## Conservative Akismet and MetForm validation
+
+Akismet .htaccess is accepted as a known guard only when the entire non-comment directive set is consistent with a deny-by-default rule and FilesMatch exceptions for static assets. Review any unusual directives manually. MetForm cache candidates remain a review finding even when their prefix resembles `return array`; do not treat missing common dangerous-function names as a full integrity check. A risk label `LOW — no selected database IOC` refers only to the selected implemented queries, not a complete database compromise exclusion.
