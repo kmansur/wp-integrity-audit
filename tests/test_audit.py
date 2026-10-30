@@ -213,6 +213,25 @@ $table_prefix = 'wp_';
             self.assertEqual(stat.S_IMODE(case.stat().st_mode), 0o700)
             self.assertEqual(stat.S_IMODE((case / "evidence.txt").stat().st_mode), 0o600)
 
+    def test_default_audit_fails_closed_without_database_configuration(self):
+        """Missing SQL coverage must not be silently reported as zero."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "site"
+            cases = Path(directory) / "cases"
+            root.mkdir()
+            for name in ("wp-admin", "wp-includes", "wp-content"):
+                (root / name).mkdir()
+            (root / "wp-load.php").write_text("<?php")
+            (root / "wp-config.php").write_text("<?php")
+            import subprocess
+            result = subprocess.run(
+                ["python3", str(SCRIPT), "--audit", str(root), "--case-root", str(cases)],
+                capture_output=True, text=True
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("unsupported/nonliteral", result.stderr.lower())
+            self.assertFalse(any(cases.rglob("database-evidence.json")))
+
     def test_guard_classification_and_relative_paths(self):
         with tempfile.TemporaryDirectory() as directory:
             target = Path(directory) / "site"
