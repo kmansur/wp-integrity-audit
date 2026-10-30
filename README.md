@@ -218,3 +218,5 @@ The component management summary now separately counts plugins requiring source/
 ## 0.14.0 terminal report display and review-aware status
 
 After normal audit completion, `report.md` is printed on an interactive standard-output TTY and its case path is always shown. If stdout is redirected or piped, only the report path is printed, even with `--show-report`. `--no-show-report` takes priority over `--show-report`. The internal `technical-report.md` is never auto-displayed. Automation exit codes are unchanged: 0 no selected markers or unresolved reviews; 10 known residues; 20 independently confirmed compromise (reserved); 30 execution error; 40 incomplete audit or unresolved review. Non-malware Core update, configuration and provenance/version review findings now yield `REVISAO_NECESSARIA` with exit 40; this does not indicate confirmed compromise.
+
+Akismet static-asset allowlists are checked for executable file extensions, without rejecting harmless filename substrings such as `refresh`.
