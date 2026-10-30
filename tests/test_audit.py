@@ -834,6 +834,24 @@ $table_prefix = 'wp_';
             self.assertEqual(record["query_status"], "API_UNAVAILABLE")
             self.assertNotEqual(record["state"], "CORE_VALIDADO")
 
+    def test_official_api_http_error_classification(self):
+        import component_versions as cv
+        import urllib.error
+        cases = [
+            ("/plugins/info/1.2/", 404, "NOT_FOUND_OFFICIAL_REPOSITORY"),
+            ("/themes/info/1.2/", 404, "NOT_FOUND_OFFICIAL_REPOSITORY"),
+            ("/plugins/info/1.2/", 503, "API_UNAVAILABLE"),
+            ("/core/checksums/1.0/", 404, "API_UNAVAILABLE"),
+        ]
+        for endpoint, code, expected in cases:
+            with self.subTest(endpoint=endpoint, code=code):
+                error = urllib.error.HTTPError("https://api.wordpress.org", code, "failure", {}, None)
+                with unittest.mock.patch.object(cv.urllib.request, "urlopen", side_effect=error):
+                    state, data, url = cv.api_json(endpoint, {"action": "test"})
+                self.assertEqual(state, expected)
+                self.assertIsNone(data)
+                self.assertTrue(url.startswith("https://api.wordpress.org/"))
+
     def test_secret_redaction(self):
         self.assertNotIn("example-secret", audit.redact("password=example-secret"))
         self.assertNotIn("192.168.1.20", audit.redact("192.168.1.20"))
