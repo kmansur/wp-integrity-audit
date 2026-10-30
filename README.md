@@ -152,3 +152,9 @@ Known BitNinja-associated host paths are labeled `COMPONENTE_DE_SEGURANCA_CONHEC
 ## Strict MetForm upload-cache triage
 
 A PHP `index.php` under uploads is classified as `LEGITIMO_VALIDADO` only if its full contents match the exact `Silence is golden.` guard bytes (LF/CRLF); arbitrary PHP at this location remains reviewable. A `font-awesome-<16 lowercase hex>.php` file under `wp-content/uploads/metform/cache/icons/` with a PHP return-array header is classified as `CACHE_PLUGIN_REQUER_VALIDACAO`, **not** as verified plugin content. The full file and its generation mechanism remain unverified; this classification **still forces exit code 40** in an otherwise marker-free audit. File-name matches alone never certify integrity.
+
+## Akismet access control and report consistency
+
+The Akismet `wp-content/plugins/akismet/.htaccess` receives `LEGITIMO_VALIDADO` only when a narrow parser finds a deny-by-default policy with asset-scoped FilesMatch grants and no unrecognized directives or PHP-executable extensions. Other Akismet rules remain subject to manual review. The `security_configuration_review` count in JSON now matches the configuration review total; any plugin security-file review is recorded separately. The management database risk is `LOW — no selected database IOC` only if targeted SQL checks were executed without family residues or selected active markers. WordPress sessions are informational and are not by themselves an indicator of compromise.
+
+A MetForm PHP return-array header and absence of a small set of known IOCs do not prove all 1.6 MB of cache data safe. Until verified against a trusted plugin implementation or a strict full-file parser, these caches remain `CACHE_PLUGIN_REQUER_VALIDACAO`.
