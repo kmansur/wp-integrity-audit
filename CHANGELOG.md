@@ -315,3 +315,5 @@ All project documentation and source commentary are in English. Versions follow 
 
 ### Tests
 - Cover TTY/non-TTY behavior, explicit suppression and unresolved-component exit semantics.
+
+- Fix overly broad Akismet static-asset extension screening: `refresh` filenames were incorrectly rejected because they contain the suffix `sh`. Only executable file extensions are disallowed.
