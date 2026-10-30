@@ -128,6 +128,36 @@ class MySQLFixtureTests(unittest.TestCase):
                 self.assertIn("site/wp-content/fixture.txt", archive.getnames())
             self.assertIn("wp_options", (case / "database-before.sql").read_text(errors="replace"))
 
+    def test_database_dump_restores_into_disposable_database(self):
+        """Verify a generated dump by restoring it into an isolated second DB.
+
+        Never restore into the live fixture or a production database.
+        """
+        restore_db = "wp_audit_restore_fixture"
+        command = ["mysql", f"--defaults-extra-file={self.cnf}"]
+        try:
+            subprocess.run(command + ["-e", f"CREATE DATABASE {restore_db}"], check=True)
+            with tempfile.TemporaryDirectory() as directory:
+                site = Path(directory) / "site"
+                case = Path(directory) / "case"
+                site.mkdir()
+                case.mkdir()
+                (site / "wp-content").mkdir()
+                (site / "wp-content" / "proof.txt").write_text("synthetic restore test")
+                audit.snapshot(site, case, self.cnf, self.dbname)
+                with (case / "database-before.sql").open("rb") as dump:
+                    subprocess.run(command + [restore_db], stdin=dump, check=True)
+                with (case / "site-before.tar.gz").open("rb") as archive:
+                    self.assertGreater(len(archive.read()), 100)
+                rows = audit.query_db(self.cnf, restore_db,
+                    "SELECT option_value FROM wp_options WHERE option_name='active_plugins';")
+                self.assertEqual(rows, [['a:1:{i:0;s:21:"legitimate/plugin.php";}']])
+                rows = audit.query_db(self.cnf, restore_db,
+                    "SELECT COUNT(*) FROM wp_users WHERE user_login='admin_abcdef';")
+                self.assertEqual(rows, [["1"]])
+        finally:
+            subprocess.run(command + ["-e", f"DROP DATABASE IF EXISTS {restore_db}"], check=True)
+
     def test_refuses_to_delete_malicious_serialized_option(self):
         self.query("UPDATE wp_options SET option_value='cipher-feeder' WHERE option_name='cron'")
         with self.assertRaises(audit.AuditError):
