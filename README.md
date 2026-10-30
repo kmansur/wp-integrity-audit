@@ -114,3 +114,9 @@ Comparison never scans or changes the live WordPress site. Both source cases mus
 Read-only audit modes now write `configuration-evidence.json` for configuration files inside the WordPress tree (`.htaccess`, `.user.ini`, `php.ini`, `web.config` and related names). Only relative paths, metadata, modes and SHA-256 values are collected; file contents are never exported. This inventory does not inspect host-wide Apache/PHP-FPM configuration, and a configuration file's presence does not demonstrate compromise.
 
 Hidden-directory PHP files now receive `PHP_DIRETORIO_OCULTO_REQUER_VALIDACAO` unless stronger indicators apply. This is a contextual review flag, not a compromise finding; `.well-known` is excluded from the hidden-directory heuristic.
+
+## Optional core integrity and host persistence metadata
+
+`--audit --check-core TARGET` reads the installed `wp-includes/version.php` as plain text, requests official MD5 checksums over HTTPS from `api.wordpress.org`, and writes `core-integrity.json`. It does **not** execute PHP, invoke WP-CLI, download code archives or change core files. Missing or mismatched files are marked for manual review; official checksum comparisons assume `en_US`, so localized WordPress installations may legitimately differ. Checksum unavailability is explicitly recorded in JSON and must not be interpreted as integrity success.
+
+`--audit --host-persistence TARGET` additionally inventories metadata (paths, SHA-256, sizes and modes) from selected Linux cron, systemd, PHP and Apache configuration locations. It writes `host-persistence.json`, never exports configuration bodies, and does not change or restart services. This is **not** a complete host-persistence investigation: per-user crontabs, running processes, deleted files, and external services require separate review. These probes are opt-in and available only in audit mode.
