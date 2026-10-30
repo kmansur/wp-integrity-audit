@@ -821,6 +821,11 @@ def compare_cases(old_case: Path, new_case: Path, output: Path) -> dict:
             raise AuditError(f"Missing or symlinked case evidence: {name}")
         with file.open(encoding="utf-8") as stream:
             return json.load(stream)
+    old_real, new_real = old_case.resolve(strict=True), new_case.resolve(strict=True)
+    requested_output = output.resolve()
+    if (requested_output == old_real or requested_output == new_real or
+            old_real in requested_output.parents or new_real in requested_output.parents):
+        raise AuditError("Comparison output must be outside both source cases")
     old_summary, new_summary = load(old_case, "report.json"), load(new_case, "report.json")
     if not old_summary.get("database_audited") or not new_summary.get("database_audited"):
         raise AuditError("Comparison requires two complete database audits")
