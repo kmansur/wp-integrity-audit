@@ -341,6 +341,8 @@ def host_persistence_inventory(case: Path, roots: list[Path]) -> list[dict]:
                                  "mode": oct(stat.S_IMODE(info.st_mode)),
                                  "sha256": sha256(file), "source": "host_metadata",
                                  "classification": ("HOST_INDICATOR_REQUIRES_INVESTIGATION" if indicator
+                                                    else "COMPONENTE_DE_SEGURANCA_CONHECIDO"
+                                                    if "bitninja" in str(file).lower()
                                                     else "INVENTARIADO_SEM_INDICADOR")})
             except OSError:
                 continue
@@ -533,7 +535,7 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
         f"- Core discrepancies: **{core_count}**",
         f"- Configuration files requiring review: **{config_count}**",
         f"- External persistence indicators: **{host_indicators}**",
-        f"- Host inventory entries: **{len(host_records)}** (requiring review: {host_review})",
+        f"- Host inventory entries: **{len(host_records)}** (known security: {host_known}; unclassified: {host_unclassified}; suspicious: {host_indicators}; review: {host_review})",
         *[f"- Optional probe issue: {issue}" for issue in optional_issues],
         "- Release recommendation: **LIBERAÇÃO NÃO RECOMENDADA**",
         "", "## Audit metadata", "",
