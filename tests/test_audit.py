@@ -419,6 +419,35 @@ $table_prefix = 'wp_';
             with self.assertRaises(audit.AuditError):
                 audit.host_persistence_inventory(Path(directory), [Path(directory)])
 
+    def test_core_discrepancy_marks_clean_case_incomplete(self):
+        import json
+        with tempfile.TemporaryDirectory() as directory:
+            case = Path(directory)
+            audit.write_private(case / "core-integrity.json", json.dumps({
+                "status": "COMPLETE",
+                "findings": [{"path": "wp-load.php",
+                              "classification": "CORE_MODIFICADO_REQUER_REVISAO"}],
+            }))
+            audit.make_report(case, "audit", [], [], [], "fixture", "wp_")
+            result = json.loads((case / "report.json").read_text())
+            self.assertEqual(result["status"], "AUDITORIA_INCOMPLETA")
+            self.assertEqual(result["exit_code"], 40)
+            self.assertEqual(len(result["optional_probe_review"]), 1)
+
+    def test_family_residues_keep_priority_over_core_discrepancy(self):
+        import json
+        with tempfile.TemporaryDirectory() as directory:
+            case = Path(directory)
+            audit.write_private(case / "core-integrity.json",
+                                json.dumps({"status": "UNAVAILABLE", "findings": []}))
+            audit.make_report(case, "audit", [], [],
+                              [{"kind": "family_option", "name": "sc_test",
+                                "state": "RESIDUO_FAMILIA_REQUER_LIMPEZA", "length": "1"}],
+                              "fixture", "wp_")
+            result = json.loads((case / "report.json").read_text())
+            self.assertEqual(result["exit_code"], 10)
+            self.assertTrue(result["optional_probe_review"])
+
     def test_secret_redaction(self):
         self.assertNotIn("example-secret", audit.redact("password=example-secret"))
         self.assertNotIn("192.168.1.20", audit.redact("192.168.1.20"))
