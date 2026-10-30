@@ -239,3 +239,6 @@ All project documentation and source commentary are in English. Versions follow 
 - Verify WordPress.org plugin manifest MD5 checksums at the installed plugin version, without downloading plugin code; classify changed files as requiring review.
 - Propagate critical Core/plugin integrity differences into incomplete-review exit semantics.
 - Expand component report columns to include parent themes, query outcomes and provenance.
+
+- Compare the locally validated Core version with the advertised latest WordPress.org version, preserving checksum mismatch as the higher-priority state.
+- Add regression coverage for outdated Core and checksum-review precedence.
