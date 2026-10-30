@@ -49,14 +49,11 @@ def redact(value: object) -> str:
     return value[:240]
 
 def sanitize_relative_path(path: str) -> str:
-    """Keep evidentiary relative paths but mask explicit sensitive substrings.
-
-    Never use generic length/entropy heuristics for filenames. The source
-    is always relative to the audited WordPress root, not an absolute host path.
-    """
+    """Preserve relative evidence paths while masking explicit sensitive values."""
     value = SENSITIVE.sub(lambda m: m.group(1) + "=[REDACTED]", path)
-    value = re.sub(r"(?<!\\d)(?:\\d{1,3}\\.){3}\\d{1,3}(?!\\d)", "[IP_REDACTED]", value)
-    return value.replace("|", "/").replace("\\n", " ").replace("\\r", " ")
+    value = re.sub(r"(?<!\d)(?:\d{1,3}\.){3}\d{1,3}(?!\d)", "[IP_REDACTED]", value)
+    return value.replace("|", "/").replace("\n", " ").replace("\r", " ")
+
 
 
 def sha256(path: Path) -> str:
