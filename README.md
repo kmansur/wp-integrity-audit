@@ -108,3 +108,7 @@ Each case now includes `evidence-index.json` with deterministic `FILE-001` / `DB
 `python3 bin/wp-integrity-audit.py --compare OLD_CASE NEW_CASE --compare-output /var/lib/wp-integrity-audit/comparisons/review-001`
 
 Comparison never scans or changes the live WordPress site. Both source cases must have complete database coverage and the same database name. Generates private `comparison.json` and `comparison.md` with added, removed and changed file/database evidence (using paths or option identifiers, not ephemeral evidence IDs). A changed cron hash is informational, not proof of compromise. The comparison does not authorize reopening a site.
+
+## WordPress configuration inventory
+
+Read-only audit modes now write `configuration-evidence.json` for configuration files inside the WordPress tree (`.htaccess`, `.user.ini`, `php.ini`, `web.config` and related names). Only relative paths, metadata, modes and SHA-256 values are collected; file contents are never exported. This inventory does not inspect host-wide Apache/PHP-FPM configuration, and a configuration file's presence does not demonstrate compromise.
