@@ -328,8 +328,10 @@ def append_management_section(case: Path) -> None:
             f"- WordPress instalado: {summary.get('core_version') or 'Unknown'}",
             f"- Plugins verificados: {summary.get('plugins_checked', 0)}",
             f"- Plugins desatualizados: {summary.get('plugins_outdated', 0)}",
+            f"- Plugins premium/customizados: {summary.get('plugins_premium_custom', 0)}",
             f"- Temas verificados: {summary.get('themes_checked', 0)}",
             f"- Temas desatualizados: {summary.get('themes_outdated', 0)}",
+            f"- Temas premium/customizados: {summary.get('themes_premium_custom', 0)}",
             f"- Componentes não encontrados no repositório: {summary.get('unlisted', 0)}",
             "- Component detail: component-version-report.md", ""]
     for path in (case / "report.md", case / "technical-report.md"):
