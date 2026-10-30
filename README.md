@@ -102,3 +102,9 @@ The `report.json` contains high-level summary and result status only; detailed e
 ## Evidence indexing and CSV
 
 Each case now includes `evidence-index.json` with deterministic `FILE-001` / `DB-001` references, SQL table/column provenance, and relative file paths. A one-row `report.csv` provides a privacy-conscious fleet-summary alongside `report.json` and `report.md`. Evidence IDs are unique within a case, not across different collections; use the case directory identifier as the namespace.
+
+## Compare two complete audit cases
+
+`python3 bin/wp-integrity-audit.py --compare OLD_CASE NEW_CASE --compare-output /var/lib/wp-integrity-audit/comparisons/review-001`
+
+Comparison never scans or changes the live WordPress site. Both source cases must have complete database coverage and the same database name. Generates private `comparison.json` and `comparison.md` with added, removed and changed file/database evidence (using paths or option identifiers, not ephemeral evidence IDs). A changed cron hash is informational, not proof of compromise. The comparison does not authorize reopening a site.
