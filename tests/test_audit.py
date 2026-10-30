@@ -94,6 +94,44 @@ $table_prefix = 'wp_';
             self.assertTrue((cases[0] / "file-evidence.json").is_file())
             self.assertFalse((cases[0] / "database-before.sql").exists())
 
+    def test_full_file_scan_detects_tail_indicator(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "root"
+            case = Path(directory) / "case"
+            root.mkdir()
+            case.mkdir()
+            (root / "long.php").write_text("X" * 350_000 + " sc_cron_guard")
+            findings = audit.file_audit(root, case)
+            self.assertEqual(len(findings), 1)
+            self.assertEqual(findings[0]["indicator"], "sc_cron_guard")
+
+    def test_reject_symlinks_in_clean_source(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            source = base / "clean"
+            site = base / "site"
+            source.mkdir()
+            site.mkdir()
+            (source / "link").symlink_to("/etc/passwd")
+            with self.assertRaises(audit.AuditError):
+                audit.validate_source(source, site)
+
+    def test_quarantine_is_outside_document_root(self):
+        with tempfile.TemporaryDirectory() as directory:
+            site = Path(directory) / "site"
+            case = Path(directory) / "case"
+            stage = Path(directory) / "stage"
+            site.mkdir()
+            case.mkdir()
+            (site / "wp-content").mkdir()
+            (site / "wp-content" / "old.txt").write_text("old")
+            stage.mkdir()
+            (stage / "new.txt").write_text("new")
+            quarantine = audit.swap_files(site, stage, case)
+            self.assertNotIn(site, quarantine.parents)
+            self.assertTrue((quarantine / "old.txt").exists())
+            self.assertTrue((site / "wp-content" / "new.txt").exists())
+
     def test_secret_redaction(self):
         self.assertNotIn("example-secret", audit.redact("password=example-secret"))
         self.assertNotIn("192.168.1.20", audit.redact("192.168.1.20"))
