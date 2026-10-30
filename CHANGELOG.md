@@ -2,6 +2,13 @@
 
 All project documentation and source commentary are in English. Versions follow Semantic Versioning.
 
+## [Unreleased]
+
+### Fixed
+- Scan complete staged content with the same full-file and filename IOC checks used for clean sources, including files downloaded during official component synchronization.
+- Prevent automatic filesystem rollback after a database write has started, because a client error does not prove the transaction was rolled back.
+- Add a regression test for malware markers after the first 256 KiB of staged PHP content.
+
 ## [0.1.0] - 2026-10-30 (Python branch; pre-release)
 
 ### Added
