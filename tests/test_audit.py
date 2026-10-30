@@ -305,6 +305,47 @@ $table_prefix = 'wp_';
             self.assertEqual(index["database"][0]["table"], "wp_options")
             self.assertIn("## Executive summary", (case / "report.md").read_text())
 
+    def test_compare_cases_reports_added_removed_and_changed(self):
+        import json
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            before, after, output = (root / name for name in ("before", "after", "out"))
+            before.mkdir()
+            after.mkdir()
+            for directory, files, options in (
+                (before, [{"path": "old.php", "sha256": "a" * 64},
+                          {"path": "changed.php", "sha256": "a" * 64}],
+                         [{"kind": "family_option", "name": "sc_old", "sha256": "1" * 64}]),
+                (after, [{"path": "new.php", "sha256": "b" * 64},
+                         {"path": "changed.php", "sha256": "b" * 64}],
+                        [{"kind": "family_option", "name": "sc_new", "sha256": "2" * 64}]),
+            ):
+                (directory / "report.json").write_text(json.dumps({
+                    "database": "fixture_db", "database_audited": True,
+                    "status": "RESIDUOS_REQUEREM_LIMPEZA"}))
+                (directory / "file-evidence.json").write_text(json.dumps(files))
+                (directory / "database-evidence.json").write_text(json.dumps(options))
+            result = audit.compare_cases(before, after, output)
+            self.assertEqual(result["diff"]["files"]["added"], ["new.php"])
+            self.assertEqual(result["diff"]["files"]["removed"], ["old.php"])
+            self.assertEqual(result["diff"]["files"]["changed"], ["changed.php"])
+            self.assertIn("family_option:sc_new", result["diff"]["database"]["added"])
+            self.assertTrue((output / "comparison.md").is_file())
+            self.assertTrue((output / "comparison.json").is_file())
+
+    def test_compare_refuses_incomplete_database_cases(self):
+        import json
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            a, b = base / "a", base / "b"
+            a.mkdir()
+            b.mkdir()
+            for p in (a, b):
+                (p / "report.json").write_text(json.dumps({
+                    "database": "fixture_db", "database_audited": False}))
+            with self.assertRaises(audit.AuditError):
+                audit.compare_cases(a, b, base / "out")
+
     def test_secret_redaction(self):
         self.assertNotIn("example-secret", audit.redact("password=example-secret"))
         self.assertNotIn("192.168.1.20", audit.redact("192.168.1.20"))
