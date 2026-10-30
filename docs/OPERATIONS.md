@@ -113,3 +113,7 @@ Do not operate `--apply-files`, `--apply-db`, or `--recover` on production until
 ## Mandatory recovery gate (0.5.0)
 
 `--apply-files`, `--apply-db`, and `--recover` fail closed and perform no modification. Re-enable these only after disposable acceptance tests prove ownership and media preservation, source-version correctness, and rollback under injected failures. Default audit remains read-only for the target site and emits private case artifacts. Generic webshell signatures require operator confirmation and must not be treated as forensic proof.
+
+## Recent changes and WordPress persistence
+
+Use `timeline.json` to correlate recent filesystem changes with incident timestamps, remembering that Unix ctime reflects metadata changes and that adversaries may alter mtime. Check `wordpress-persistence.json` for MU-plugins and drop-ins requiring independent provenance validation. The default timeline window is 30 days. Preserve the private case directory and do not distribute internal paths without review.
