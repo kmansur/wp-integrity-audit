@@ -144,3 +144,10 @@ All project documentation and source commentary are in English. Versions follow 
 - Separate domain and case_id in CSV and JSON.
 - Classify ordinary host configuration files as INVENTARIADO_SEM_INDICADOR rather than indiscriminately labeling them suspicious; flag only recognized IOC patterns for investigation.
 - Keep detailed host paths in internal JSON and omit infrastructure names from the Markdown host summary; add regression coverage.
+
+### Management reporting and host IOC triage
+- Split management `report.md` from detailed internal `technical-report.md`.
+- Summarize Core differences and configuration review counts in both outputs; preserve detailed evidence only in the technical report.
+- Keep product-specific host inventory paths in internal `host-persistence.json`; avoid generic suspicion labels for ordinary host files.
+- Highlight explicit host indicators in optional probe review without overriding confirmed database residue status.
+- Extend report and CSV tests for per-domain case identifiers and sanitized management summaries.
