@@ -108,3 +108,5 @@ All project documentation and source commentary are in English. Versions follow 
 - Add read-only `--compare OLD_CASE NEW_CASE` with optional `--compare-output`.
 - Write private Markdown and JSON comparison reports identifying new, removed and changed file/database evidence.
 - Reject comparisons with incomplete database audits or mismatched database names; add synthetic regression tests.
+
+- Prevent comparison output directories from being created inside either source case; add regression test.
