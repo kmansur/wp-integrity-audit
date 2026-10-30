@@ -242,3 +242,7 @@ All project documentation and source commentary are in English. Versions follow 
 
 - Compare the locally validated Core version with the advertised latest WordPress.org version, preserving checksum mismatch as the higher-priority state.
 - Add regression coverage for outdated Core and checksum-review precedence.
+
+- Distinguish an officially listed plugin whose checksum manifest is missing from a genuinely modified plugin (`PLUGIN_OFICIAL_SEM_CHECKSUM`).
+- Display premium/custom plugin and theme totals in the management report.
+- Add regression tests for current and outdated WordPress.org plugin versions and unavailable plugin checksum manifests.
