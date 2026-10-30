@@ -55,7 +55,10 @@ def api_json(path: str, params: dict, *, timeout: int = 12) -> tuple[str, dict |
         if "error" in data:
             return "NOT_FOUND_OFFICIAL_REPOSITORY", None, url
         return "SUCCESS", data, url
-    except (OSError, ValueError, urllib.error.URLError, TimeoutError):
+    except urllib.error.HTTPError as error:
+        return ("NOT_FOUND_OFFICIAL_REPOSITORY" if error.code == 404 and
+                path in ("/plugins/info/1.2/", "/themes/info/1.2/") else "API_UNAVAILABLE"), None, url
+    except (OSError, ValueError, TimeoutError):
         return "API_UNAVAILABLE", None, url
 
 def local_core(target: Path) -> dict:
