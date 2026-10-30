@@ -35,3 +35,9 @@ python3 -m unittest discover -s tests -v
 ```
 
 These checks cover syntax and selected isolated behavior. Before declaring production readiness, build disposable WordPress/MySQL/MariaDB fixtures and validate both normal and interruption/error paths, restoring all backups independently.
+
+## Default database coverage
+
+`--audit` now combines filesystem, process and MySQL checks. The operator must have a valid readable WordPress `wp-config.php` with literal DB constants and a reachable MySQL/MariaDB server. Database connection errors fail the audit. Use `--audit --files-only TARGET` to intentionally omit the database; the report explicitly identifies this omission. No full database export is performed during these audits.
+
+The result should be interpreted from the live case evidence, never copied from a previous incident. Historical references in plugin caches are reported separately from active indicators. Files identified as plugin guard patterns are not cryptographically verified, and may still require independent package integrity checks.
