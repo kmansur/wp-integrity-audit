@@ -8,6 +8,8 @@ All project documentation and source commentary are in English. Versions follow 
 - Synthetic MySQL integration test that restores a generated SQL backup into a second isolated database and verifies WordPress fixture records.
 
 ### Fixed
+- Remove temporary staged WordPress files if SQL preflight or operator confirmation fails, before any site modification.
+- Add regression coverage for swap failure rollback and evidence-file permissions.
 - Read archived file bodies to detect truncated or corrupted tar backups instead of checking headers alone.
 - Scan complete staged content with the same full-file and filename IOC checks used for clean sources, including files downloaded during official component synchronization.
 - Prevent automatic filesystem rollback after a database write has started, because a client error does not prove the transaction was rolled back.
