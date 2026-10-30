@@ -485,7 +485,7 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
         f"- Active database markers: **{summary['active_database_markers']}**",
         f"- Confirmed compromised files: **{summary['confirmed_compromised_files']}**",
         f"- Validated legitimate file patterns: **{summary['validated_legitimate_files']}**",
-        f"- Security configurations requiring validation: **{summary['security_configuration_review']}**",
+        f"- Security configurations requiring validation: **{summary['security_configuration_review'] + config_count}**",
         f"- Suspicious processes: **{summary['suspicious_processes']}**",
         f"- Core discrepancies: **{core_count}**",
         f"- Configuration files requiring review: **{config_count}**",
