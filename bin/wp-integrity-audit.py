@@ -119,6 +119,30 @@ def iter_files(root: Path):
             if path.is_file() and not path.is_symlink():
                 yield path
 
+def known_upload_guard(path: Path) -> bool:
+    """Accept only an exact, minimal WordPress directory-listing guard."""
+    try:
+        return (path.is_file() and not path.is_symlink() and path.stat().st_size <= 64
+                and path.read_bytes() in (b"<?php\n// Silence is golden.\n",
+                                          b"<?php\r\n// Silence is golden.\r\n"))
+    except OSError:
+        return False
+
+
+def metform_icon_cache_candidate(relative: str, path: Path) -> bool:
+    """Identify a candidate for review, never certify it as legitimate."""
+    if not re.fullmatch(r"wp-content/uploads/metform/cache/icons/font-awesome-[a-f0-9]{16}\\.php", relative):
+        return False
+    try:
+        if path.is_symlink() or not path.is_file() or path.stat().st_size > 8388608:
+            return False
+        with path.open("rb") as stream:
+            head = stream.read(4096)
+        return bool(re.match(rb"\\s*<\\?php\\s+return\\s+(?:array\\s*\\(|\\[)", head))
+    except OSError:
+        return False
+
+
 def classify_file(relative: str, name: str, text: str, indicator: str | None) -> tuple[str, str]:
     """Classify evidence conservatively, with explicit legitimate guard cases.
 
@@ -177,6 +201,10 @@ def file_audit(target: Path, case: Path) -> list[dict]:
         if not (unusual or upload_php or hidden_php or match):
             continue
         classification, reason = classify_file(relative, name, safe_text, match.group(0) if match else None)
+        if upload_php and not match and name == "index.php" and known_upload_guard(path):
+            classification, reason = "LEGITIMO_VALIDADO", "Exact WordPress directory-listing guard content"
+        elif upload_php and not match and metform_icon_cache_candidate(relative, path):
+            classification, reason = "CACHE_PLUGIN_REQUER_VALIDACAO", "MetForm icon cache candidate; origin and complete content not verified"
         if hidden_php and not match and classification == "ARQUIVO_SUSPEITO_REQUER_VALIDACAO":
             classification, reason = "PHP_DIRETORIO_OCULTO_REQUER_VALIDACAO", "PHP within hidden directory"
         if relative.startswith("wp-content/wflogs/"):
@@ -389,7 +417,7 @@ def audit_status(files: list[dict], processes: list[str],
         "validated_legitimate_files": sum(x.get("classification") == "LEGITIMO_VALIDADO" for x in files),
         "security_configuration_review": sum(x.get("classification") == "CONFIGURACAO_PLUGIN_SEGURANCA_REQUER_VALIDACAO" for x in files),
         "confirmed_compromised_files": 0,  # Heuristic file matches are not forensic confirmation.
-        "file_indicators_requiring_review": sum(x.get("classification") in ("IOC_REQUER_VALIDACAO", "ARQUIVO_SUSPEITO_REQUER_VALIDACAO", "PHP_UPLOAD_REQUER_VALIDACAO", "PHP_DIRETORIO_OCULTO_REQUER_VALIDACAO") for x in files),
+        "file_indicators_requiring_review": sum(x.get("classification") in ("IOC_REQUER_VALIDACAO", "ARQUIVO_SUSPEITO_REQUER_VALIDACAO", "PHP_UPLOAD_REQUER_VALIDACAO", "PHP_DIRETORIO_OCULTO_REQUER_VALIDACAO", "CACHE_PLUGIN_REQUER_VALIDACAO") for x in files),
         "suspicious_processes": len(processes),
     }
     if database is None:
