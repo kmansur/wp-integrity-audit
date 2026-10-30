@@ -400,6 +400,21 @@ def optional_probe_review(case: Path) -> list[str]:
     return issues
 
 
+def supplementary_evidence(case: Path) -> tuple[dict, list, list]:
+    """Load metadata only; keep detailed host inventory in internal evidence."""
+    def read(name, fallback):
+        path = case / name
+        if not path.is_file() or path.is_symlink():
+            return fallback
+        return json.loads(path.read_text(encoding="utf-8"))
+    core = read("core-integrity.json", {})
+    configs = read("configuration-evidence.json", [])
+    host = read("host-persistence.json", [])
+    if not isinstance(core, dict) or not isinstance(configs, list) or not isinstance(host, list):
+        raise AuditError("Malformed supplementary evidence")
+    return core, configs, host
+
+
 def make_report(case: Path, mode: str, findings: list[dict], processes: list[str],
                 database: list[dict] | None = None, db_name: str | None = None, db_prefix: str | None = None) -> None:
     """Generate a precise coverage statement and evidence-based technical opinion."""
@@ -407,6 +422,14 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
     attach_evidence_ids(findings, database, db_name, db_prefix)
     status, exit_code, summary = audit_status(findings, processes, database)
     optional_issues = optional_probe_review(case)
+    core, configurations, host_records = supplementary_evidence(case)
+    core_count = len(core.get("findings", []))
+    config_count = len(configurations)
+    host_indicators = sum(x.get("classification") == "HOST_INDICATOR_REQUIRES_INVESTIGATION" for x in host_records)
+    host_review = sum(x.get("classification") == "HOST_PERSISTENCE_REQUIRES_CONTEXT" for x in host_records)
+    host_legitimate = len(host_records) - host_indicators - host_review
+    case_match = re.fullmatch(r"(.+)-(\d{8}T\d{6}Z-[a-f0-9]{6})", case.name)
+    domain, case_id = (case_match.group(1), case_match.group(2)) if case_match else (case.name, case.name)
     if optional_issues and exit_code == 0:
         status, exit_code = "AUDITORIA_INCOMPLETA", 40
     write_private(case / "report.json", json.dumps({
@@ -415,6 +438,9 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
         "collected_at_utc": dt.datetime.now(dt.timezone.utc).isoformat(),
         "status": status, "exit_code": exit_code, "summary": summary,
         "optional_probe_review": optional_issues,
+        "domain": domain, "case_id": case_id,
+        "core_discrepancies": core_count, "configuration_review_count": config_count,
+        "host_persistence_indicators": host_indicators, "host_persistence_review": host_review,
         "database": db_name if audited else None,
         "table_prefix": db_prefix if audited else None,
         "database_audited": audited,
@@ -423,11 +449,11 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
     # Persist a normalized audit summary for fleet-wide CSV aggregation.
     csv_stream = io.StringIO()
     writer = csv.writer(csv_stream)
-    writer.writerow(["domain", "status", "exit_code", "family_residues",
+    writer.writerow(["domain", "case_id", "status", "exit_code", "family_residues",
                      "historical_references", "informational_records",
                      "active_database_markers", "file_review", "suspicious_processes",
                      "release_recommended", "tool_version"])
-    writer.writerow([case.name, status, exit_code, summary["confirmed_family_residues"],
+    writer.writerow([domain, case_id, status, exit_code, summary["confirmed_family_residues"],
                      summary["historical_references"], summary["informational_records"],
                      summary["active_database_markers"],
                      summary["file_indicators_requiring_review"], summary["suspicious_processes"],
@@ -453,6 +479,10 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
         f"- Validated legitimate file patterns: **{summary['validated_legitimate_files']}**",
         f"- Security configurations requiring validation: **{summary['security_configuration_review']}**",
         f"- Suspicious processes: **{summary['suspicious_processes']}**",
+        f"- Core discrepancies: **{core_count}**",
+        f"- Configuration files requiring review: **{config_count}**",
+        f"- External persistence indicators: **{host_indicators}**",
+        f"- Host inventory entries: **{len(host_records)}** (requiring review: {host_review})",
         *[f"- Optional probe issue: {issue}" for issue in optional_issues],
         "- Release recommendation: **LIBERAÇÃO NÃO RECOMENDADA**",
         "", "## Audit metadata", "",
@@ -496,6 +526,25 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
                    f"- Known cron marker matches: {len(item['indicator_matches'])}"]
                   if item.get("kind") == "cron_metadata" else []), "",
             ])
+    lines.extend(["", "## WordPress Core integrity", "",
+                  f"- Status: `{core.get('status', 'NOT EXECUTED')}`",
+                  f"- Discrepancies: **{core_count}**", ""])
+    for item in core.get("findings", []):
+        lines.append(f"- `{sanitize_relative_path(item.get('path', ''))}`: "
+                     f"`{item.get('classification', 'REVIEW')}`")
+    if any(item.get("path") == "wp-includes/version.php" for item in core.get("findings", [])):
+        lines.append("- Priority review: `wp-includes/version.php` differs from the reference; this alone does not prove malware.")
+    lines.extend(["", "## WordPress configuration inventory", "",
+                  f"- Configuration files requiring review: **{config_count}**", "",
+                  "| Relative path | Classification | SHA-256 |", "|---|---|---|"])
+    for item in configurations:
+        lines.append(f"| `{sanitize_relative_path(item.get('path', ''))}` | "
+                     f"{item.get('classification', 'REVIEW')} | `{item.get('sha256', '')}` |")
+    lines.extend(["", "## External persistence summary", "",
+                  f"- Suspicious indicators: **{host_indicators}**",
+                  f"- Legitimate/inventory items: **{host_legitimate}**",
+                  f"- Items requiring review: **{host_review}**",
+                  "- Detailed host paths remain in the internal host-persistence.json.", ""])
     lines.extend(["", "## Technical opinion", ""])
     critical = [x for x in findings if x["classification"] == "IOC_REQUER_VALIDACAO"]
     if audited:
