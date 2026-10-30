@@ -499,6 +499,8 @@ $table_prefix = 'wp_';
             self.assertEqual(doc["domain"], "mbengenharia.com")
             self.assertEqual(doc["case_id"], "20261030T220303Z-538f44")
             self.assertEqual(doc["configuration_review_count"], 1)
+            self.assertEqual(doc["summary"]["security_configuration_review"], 1)
+            self.assertEqual(doc["persistence_risk"], "REVIEW REQUIRED")
             self.assertEqual(doc["core_discrepancies"], 2)
             self.assertEqual(doc["host_persistence_indicators"], 1)
             md = (case / "technical-report.md").read_text()
@@ -514,6 +516,23 @@ $table_prefix = 'wp_';
             csv_rows = list(csv.reader((case / "report.csv").open()))
             self.assertEqual(csv_rows[0][:2], ["domain", "case_id"])
             self.assertEqual(csv_rows[1][:2], ["mbengenharia.com", "20261030T220303Z-538f44"])
+
+    def test_configuration_directives_only_export_labels(self):
+        import json
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder) / "site"
+            case = Path(folder) / "case"
+            root.mkdir()
+            case.mkdir()
+            (root / ".htaccess").write_text("AddHandler application/x-httpd-php .jpg\\n")
+            (root / ".user.ini").write_text("memory_limit=256M\\n")
+            result = audit.configuration_audit(root, case)
+            by_name = {item["path"]: item for item in result}
+            self.assertEqual(by_name[".htaccess"]["classification"], "CONFIGURACAO_REQUER_VALIDACAO")
+            self.assertEqual(by_name[".user.ini"]["classification"], "CONFIGURACAO_INVENTARIADA_SEM_INDICADOR")
+            evidence = (case / "configuration-evidence.json").read_text()
+            self.assertIn("HANDLER_OVERRIDE", evidence)
+            self.assertNotIn("application/x-httpd-php", evidence)
 
     def test_secret_redaction(self):
         self.assertNotIn("example-secret", audit.redact("password=example-secret"))
