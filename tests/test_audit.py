@@ -264,6 +264,7 @@ $table_prefix = 'wp_';
             self.assertIn(path, report)
             self.assertIn("NOT EXECUTED", report)
             self.assertIn("NOT EVALUATED", report)
+            self.assertIn("LIBERAÇÃO NÃO RECOMENDADA", report)
             self.assertNotIn("[LONG_VALUE_REDACTED]", report)
 
     def test_sensitive_path_substrings_only(self):
