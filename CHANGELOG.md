@@ -179,3 +179,7 @@ All project documentation and source commentary are in English. Versions follow 
 - Eliminate duplicate security-configuration counts between JSON and Markdown.
 - Show scoped low database risk when completed targeted checks find no selected database IOC; WordPress session rows remain informational.
 - Keep MetForm icon caches under review until their full contents and trusted generator are verified.
+
+- Match the observed guarded MetForm cache header with a generator comment and `ABSPATH` guard, preserving manual-review status.
+- Support nested `IfModule` blocks in strict Akismet `.htaccess` access-rule recognition.
+- Add synthetic regression tests for guarded headers, nested blocks and unsafe grants.
