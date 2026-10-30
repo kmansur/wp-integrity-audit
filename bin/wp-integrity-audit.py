@@ -603,7 +603,38 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
                   "", "## Limitations", "",
                   "Classification of plugin guard files is signature-based, not proof of package integrity.",
                   "No findings never establish that a site is clean. Review evidence before distributing reports."])
-    write_private(case / "report.md", "\n".join(lines) + "\n")
+    write_private(case / "technical-report.md", "\n".join(lines) + "\n")
+    management = [
+        "# WordPress Integrity Audit — Management Summary", "",
+        f"- Domain: `{domain}`",
+        f"- Case ID: `{case_id}`",
+        f"- Final status: **{status}**",
+        f"- Exit code: **{exit_code}**",
+        f"- Confirmed family residues: **{summary['confirmed_family_residues']}**",
+        f"- Historical references: **{summary['historical_references']}**",
+        f"- Informational records: **{summary['informational_records']}**",
+        f"- Active database markers: **{summary['active_database_markers']}**",
+        f"- Suspicious processes: **{summary['suspicious_processes']}**",
+        f"- WordPress Core discrepancies requiring review: **{core_count}**",
+        f"- WordPress configuration files requiring review: **{config_count}**",
+        f"- External persistence indicators: **{host_indicators}**",
+        f"- Host inventory records requiring review: **{host_review}**",
+        "", "## Risk overview", "",
+        f"- Database risk: **{'HIGH' if summary['confirmed_family_residues'] else 'NOT DETERMINED'}**",
+        f"- File risk: **{'REQUIRES REVIEW' if summary['file_indicators_requiring_review'] else 'LOW FOR SELECTED INDICATORS'}**",
+        f"- Core risk: **{'MEDIUM — REVIEW REQUIRED' if core_count else 'NO EXPLICIT MISMATCH DETECTED' if core.get('status') == 'COMPLETE' else 'NOT DETERMINED'}**",
+        "- External persistence risk: **NOT DETERMINED**",
+        "", "## Recommendation", "",
+        "**LIBERAÇÃO NÃO RECOMENDADA**",
+        "Known family residues or unresolved review findings require approved remediation and subsequent verification.",
+        "", "## Coverage", "",
+        f"- Database audit: {'EXECUTED' if audited else 'NOT EXECUTED'}",
+        f"- Core verification: {core.get('status', 'NOT EXECUTED')}",
+        f"- Database dump: {'PERFORMED' if (case / 'database-before.sql').is_file() else 'NOT PERFORMED'}",
+        f"- File snapshot: {'PERFORMED' if (case / 'site-before.tar.gz').is_file() else 'NOT PERFORMED'}",
+        "", "Detailed infrastructure evidence is retained in the internal technical report.", "",
+    ]
+    write_private(case / "report.md", "\n".join(management) + "\n")
 
 
 @contextlib.contextmanager
@@ -1110,8 +1141,8 @@ def mark_incomplete_case(case: Path, skipped: list[str]) -> None:
         document["status"] = "AUDITORIA_INCOMPLETA"
         document["exit_code"] = 40
     write_private(report_file, json.dumps(document, indent=2, ensure_ascii=False))
-    markdown = case / "report.md"
-    previous = markdown.read_text(encoding="utf-8")
+    for markdown in (case / "report.md", case / "technical-report.md"):
+        previous = markdown.read_text(encoding="utf-8")
     previous = previous.replace("## Audit metadata", "## Omitted checks\n\n" +
                                 "\n".join(f"- {name}" for name in skipped) +
                                 "\n\n## Audit metadata", 1)
