@@ -502,6 +502,7 @@ $table_prefix = 'wp_';
             self.assertEqual(doc["summary"]["security_configuration_review"], 1)
             self.assertEqual(doc["persistence_risk"], "REVIEW REQUIRED")
             self.assertEqual(doc["core_discrepancies"], 2)
+            self.assertIn("CORE_REQUER_REVISAO", doc["status_detail"] if doc["status"] == "RESIDUOS_REQUEREM_LIMPEZA" else "CORE_REQUER_REVISAO")
             self.assertEqual(doc["host_persistence_indicators"], 1)
             md = (case / "technical-report.md").read_text()
             self.assertIn("wp-includes/version.php", md)
