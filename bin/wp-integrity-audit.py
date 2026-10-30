@@ -399,6 +399,19 @@ def database_audit(option_file: str, dbname: str, prefix: str, case: Path,
                 })
         else:
             findings.append({"kind": kind, "name": "(none)", "length": "0", "state": "NOT_FOUND"})
+    cron_info = details.get("cron")
+    if cron_info:
+        findings.append({
+            "kind": "cron_metadata", "name": "cron",
+            "length": str(cron_info["value_length_bytes"]), "state": "INFORMATIONAL",
+            "sha256": cron_info["sha256"],
+            "value_length_bytes": cron_info["value_length_bytes"],
+            "value_classification": "DYNAMIC_WORDPRESS_CRON",
+            "safe_excerpt": "[NOT_EXPOSED]",
+            "decoded_excerpt": "[NOT_EXPOSED]",
+            "collected_at_utc": dt.datetime.now(dt.timezone.utc).isoformat(),
+            "indicator_matches": [x["name"] for x in findings if x["kind"] == "cron_marker" and x.get("state") != "NOT_FOUND"],
+        })
     write_private(case / ("database-post-audit.json" if post else "database-evidence.json"),
                   json.dumps(findings, indent=2))
     return findings
