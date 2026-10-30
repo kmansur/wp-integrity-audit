@@ -212,12 +212,12 @@ def configuration_audit(target: Path, case: Path) -> list[dict]:
             info = path.stat()
             # Detect relevant directives without recording values, URLs or secrets.
             patterns = {
-                "HANDLER_OVERRIDE": r"(?im)^\\s*(?:AddHandler|SetHandler)\\b",
-                "PHP_CONFIGURATION_OVERRIDE": r"(?im)^\\s*(?:php_value|php_flag)\\b",
-                "PHP_AUTO_PREPEND_APPEND": r"(?im)\\b(?:auto_prepend_file|auto_append_file)\\b",
-                "REWRITE_TO_EXTERNAL_URL": r"(?im)^\\s*RewriteRule\\s+\\S+\\s+https?://",
-                "PHP_UPLOAD_ACCESS_RULE": r"(?im)<FilesMatch\\b[^>]*\\.(?:php|phtml)",
-                "ACCESS_OVERRIDE": r"(?im)^\\s*Require\\s+all\\s+granted\\b",
+                "HANDLER_OVERRIDE": r"(?im)^\s*(?:AddHandler|SetHandler)\b",
+                "PHP_CONFIGURATION_OVERRIDE": r"(?im)^\s*(?:php_value|php_flag)\b",
+                "PHP_AUTO_PREPEND_APPEND": r"(?im)\b(?:auto_prepend_file|auto_append_file)\b",
+                "REWRITE_TO_EXTERNAL_URL": r"(?im)^\s*RewriteRule\s+\S+\s+https?://",
+                "PHP_UPLOAD_ACCESS_RULE": r"(?im)<FilesMatch\b[^>]*\.(?:php|phtml)",
+                "ACCESS_OVERRIDE": r"(?im)^\s*Require\s+all\s+granted\b",
             }
             indicators = []
             if info.st_size <= 1048576 and path.name != ".htpasswd":
