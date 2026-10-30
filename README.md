@@ -196,3 +196,7 @@ Component-version scanning now streams file hashes in bounded 1 MiB blocks. It d
 ## 0.9.0 official plugin extra-file detection
 
 When an official plugin checksum manifest is available, the component audit now reports executable files present in the plugin directory but absent from the manifest as `EXTRA_EXECUTABLE` evidence. These remain review findings, not malware confirmation. Plugins without an official manifest are not treated as infected merely because their origin cannot be verified.
+
+## 0.10.0 manifest validation
+
+Checksum verification requires usable file entries. A retrieved but empty or invalid checksum manifest is classified as unavailable, not a verified match. Audit remains passive and destructive recovery modes remain disabled.
