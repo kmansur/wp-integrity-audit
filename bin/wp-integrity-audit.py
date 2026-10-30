@@ -189,6 +189,38 @@ def file_audit(target: Path, case: Path) -> list[dict]:
     return findings
 
 
+
+def configuration_audit(target: Path, case: Path) -> list[dict]:
+    """Read-only configuration inventory. Never export configuration contents.
+
+    Audit files inside the WordPress tree only. A metadata presence or generic
+    configuration hash is not proof of compromise.
+    """
+    names = {".htaccess", ".user.ini", "php.ini", "php5.ini", "php7.ini",
+             "php8.ini", ".htpasswd", "web.config", "user.ini"}
+    findings = []
+    for path in iter_files(target):
+        relative = path.relative_to(target).as_posix()
+        if path.name not in names:
+            continue
+        try:
+            info = path.stat()
+            findings.append({
+                "path": relative,
+                "classification": "CONFIGURACAO_REQUER_VALIDACAO",
+                "source": "filesystem",
+                "size": info.st_size,
+                "sha256": sha256(path),
+                "mode": oct(stat.S_IMODE(info.st_mode)),
+                "reason": "Configuration file inventory; content intentionally withheld",
+            })
+        except OSError:
+            continue
+    write_private(case / "configuration-evidence.json",
+                  json.dumps(findings, indent=2, ensure_ascii=False))
+    return findings
+
+
 def process_audit(case: Path) -> list[str]:
     result = run(["ps", "-eo", "pid=,ppid=,user=,args="], capture_output=True).stdout
     matches = [redact(line) for line in result.splitlines() if any(x in line for x in ("--sc-cli", "--sc-succ", "cipher-feeder", ".gr_"))]
@@ -944,6 +976,7 @@ def main() -> int:
         case = ensure_private_dir(case_root / f"{label}-{timestamp}-{secrets.token_hex(3)}")
         print(f"Version {VERSION}; mode={args.mode}; case={case}")
         files = file_audit(target, case)
+        configuration_audit(target, case)
         elementor_asset_audit(target, case)
         processes = process_audit(case)
         if args.mode == "audit" and args.files_only:
