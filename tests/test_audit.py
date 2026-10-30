@@ -879,6 +879,30 @@ $table_prefix = 'wp_';
             self.assertEqual(result["summary"]["plugins_outdated"], 0)
             self.assertEqual(result["components"][0]["state"], "CORE_DESATUALIZADO")
 
+    def test_akismet_realistic_asset_allowlist(self):
+        rules = (
+            "<IfModule !mod_authz_core.c>\nOrder Deny,Allow\nDeny from all\n</IfModule>\n"
+            "<IfModule mod_authz_core.c>\nRequire all denied\n</IfModule>\n"
+            '<FilesMatch "^(form\.js|akismet(-frontend|-admin)?\.js|akismet(-admin)?(-rtl)?\.css|inter\.css)$">\n'
+            "<IfModule !mod_authz_core.c>\nAllow from all\n</IfModule>\n"
+            "<IfModule mod_authz_core.c>\nRequire all granted\n</IfModule>\n"
+            "</FilesMatch>\n"
+            '<FilesMatch "^(logo-(a|full)-2x\.png|akismet-refresh-logo\.svg)$">\n'
+            "<IfModule mod_authz_core.c>\nRequire all granted\n</IfModule>\n"
+            "</FilesMatch>\n")
+        self.assertTrue(audit.akismet_access_guard(rules))
+        self.assertFalse(audit.akismet_access_guard(rules + "Require all granted\n"))
+
+    def test_reviewed_metform_cache_is_hash_bound(self):
+        relative = "wp-content/uploads/metform/cache/icons/font-awesome-38edd54e30815111.php"
+        with tempfile.TemporaryDirectory() as folder:
+            cache = Path(folder) / "cache.php"
+            cache.write_text("<?php return array();")
+            self.assertFalse(audit.reviewed_metform_cache(relative, cache))
+            with unittest.mock.patch.object(audit, "sha256", return_value=audit.REVIEWED_METFORM_CACHE_SHA256[relative]):
+                self.assertTrue(audit.reviewed_metform_cache(relative, cache))
+                self.assertFalse(audit.reviewed_metform_cache("wp-content/uploads/other/cache.php", cache))
+
     def test_secret_redaction(self):
         self.assertNotIn("example-secret", audit.redact("password=example-secret"))
         self.assertNotIn("192.168.1.20", audit.redact("192.168.1.20"))
