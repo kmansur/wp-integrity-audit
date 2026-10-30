@@ -213,8 +213,10 @@ def audit_status(files: list[dict], processes: list[str],
     }
     if database is None:
         return "AUDITORIA_INCOMPLETA", 40, summary
+    # Heuristic markers alone cannot establish executed compromise.
+    # Reserve exit 20 for independently confirmed execution evidence.
     if summary["active_database_markers"] or summary["suspicious_processes"]:
-        return "COMPROMETIMENTO_CONFIRMADO", 20, summary
+        return "AUDITORIA_INCOMPLETA", 40, summary
     if summary["confirmed_family_residues"]:
         return "RESIDUOS_REQUEREM_LIMPEZA", 10, summary
     if summary["file_indicators_requiring_review"]:
