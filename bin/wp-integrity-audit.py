@@ -426,6 +426,32 @@ def rotate_salts(path: Path) -> None:
     finally:
         Path(temp).unlink(missing_ok=True)
 
+def preflight_recovery_sources(target: Path, core_source: Path | None) -> None:
+    """Validate core source and literal salts BEFORE database/file changes."""
+    config = target / "wp-config.php"
+    if config.is_symlink():
+        raise AuditError("Recovery cannot rewrite a symlinked wp-config.php")
+    data = config.read_text(encoding="utf-8", errors="replace")
+    for key in ("AUTH_KEY", "SECURE_AUTH_KEY", "LOGGED_IN_KEY", "NONCE_KEY",
+                "AUTH_SALT", "SECURE_AUTH_SALT", "LOGGED_IN_SALT", "NONCE_SALT"):
+        pattern = re.compile(r"define\s*\(\s*['\\\"]" + key +
+                             r"['\\\"]\s*,\s*['\\\"][^'\\\"\r\n]*['\\\"]\s*\)\s*;")
+        if not pattern.search(data):
+            raise AuditError(f"Missing/nonliteral salt in wp-config.php: {key}")
+    if core_source is None:
+        return
+    core_source = core_source.resolve(strict=True)
+    if core_source == target or target in core_source.parents or core_source in target.parents:
+        raise AuditError("Core source must be independent of the target")
+    if not all((core_source / x).exists() for x in ("wp-admin", "wp-includes", "wp-load.php")):
+        raise AuditError("Invalid core source")
+    for directory, dirs, files in os.walk(core_source, followlinks=False):
+        for name in dirs + files:
+            mode = (Path(directory) / name).lstat().st_mode
+            if not (stat.S_ISREG(mode) or stat.S_ISDIR(mode)):
+                raise AuditError("Core source contains symlinks or special files")
+
+
 def sync_core(source: Path, target: Path) -> None:
     source = source.resolve(strict=True)
     if source == target or target in source.parents or source in target.parents:
@@ -538,6 +564,8 @@ def main() -> int:
                 raise AuditError("Recovery requires root; audit does not")
             if args.mode == "recover" and processes:
                 raise AuditError("Matching suspicious processes are still active; isolate the host first")
+            if args.mode == "recover":
+                preflight_recovery_sources(target, args.core_source)
             if (target / "wp-content").is_symlink():
                 raise AuditError("Cannot safely replace symlinked wp-content")
             print("Recovery modifies files and/or database; independent verified backup is required.")
