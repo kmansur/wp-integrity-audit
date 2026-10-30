@@ -44,6 +44,7 @@ Mutating modes require interactive confirmations; no `--yes` bypass exists. Repo
 - The original script-specific media path is not retained.
 - Quarantined WordPress content is moved outside the site's document root, while confidential backups remain under the private case directory. Recovery validates literal WordPress authentication salts and optional clean-core sources before changes, then re-scans files/processes/database and refuses to declare success if recognized indicators remain. Operators still must independently verify backups and site operation.
 - Recovery is **not atomic across the filesystem and database** and core replacement does not remove extraneous files. Use isolated fixtures and a controlled recovery plan.
+- The staged replacement tree is rescanned in full before installation. If SQL modifications have started, an error never triggers automatic restoration of pre-change files because the database commit state may be uncertain; follow the documented manual restore procedure instead.
 
 ## Tests
 
