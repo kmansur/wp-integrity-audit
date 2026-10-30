@@ -132,6 +132,32 @@ $table_prefix = 'wp_';
             self.assertTrue((quarantine / "old.txt").exists())
             self.assertTrue((site / "wp-content" / "new.txt").exists())
 
+    def test_salt_rotation_preserves_other_configuration(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = Path(directory) / "wp-config.php"
+            keys = ("AUTH_KEY", "SECURE_AUTH_KEY", "LOGGED_IN_KEY", "NONCE_KEY",
+                    "AUTH_SALT", "SECURE_AUTH_SALT", "LOGGED_IN_SALT", "NONCE_SALT")
+            config.write_text("<?php\n" + "".join(
+                "define('" + key + "', 'old-secret');\n" for key in keys
+            ) + "define('DB_NAME', 'example');\n")
+            config.chmod(0o644)
+            audit.rotate_salts(config)
+            output = config.read_text()
+            self.assertNotIn("old-secret", output)
+            self.assertIn("define('DB_NAME', 'example');", output)
+            self.assertEqual(stat.S_IMODE(config.stat().st_mode), 0o640)
+            for key in keys:
+                self.assertIn("define('" + key + "', '", output)
+
+    def test_salt_rotation_refuses_symlink(self):
+        with tempfile.TemporaryDirectory() as directory:
+            real = Path(directory) / "actual.php"
+            link = Path(directory) / "wp-config.php"
+            real.write_text("<?php")
+            link.symlink_to(real)
+            with self.assertRaises(audit.AuditError):
+                audit.rotate_salts(link)
+
     def test_secret_redaction(self):
         self.assertNotIn("example-secret", audit.redact("password=example-secret"))
         self.assertNotIn("192.168.1.20", audit.redact("192.168.1.20"))
