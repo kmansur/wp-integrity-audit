@@ -761,7 +761,7 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
                   if item.get("kind") == "cron_metadata" else []), "",
             ])
     lines.extend(["", "## WordPress Core integrity", "",
-                  f"- Status: `{core.get('status', 'NOT EXECUTED')}`",
+                  f"- Status: `{summary['component_coverage'].get('core', core.get('status', 'NOT EXECUTED'))}`",
                   f"- Discrepancies: **{core_count}**", ""])
     for item in core.get("findings", []):
         lines.append(f"- `{sanitize_relative_path(item.get('path', ''))}`: "
