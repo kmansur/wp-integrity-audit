@@ -4,6 +4,14 @@ All project documentation and source commentary are in English. Versions follow 
 
 ## [Unreleased]
 
+### Audit report improvements
+- Correct historical-cache excerpt handling after failed MySQL CI regression.
+- Show interpreted values for two strictly allowlisted numeric transient options.
+- Replace the aggregated database finding count with category-specific counts.
+- Record the tool's SHA-256 in the report, explain dynamic WordPress cron behavior and add a classification legend.
+- Extend MySQL integration tests for the report formatting and classification.
+
+
 ## [0.2.0] - 2026-10-30 (pre-release)
 
 ### Changed
