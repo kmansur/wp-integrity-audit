@@ -490,6 +490,14 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
         "database": [{"id": entry["evidence_id"], "name": entry.get("name"),
                       "table": entry["source_table"], "column": entry["source_column"],
                       "state": entry.get("state")} for entry in (database or [])],
+        "core": [{"id": x["evidence_id"], "path": x.get("path"),
+                  "classification": x.get("classification")} for x in core.get("findings", [])],
+        "config": [{"id": x["evidence_id"], "path": x.get("path"),
+                    "classification": x.get("classification")} for x in configurations],
+        "host": [{"id": x["evidence_id"], "classification": x.get("classification")}
+                 for x in host_records],
+        "processes": [{"id": f"PROC-{i:03d}", "source": "process"}
+                      for i, _ in enumerate(processes, 1)],
     }, indent=2, ensure_ascii=False))
     lines = [
         "# WordPress Integrity Audit", "",
