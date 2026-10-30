@@ -166,3 +166,9 @@ All project documentation and source commentary are in English. Versions follow 
 - Fix literal backslash escaping in directive patterns to ensure real Apache/PHP configuration directives are detected.
 
 - Add an additive `status_detail` field for simultaneous family residues and Core discrepancies, preserving stable primary status and exit code.
+
+### MetForm false-positive triage
+- Recognize exact WordPress `Silence is golden.` directory guards in uploads.
+- Add restricted `CACHE_PLUGIN_REQUER_VALIDACAO` classification for a MetForm Font Awesome cache candidate when its path and PHP return-array header match.
+- Keep potential cache findings in required-review counts and return-code precedence; no blanket uploads exemption.
+- Add synthetic guard, cache and unrelated PHP regression cases.
