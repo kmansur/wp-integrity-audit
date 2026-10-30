@@ -12,7 +12,7 @@ import urllib.request
 
 API = "https://api.wordpress.org"
 VERSION_RE = re.compile(r"^[0-9]+(?:\.[0-9]+){1,4}(?:[-+._][A-Za-z0-9.-]+)?$")
-HEADERS = re.compile(r"(?im)^\s*(?:\*\s*)?(Plugin Name|Theme Name|Version|Template|Update URI|Plugin URI|Theme URI)\s*:\s*([^\r\n]{0,250})")
+HEADERS = re.compile(r"(?im)^\s*(?:(?:/\*)?\s*\*?\s*)?(Plugin Name|Theme Name|Version|Template|Update URI|Plugin URI|Theme URI)\s*:\s*([^\r\n]{0,250})")
 STATIC_ROOT = {"index.php", "wp-activate.php", "wp-blog-header.php", "wp-comments-post.php", "wp-config-sample.php",
                "wp-cron.php", "wp-links-opml.php", "wp-load.php", "wp-login.php", "wp-mail.php",
                "wp-settings.php", "wp-signup.php", "wp-trackback.php", "xmlrpc.php"}
