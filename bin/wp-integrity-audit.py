@@ -199,11 +199,11 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
     audited = database is not None
     lines = [
         "# WordPress Integrity Audit", "",
-        f"- Version: `{VERSION}`", f"- Mode: `{mode}`",
+        f"- Version: `{VERSION}`", f"- Tool SHA-256: `{sha256(Path(__file__))}`", f"- Mode: `{mode}`",
         f"- Timestamp (UTC): {dt.datetime.now(dt.timezone.utc).isoformat()}",
         f"- File findings: {len(findings)}", f"- Process findings: {len(processes)}",
         f"- Database audit: **{'EXECUTED' if audited else 'NOT EXECUTED'}**",
-        f"- Database findings: {sum(1 for x in database if x.get('state') not in ('NOT_FOUND','ABSENT')) if audited else 'NOT EVALUATED'}",
+        f"- Database audit coverage: {'EXECUTED' if audited else 'NOT EVALUATED'}",
         "", "## Filesystem evidence", "",
         "| Relative path | Classification | SHA-256 |",
         "|---|---|---|",
@@ -231,6 +231,7 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
                 f"- Value length: {item['value_length_bytes']} bytes",
                 f"- Classification: `{item['value_classification']}`",
                 f"- Safe evidence: `{item['safe_excerpt']}`",
+                f"- Interpreted value: `{item['safe_excerpt'] if item.get('value_classification') == 'ESCALAR_TEXTO_NUMERO_NAO_CODIFICADO' else '[NOT_EXPOSED]'}`",
                 f"- Decoded excerpt: `{item['decoded_excerpt']}`", "",
             ])
     lines.extend(["", "## Technical opinion", ""])
@@ -242,6 +243,8 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
         lines.extend([
             f"- Confirmed family residues: **{positive('family_option')}**.",
             f"- Historical references: **{positive('historical_cache')}**.",
+            f"- Informational records: **{sum(int(item['length']) for item in database if item['kind'] in ('session_rows', 'application_password_rows'))}**.",
+            f"- Active database markers: **{positive('marker_option') + positive('cron_marker') + positive('active_plugins_marker')}**.",
             f"- Informational session records: **{sum(int(item['length']) for item in database if item['kind'] == 'session_rows')}**.",
         ])
     lines.append(f"- Files requiring IOC investigation: **{len(critical)}**.")
@@ -263,7 +266,18 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
             lines.append("- **Known compromise-related database markers remain; do not declare this installation clean.**")
         else:
             lines.append("- No selected database IOC was observed; this is not a clean-site certification.")
-    lines.extend(["", "## Limitations", "",
+    if audited:
+        lines.extend(["", "### Dynamic WordPress cron option", "",
+                      "WordPress modifies cron automatically; changes in hash or size alone do not indicate compromise.",
+                      "Examine indicator matches and collection time together.", ""])
+    lines.extend(["", "## Classification legend", "",
+                  "- `RESIDUO_FAMILIA_REQUER_LIMPEZA`: family-specific database residue.",
+                  "- `HISTORICAL_REFERENCE`: historic cache reference, not proof of execution.",
+                  "- `LEGITIMO_VALIDADO`: recognized plugin guard pattern, not cryptographic verification.",
+                  "- `CONFIGURACAO_PLUGIN_SEGURANCA_REQUER_VALIDACAO`: security plugin configuration needs contextual analysis.",
+                  "- `PRESENT`: informational record exists.",
+                  "- `NOT_FOUND`: check ran with no matching records.",
+                  "", "## Limitations", "",
                   "Classification of plugin guard files is signature-based, not proof of package integrity.",
                   "No findings never establish that a site is clean. Review evidence before distributing reports."])
     write_private(case / "report.md", "\n".join(lines) + "\n")
