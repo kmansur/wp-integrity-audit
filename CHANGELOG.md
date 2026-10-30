@@ -185,3 +185,5 @@ All project documentation and source commentary are in English. Versions follow 
 - Add synthetic regression tests for guarded headers, nested blocks and unsafe grants.
 
 - Strengthen MetForm regression coverage: a plausible generated-cache header containing a known IOC later in the file must retain IOC classification, never legitimate-cache status.
+
+- Align the previous MetForm synthetic cache fixture with the supported guarded-header grammar.
