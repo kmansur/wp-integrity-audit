@@ -154,6 +154,8 @@ def official_plugin_checksums(record: dict, target: Path) -> None:
         checksums = data.get("files") if isinstance(data, dict) else None
         if not isinstance(checksums, dict) or not checksums:
             record["checksum_status"] = "UNAVAILABLE"
+            if record["state"] == "PLUGIN_OFICIAL_ATUAL":
+                record["state"] = "PLUGIN_OFICIAL_SEM_CHECKSUM"
             return
         changed = []
         root = target / "wp-content" / "plugins" / slug
@@ -174,6 +176,8 @@ def official_plugin_checksums(record: dict, target: Path) -> None:
             record["state"] = "PLUGIN_COM_ARQUIVOS_MODIFICADOS"
     except urllib.error.HTTPError as error:
         record["checksum_status"] = "UNAVAILABLE" if error.code == 404 else "API_UNAVAILABLE"
+        if error.code == 404 and record["state"] == "PLUGIN_OFICIAL_ATUAL":
+            record["state"] = "PLUGIN_OFICIAL_SEM_CHECKSUM"
     except (OSError, ValueError, TimeoutError):
         record["checksum_status"] = "API_UNAVAILABLE"
 
@@ -271,7 +275,9 @@ def audit(target: Path, case: Path, *, offline: bool = False,
                           "plugins_checked": len(plugins), "themes_checked": len(themes),
                           "plugins_outdated": sum(r["state"] == "PLUGIN_OFICIAL_DESATUALIZADO" for r in plugins),
                           "themes_outdated": sum(r["state"] == "TEMA_OFICIAL_DESATUALIZADO" for r in themes),
-                          "unlisted": sum(r["query_status"] == "NOT_FOUND_OFFICIAL_REPOSITORY" for r in records)}}
+                          "unlisted": sum(r["query_status"] == "NOT_FOUND_OFFICIAL_REPOSITORY" for r in records),
+                          "plugins_premium_custom": sum(r["state"] in ("PLUGIN_PREMIUM_REQUER_FONTE_CONFIAVEL", "PLUGIN_CUSTOMIZADO") for r in plugins),
+                          "themes_premium_custom": sum(r["state"] in ("TEMA_PREMIUM_REQUER_FONTE_CONFIAVEL", "TEMA_CUSTOMIZADO", "TEMA_FILHO_CUSTOMIZADO") for r in themes)}}
     (case / "component-version-evidence.json").write_text(json.dumps(result, indent=2, ensure_ascii=False))
     lines = ["# Component versions and provenance", "", f"- WordPress installed: {core['local_version'] or 'Unknown'}",
              f"- WordPress expected: {core['official_version'] or 'Not determined'}",
