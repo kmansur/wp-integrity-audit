@@ -218,3 +218,18 @@ All project documentation and source commentary are in English. Versions follow 
 
 ### Limitations
 - Timeline and persistence inventory are contextual evidence; their mere presence does not prove malicious activity. Recovery modes remain disabled pending safety homologation.
+
+## [0.7.0] - 2026-10-30
+
+### Added
+- Passive Core, plugin and theme header/version inventory by default, with explicit `--skip-version-check`, `--offline` and `--official-compare` flags.
+- WordPress.org HTTPS API queries with timeouts, bounded responses and separate API unavailable/not-found statuses.
+- Core checksum comparison, missing/modified official paths and extra PHP in core directories and root; no PHP execution or package download.
+- Plugin and theme main-file hashes, child theme template information and local metadata.
+- Component JSON, Markdown and CSV evidence with stable CORE/PLUGIN/THEME identifiers and separate coverage reporting.
+- Synthetic tests for offline isolation, child themes, API unavailability and changed Core hashes.
+
+### Known limitations
+- Plugin active state and active theme are not yet linked to read-only database options.
+- Official plugin/theme full-tree checksums and provenance validation of premium components are not yet implemented.
+- Component version results are additional evidence; complete release semantics and report integration require CI and real WordPress fixture validation.
