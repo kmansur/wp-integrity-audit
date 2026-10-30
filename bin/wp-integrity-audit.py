@@ -32,6 +32,8 @@ IOC = re.compile(r"SC_ADV_BEGIN|--sc-cli|--sc-succ|trace-inspector-pad|cipher-fe
 PATTERN_NAMES = (".sc_", ".gr_", ".gk_", ".kk_", ".wp-object-cache")
 SENSITIVE = re.compile(r"(?i)(password|passwd|secret|token|api[_-]?key)\s*[:=]\s*[^\s,;]+")
 LONG_VALUE = re.compile(r"(?<![\w])[A-Za-z0-9_/-]{40,}(?![\w])")
+# Never apply arbitrary high-entropy redaction to filesystem paths: it
+# destroys evidentiary context and makes file identification impossible.
 DB_KEY = re.compile(r"""define\s*\(\s*['"](?P<name>DB_NAME|DB_USER|DB_PASSWORD|DB_HOST)['"]\s*,\s*(?P<quote>['"])(?P<value>(?:\\.|(?!(?P=quote)).)*)(?P=quote)\s*\)""", re.S)
 SQL_TABLE_PREFIX = re.compile(r"\$table_prefix\s*=\s*['\"]([A-Za-z0-9_]+)['\"]")
 
@@ -102,12 +104,33 @@ def iter_files(root: Path):
             if path.is_file() and not path.is_symlink():
                 yield path
 
-def file_audit(target: Path, case: Path) -> list[dict]:
-    """Scan entire PHP-like files in bounded chunks and record IOC evidence.
+def classify_file(relative: str, name: str, text: str, indicator: str | None) -> tuple[str, str]:
+    """Classify evidence conservatively, with explicit legitimate guard cases.
 
-    A short overlap prevents missing patterns across chunk boundaries.
-    Results are heuristics; malware can evade these signatures.
+    Plugin ownership is contextual evidence, not a cryptographic validation.
+    A known guard file is classified as validated only when its expected
+    minimal structure is present and no known strong IOC has been detected.
     """
+    normalized = "/" + relative
+    if normalized.startswith("/wp-content/wflogs/"):
+        return ("CONFIGURACAO_PLUGIN_SEGURANCA_REQUER_VALIDACAO",
+                "Wordfence configuration; historic strings do not establish execution")
+    if "/wp-content/uploads/sucuri/" in normalized and not indicator and (
+            "exit(0)" in text or "datastore=" in text):
+        return ("LEGITIMO_VALIDADO", "Recognized Sucuri datastore guard pattern")
+    if normalized.startswith("/wp-content/uploads/simple-history-logs-") and name == "index.php" and not indicator and "Silence is golden" in text:
+        return ("LEGITIMO_VALIDADO", "Recognized Simple History guard pattern")
+    if normalized == "/wp-content/uploads/wpforms/cache/index.php" and not indicator and "404 Not Found" in text:
+        return ("LEGITIMO_VALIDADO", "Recognized WPForms cache guard pattern")
+    if indicator:
+        return ("IOC_REQUER_VALIDACAO", "Known family indicator detected; inspect source and context")
+    if normalized.startswith("/wp-content/uploads/"):
+        return ("PHP_UPLOAD_REQUER_VALIDACAO", "Executable extension in uploads; not proof of infection")
+    return ("ARQUIVO_SUSPEITO_REQUER_VALIDACAO", "Suspicious filename requires manual review")
+
+
+def file_audit(target: Path, case: Path) -> list[dict]:
+    """Inspect known IOC filenames and all script content in bounded chunks."""
     findings: list[dict] = []
     for path in iter_files(target):
         relative = path.relative_to(target).as_posix()
@@ -116,38 +139,37 @@ def file_audit(target: Path, case: Path) -> list[dict]:
         upload_php = relative.startswith("wp-content/uploads/") and path.suffix.lower() in (".php", ".phtml", ".phar")
         match = None
         snippet = ""
+        safe_text = ""
         if path.suffix.lower() in (".php", ".phtml", ".inc", ".phar"):
             try:
                 with path.open("rb") as stream:
                     overlap = b""
-                    while True:
-                        chunk = stream.read(65536)
-                        if not chunk:
-                            break
+                    while chunk := stream.read(65536):
                         sample = overlap + chunk
                         decoded = sample.decode("utf-8", "replace")
+                        if not safe_text:
+                            safe_text = decoded[:4096]
                         match = IOC.search(decoded)
                         if match:
-                            snippet = redact(decoded[max(0, match.start() - 50):match.end() + 90])
+                            snippet = redact(decoded[max(0, match.start() - 40):match.end() + 60])
                             break
                         overlap = sample[-256:]
             except OSError:
                 continue
         if not (unusual or upload_php or match):
             continue
-        classification = ("SECURITY_PLUGIN_REVIEW" if "/wflogs/" in relative
-                          else "IOC_REQUIRES_VALIDATION" if match or unusual
-                          else "UPLOAD_SCRIPT_REVIEW")
+        classification, reason = classify_file(relative, name, safe_text, match.group(0) if match else None)
+        if relative.startswith("wp-content/wflogs/"):
+            snippet = ""  # Wordfence configuration may contain secrets.
         try:
-            record = {
+            findings.append({
                 "path": relative, "sha256": sha256(path), "size": path.stat().st_size,
-                "classification": classification,
+                "classification": classification, "reason": reason,
                 "indicator": match.group(0) if match else ("filename" if unusual else "upload PHP"),
-                "snippet": snippet
-            }
+                "snippet": snippet,
+            })
         except OSError:
             continue
-        findings.append(record)
     write_private(case / "file-evidence.json", json.dumps(findings, indent=2, ensure_ascii=False))
     return findings
 
@@ -158,26 +180,57 @@ def process_audit(case: Path) -> list[str]:
     write_private(case / "process-evidence.json", json.dumps(matches, indent=2))
     return matches
 
-def make_report(case: Path, mode: str, findings: list[dict], processes: list[str], database: list[dict] | None = None) -> None:
-    """Client report contains metadata only; never embeds raw DB option values."""
+def make_report(case: Path, mode: str, findings: list[dict], processes: list[str],
+                database: list[dict] | None = None) -> None:
+    """Generate a precise coverage statement and evidence-based technical opinion."""
+    audited = database is not None
     lines = [
-        "# WordPress Integrity Audit", "", f"- Version: `{VERSION}`", f"- Mode: `{mode}`",
+        "# WordPress Integrity Audit", "",
+        f"- Version: `{VERSION}`", f"- Mode: `{mode}`",
         f"- Timestamp (UTC): {dt.datetime.now(dt.timezone.utc).isoformat()}",
         f"- File findings: {len(findings)}", f"- Process findings: {len(processes)}",
-        f"- Database findings: {len(database or [])}", "",
-        "## File findings", "",
+        f"- Database audit: **{'EXECUTED' if audited else 'NOT EXECUTED'}**",
+        f"- Database findings: {len(database) if audited else 'NOT EVALUATED'}",
+        "", "## Filesystem evidence", "",
         "| Relative path | Classification | SHA-256 |",
         "|---|---|---|",
     ]
     for finding in findings:
-        lines.append(f"| {redact(finding['path']).replace('|','/')} | {finding['classification']} | {finding['sha256']} |")
-    if database is not None:
-        lines.extend(["", "## Database findings (metadata only)", "", "| Kind | Name | Length |", "|---|---|---|"])
+        # Preserve actual relative file paths, including long directory names.
+        path = finding["path"].replace("|", "/").replace("\n", " ")
+        lines.append(f"| `{path}` | {finding['classification']} | {finding['sha256']} |")
+    if audited:
+        lines.extend(["", "## Database evidence (metadata only)", "",
+                      "| Kind | Name | Count/size | State |",
+                      "|---|---|---|---|"])
         for item in database:
-            lines.append(f"| {redact(item['kind'])} | {redact(item['name'])} | {item['length']} |")
-    lines.extend(["", "## Limitations", "", "Signature matches are not proof of compromise. No matches do not prove the site is clean.",
-                  "Review all outputs for confidential information before external distribution."])
+            lines.append(f"| {item['kind']} | {item['name']} | {item['length']} | {item.get('state','')} |")
+    lines.extend(["", "## Technical opinion", ""])
+    critical = [x for x in findings if x["classification"] == "IOC_REQUER_VALIDACAO"]
+    lines.append(f"- Files requiring IOC investigation: **{len(critical)}**.")
+    lines.append(f"- Matching process indicators: **{len(processes)}**.")
+    if not audited:
+        lines.append("- **Database was not audited. No conclusion about database persistence, cron, sessions or administrators is supported.**")
+    else:
+        def total(kind: str) -> int:
+            return sum(int(x["length"]) if kind in ("session_rows", "application_password_rows") else 1
+                       for x in database if x["kind"] == kind)
+        family = total("family_option")
+        lines.append(f"- Family-specific option/transient residues: **{family}**.")
+        lines.append(f"- Matching suspicious administrator naming pattern: **{total('suspicious_users')}**.")
+        lines.append(f"- Stored WordPress session records: **{total('session_rows')}**.")
+        lines.append(f"- Historical plugin update-cache references: **{total('historical_cache')}**; this is not evidence of active execution.")
+        for kind, name in (("cron_marker", "cron"), ("active_plugins_marker", "active_plugins")):
+            lines.append(f"- Known indicators in `{name}`: **{total(kind)}**.")
+        if family or total("marker_option") or total("cron_marker") or total("active_plugins_marker"):
+            lines.append("- **Known compromise-related database markers remain; do not declare this installation clean.**")
+        else:
+            lines.append("- No selected database IOC was observed; this is not a clean-site certification.")
+    lines.extend(["", "## Limitations", "",
+                  "Classification of plugin guard files is signature-based, not proof of package integrity.",
+                  "No findings never establish that a site is clean. Review evidence before distributing reports."])
     write_private(case / "report.md", "\n".join(lines) + "\n")
+
 
 @contextlib.contextmanager
 def database_client(config: dict[str, str], case: Path):
