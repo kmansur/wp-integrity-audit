@@ -10,6 +10,7 @@ All project documentation and source commentary are in English. Versions follow 
 - Combined default audit now includes database checks. Use `--files-only` to omit them explicitly.
 - Report coverage and technical conclusions distinguish historical references, active markers and unaudited areas.
 - Context-aware classification for recognized plugin guards, retaining relative paths.
+- Add regression coverage proving default audit fails closed without database configuration, rather than emitting misleading zero findings.
 
 
 
