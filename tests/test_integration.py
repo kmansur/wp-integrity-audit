@@ -142,6 +142,9 @@ class MySQLFixtureTests(unittest.TestCase):
         self.assertIn("wp_usermeta", report)
         self.assertIn("Confirmed family residues:", report)
         self.assertIn("Historical references:", report)
+        self.assertIn("Classification legend", report)
+        self.assertIn("Tool SHA-256:", report)
+        self.assertIn("Active database markers:", report)
 
     def test_numeric_transient_excerpts_and_markdown_layout(self):
         """Only allowlisted scalar transient values are shown in reports."""
@@ -162,6 +165,9 @@ class MySQLFixtureTests(unittest.TestCase):
         report = (self.case / "report.md").read_text()
         self.assertIn("#### `_transient_sc_spread_interval`", report)
         self.assertIn("- Safe evidence: `1`", report)
+        self.assertIn("- Interpreted value: `1`", report)
+        self.assertIn("- Interpreted value: `1793545906`", report)
+        self.assertIn("WordPress modifies cron automatically", report)
         self.assertIn("### Evidence details", report)
         self.assertNotIn("super-secret-value", report)
         self.assertIn("|---|---|---|---|\n", report)
