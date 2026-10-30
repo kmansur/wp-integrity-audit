@@ -62,3 +62,11 @@ Do not commit case directories, site backups, SQL dumps, credentials, client pat
 ## Versioning
 
 This rewrite starts at `0.1.0` (development/pre-release). It does not supersede or modify the historical Bash version `2026.10.28.18`. The Bash entry point was removed from this branch; the original remains available in Git history on `main`.
+
+## Audit coverage (important)
+
+`--audit` now performs **filesystem, process and database** checks by default and requires access to MySQL/MariaDB. If a database query fails, the audit fails rather than reporting zero findings. Use `--audit --files-only` to explicitly skip SQL; the report will say `Database audit: NOT EXECUTED` and `NOT EVALUATED`.
+
+The database matrix checks family-specific options (`sc_*`), historical `SimplePluginLogger_plugin_info_before_update` references, serialized `cron` and `active_plugins` markers, WordPress sessions, application passwords and suspicious login patterns. Report conclusions are computed from the collected records, not from assumptions about the site. Known plugin guard files receive specific contextual classes; those classifications are **pattern recognition, not cryptographic proof of legitimacy**. Wordfence `wflogs` configuration contents are never excerpted.
+
+Relative paths are preserved to support incident triage. Reports may still contain client-specific filenames and need review before disclosure.
