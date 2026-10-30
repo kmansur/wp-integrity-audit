@@ -1,8 +1,22 @@
 #!/usr/bin/env bash
+#
+# WordPress Integrity Audit — legacy incident-response implementation.
+#
+# SECURITY BOUNDARY:
+#   --audit performs file/process inspection but creates private local reports.
+#   --audit-db and --audit-db-post also archive the site and dump its database.
+#   --apply-files, --apply-db and --recover MODIFY a WordPress installation.
+#
+# Do not use recovery modes on production until the documented destructive SQL,
+# rollback, archive-extraction and secret-handling concerns have been resolved.
+# Refer to docs/SECURITY_REVIEW.md before operating this tool.
+#
 # WH01 WordPress recovery helper. Audit-only by default; never executes PHP/WP-CLI.
 set -Eeuo pipefail
 umask 077
 SCRIPT_VERSION='2026.10.28.18'
+# Print the legacy CLI syntax. Note that the examples below contain a known
+# filename typo; the actual script path is bin/wp-integrity-audit.sh.
 usage(){ cat <<'EOF'
 Uso:
  wp-integraty-audit.sh.sh --audit TARGET
@@ -24,6 +38,8 @@ log(){ printf '[%s] %s\n' "$(date '+%F %T')" "$*"; }
 [[ $(id -u) -eq 0 ]] || die 'execute como root'
 for c in sha256sum tar find python3 mysqldump mysql; do command -v "$c" >/dev/null || die "$c ausente"; done
 command -v flock >/dev/null || die 'flock ausente'
+# This lock is global across all target sites, preventing concurrent runs.
+# The WH01-specific name and /tmp fallback are portability/security debt.
 LOCK_PATH=/run/lock/wh01-wp-recover.lock
 if ! ( : >> "$LOCK_PATH" ) 2>/dev/null; then LOCK_PATH=/tmp/wh01-wp-recover.lock; fi
 exec 9>"$LOCK_PATH"
@@ -67,12 +83,18 @@ fi
 STAMP=$(date -u +%Y%m%dT%H%M%SZ); SAFE=$(basename "$TARGET" | tr -c 'A-Za-z0-9._-' '_')
 [[ -n "$DOMAIN_LABEL" ]] || DOMAIN_LABEL=$(basename "$(dirname "$TARGET")")
 DOMAIN_LABEL=$(printf '%s' "$DOMAIN_LABEL" | tr -c 'A-Za-z0-9._-' '_')
+# The case root is hardcoded to a specific incident host. Files written here
+# include sensitive reports and (for database modes) complete site/DB backups.
+# Never expose this directory over HTTP or commit its contents to Git.
 CASE=/root/incident-wh01-20261028/recovery-$SAFE-$STAMP; mkdir -m 700 "$CASE"
 REPORT="$CASE/report.txt"; exec > >(tee -a "$REPORT") 2>&1
 log "script-version=$SCRIPT_VERSION"
 DOMAIN_REPORT="$CASE/RELATORIO-${DOMAIN_LABEL}.md"
 MANAGEMENT_REPORT=/root/incident-wh01-20261028/RELATORIO-GERENCIAL-RECUPERACOES.csv
 if [[ ! -e "$MANAGEMENT_REPORT" ]]; then printf 'timestamp_utc;dominio;target;modo;status;case\n' > "$MANAGEMENT_REPORT"; chmod 600 "$MANAGEMENT_REPORT"; fi
+# Collect potential IOC file evidence and write Markdown.
+# Redaction is heuristic rather than a proven de-identification boundary:
+# external distribution REQUIRES manual review of the generated report.
 write_client_file_evidence(){
   local out="$1" list="$CASE/client-file-list.txt"
   : > "$list"
@@ -134,6 +156,8 @@ with open(out,'w',encoding='utf-8') as f:
 PY
   chmod 600 "$out" "$list" 2>/dev/null || true
 }
+# Build management and client-facing summaries. The management CSV includes
+# the original target and case paths; restrict access to the entire case root.
 write_reports(){
   local status=$1
   write_client_file_evidence "$CASE/client-file-evidence.md"
@@ -185,6 +209,9 @@ if [[ -n "$CORE_SOURCE" ]]; then
   find "$CORE_SOURCE" -xdev -type f -print0 | sort -z | xargs -0 sha256sum > "$CASE/core-source.sha256"
 fi
 SWAPPED=0; DB_CHANGED=0; QUAR=; STAGE=; BACKUP_STATUS=NA
+# Best-effort rollback, NOT an atomic recovery transaction. In particular,
+# failure between moving the original wp-content and moving the stage can
+# leave the original directory absent because SWAPPED is set only afterward.
 rollback_files(){
   if [[ "$SWAPPED" == 1 && "$DB_CHANGED" == 0 && -n "$QUAR" && -d "$QUAR" && ! -d "$TARGET/wp-content" ]]; then
     log 'falha antes da alteração do banco; restaurando wp-content original'
@@ -248,6 +275,8 @@ else
     *) die 'backup forense incompleto; nenhuma alteração será feita';;
   esac
 fi
+# Read literal WordPress configuration constants without executing PHP.
+# Dynamic or environment-driven wp-config.php definitions are not supported.
 read_define(){
   python3 - "$TARGET/wp-config.php" "$1" <<'PY'
 import re,sys
@@ -265,6 +294,8 @@ else:
 print(value,end='')
 PY
 }
+# Set restrictive wp-config.php permissions; requires checking that the
+# selected group actually matches the webserver's intended access model.
 secure_wp_config(){
   local group_id group_name before after
   before=$(stat -c '%u:%g %a %U:%G' "$TARGET/wp-config.php")
@@ -308,6 +339,9 @@ fix_upload_permissions(){
   printf 'uploads-owner=%s:%s\nvhost-config=%s\n' "$web_user" "$web_group" "$vhost_conf" | tee "$CASE/uploads-metadata.txt"
   log "permissões de uploads ajustadas para $web_user:$web_group"
 }
+# Download published WordPress.org components into a staging directory.
+# Existing ZIP checks are incomplete (e.g., symlink/size/integrity policy);
+# do not treat this as a fully trusted archive extraction implementation.
 official_sync_components(){
   local stage=$1
   [[ "$OFFICIAL_SYNC" == 1 ]] || return 0
@@ -404,6 +438,8 @@ if failures:
 print(f'pré-validação oficial aprovada: {len(rows)} componentes')
 PY
 }
+# Compare plugin/theme directory names only. This does not verify package
+# signatures, content hashes, compatibility or functional correctness.
 compare_package_components(){
   local stage=$1 current_file="$CASE/components-production.txt" package_file="$CASE/components-package.txt" diff_file="$CASE/components-comparison.txt"
   {
@@ -442,6 +478,8 @@ elementor_asset_audit(){
     [[ -f "$TARGET/video/Brisa_da_Mata_Araucaria.MP4" ]] && echo 'video_brisa=present' || echo 'video_brisa=missing'
   } | tee "$out"
 }
+# Replace eight literal WP authentication keys/salts using Python secrets.
+# Failure handling is not atomic; a failed write may leave partial changes.
 rotate_wp_salts(){
   python3 - "$TARGET/wp-config.php" <<'PY'
 import re, secrets, sys
@@ -460,6 +498,9 @@ PY
   log 'salts/chaves do WordPress regenerados; sessões antigas invalidadas'
   : > "$CASE/wp-salts-rotated.txt"
 }
+# Resolve DB settings from wp-config.php. Credentials subsequently appear in
+# MYSQL_PWD/environment variables and in a temporary protected client file;
+# privileged process inspection may still expose environment contents.
 DB_NAME=$(read_define DB_NAME) || die 'DB_NAME não literal'
 DB_USER=$(read_define DB_USER) || die 'DB_USER não literal'
 DB_PASS=$(read_define DB_PASSWORD) || die 'DB_PASSWORD não literal'
@@ -489,6 +530,10 @@ with open(os.environ['CNF'], 'w', encoding='utf-8') as f:
     f.write('password=' + esc(os.environ['DB_PASS']) + '\n')
 PY
 chmod 600 "$CNF"
+# WARNING: The dump is a full database export, not just IOC evidence.
+# Even database *audit* modes take this backup, which may contain credentials,
+# user information and application secrets. Protect, retain and delete it
+# according to an incident-specific evidence-handling policy.
 MYSQL_PWD="$DB_PASS" mysqldump --host="$DB_HOST" --user="$DB_USER" --single-transaction --quick --hex-blob --no-tablespaces "$DB_NAME" > "$CASE/database-before.sql"
 [[ -s "$CASE/database-before.sql" ]] || die 'dump do banco vazio ou não criado'
 sha256sum "$CASE/database-before.sql" > "$CASE/database-before.sql.sha256"
@@ -655,6 +700,8 @@ PY
   log "auditoria de banco concluída; nenhuma alteração SQL foi feita"; write_reports AUDIT_DB_OK
   exit 0
 fi
+# Site-content replacement is invasive. The supplied source must be verified
+# independently; the IOC signature scan is not a complete trust check.
 if [[ "$MODE" == --apply-files || "$MODE" == --recover ]]; then
   log 'validando fonte limpa'
   if grep -RIlE --binary-files=without-match --exclude='*.jpg' --exclude='*.png' --exclude='*.gif' "$IOC_RE" "$SOURCE" 2>/dev/null | tee "$CASE/source-ioc-hits.txt" | grep -q .; then die 'fonte contém IOCs; abortando'; fi
@@ -688,6 +735,10 @@ if [[ -n "$CORE_SOURCE" && "$MODE" == --recover ]]; then
   rsync -a "$CORE_SOURCE/wp-includes/" "$TARGET/wp-includes/"
   find "$CORE_SOURCE" -maxdepth 1 -type f \( -name '*.php' -o -name 'license.txt' -o -name 'readme.html' \) -exec cp -p {} "$TARGET/" \;
 fi
+# HIGH-IMPACT SQL: the statements below delete complete active_plugins/cron
+# option records on signature match, not individual serialized entries.
+# This can disrupt plugins and scheduled jobs. Treat as unsafe for production
+# remediation pending surgical rewriting, regression tests and restore drills.
 if [[ "$MODE" == --apply-db || "$MODE" == --recover ]]; then
   log 'limpeza conservadora: remove sessões/IOCs e preserva plugins/cron legítimos'
   ask_yes 'Alterar o banco após o dump de backup?' || die 'cancelado'
