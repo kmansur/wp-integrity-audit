@@ -652,6 +652,24 @@ $table_prefix = 'wp_';
             self.assertEqual(evidence[0]["classification"], "WEB_SHELL_HEURISTIC_REQUIRES_REVIEW")
             self.assertEqual(audit.audit_status(evidence, [], [])[1], 40)
 
+    def test_wordpress_persistence_inventory_and_recent_timeline(self):
+        import json
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "site"
+            case = Path(directory) / "case"
+            (root / "wp-content/mu-plugins").mkdir(parents=True)
+            case.mkdir()
+            (root / "wp-content/mu-plugins/audit.php").write_text("<?php")
+            (root / "wp-content/object-cache.php").write_text("<?php")
+            (root / "wp-content/regular.txt").write_text("example")
+            records = audit.wordpress_persistence_inventory(root, case)
+            self.assertEqual(len(records), 2)
+            self.assertTrue(all(r["sha256"] for r in records))
+            timeline = audit.recent_file_timeline(root, case)
+            self.assertEqual(len(timeline), 3)
+            content = json.loads((case / "timeline.json").read_text())
+            self.assertIn("not creation time", content["timestamp_note"])
+
     def test_secret_redaction(self):
         self.assertNotIn("example-secret", audit.redact("password=example-secret"))
         self.assertNotIn("192.168.1.20", audit.redact("192.168.1.20"))
