@@ -61,7 +61,7 @@ Do not commit case directories, site backups, SQL dumps, credentials, client pat
 
 ## Versioning
 
-This rewrite starts at `0.1.0` (development/pre-release). It does not supersede or modify the historical Bash version `2026.10.28.18`. The Bash entry point was removed from this branch; the original remains available in Git history on `main`.
+This rewrite starts at `0.2.0` (development/pre-release). It does not supersede or modify the historical Bash version `2026.10.28.18`. The Bash entry point was removed from this branch; the original remains available in Git history on `main`.
 
 ## Audit coverage (important)
 
