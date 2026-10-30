@@ -624,7 +624,7 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
         for item in component_result["components"]))
     summary["critical_component_review"] = critical_component_review
     if critical_component_review and exit_code == 0:
-        status, exit_code = "AUDITORIA_INCOMPLETA", 40
+        status, exit_code, status_detail = "AUDITORIA_INCOMPLETA", 40, "CORE_OR_COMPONENT_INTEGRITY_REQUIRES_REVIEW"
     write_private(case / "report.json", json.dumps({
         "schema_version": 1, "tool_version": VERSION,
         "tool_sha256": sha256(Path(__file__)), "mode": mode,
