@@ -131,14 +131,14 @@ def known_upload_guard(path: Path) -> bool:
 
 def metform_icon_cache_candidate(relative: str, path: Path) -> bool:
     """Identify a candidate for review, never certify it as legitimate."""
-    if not re.fullmatch(r"wp-content/uploads/metform/cache/icons/font-awesome-[a-f0-9]{16}\\.php", relative):
+    if not re.fullmatch(r"wp-content/uploads/metform/cache/icons/font-awesome-[a-f0-9]{16}\.php", relative):
         return False
     try:
         if path.is_symlink() or not path.is_file() or path.stat().st_size > 8388608:
             return False
         with path.open("rb") as stream:
             head = stream.read(4096)
-        return bool(re.match(rb"\\s*<\\?php\\s+return\\s+(?:array\\s*\\(|\\[)", head))
+        return bool(re.match(rb"\s*<\?php\s+return\s+(?:array\s*\(|\[)", head))
     except OSError:
         return False
 
