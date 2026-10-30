@@ -72,3 +72,9 @@ The database matrix checks family-specific options (`sc_*`), historical `SimpleP
 Relative paths are preserved to support incident triage. Reports may still contain client-specific filenames and need review before disclosure.
 
 The report's `Database findings` count includes only positive records, while every SQL check remains explicitly represented in `database-evidence.json`. Sensitive substrings in relative paths are masked without removing long, legitimate directory names.
+
+## Detailed database evidence
+
+The database report now records the literal database name and physical `<prefix>options`/`<prefix>usermeta` tables so an operator can locate records in phpMyAdmin. WordPress option identifiers such as `SimplePluginLogger_plugin_info_before_update` are preserved without length-based redaction. Family-specific options receive `RESIDUO_FAMILIA_REQUER_LIMPEZA`, while historical references retain `HISTORICAL_REFERENCE`.
+
+For candidate option values, the tool collects full-value SHA-256, exact byte length and a limited encoding classification. Excerpts are restricted to recognized IOC tokens; arbitrary original or decoded database data is deliberately omitted because it can contain credentials and tokens. This is a safe-evidence compatibility choice rather than exact parity with the legacy Shell's unrestricted technical excerpts. Summaries distinguish confirmed family residues, historical references and informational WordPress sessions. Do not distribute detailed case JSON without review.
