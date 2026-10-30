@@ -266,3 +266,11 @@ All project documentation and source commentary are in English. Versions follow 
 
 ### Limitations
 - The new extra-file detection applies only where a trustworthy official plugin manifest is available. Theme file provenance and complete disposable-site acceptance remain outstanding.
+
+## [0.10.0] - 2026-10-30
+
+### Security and correctness
+- Reject unusable WordPress Core checksum manifests with no valid file entries rather than incorrectly declaring a checksum match.
+- Require at least one usable plugin checksum entry before declaring plugin checksum validation successful.
+- Record the number of checksum entries actually evaluated.
+- Add a regression test for a traversal-only Core manifest.
