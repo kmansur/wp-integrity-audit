@@ -138,6 +138,19 @@ def known_upload_guard(path: Path) -> bool:
         return False
 
 
+REVIEWED_METFORM_CACHE_SHA256 = {
+    "wp-content/uploads/metform/cache/icons/font-awesome-38edd54e30815111.php":
+        "232e3228a29927ce62cdd282c81e1327a6022abe92f4d529d94888dfbade1766",
+}
+
+
+def reviewed_metform_cache(relative: str, path: Path) -> bool:
+    """Validate a specifically reviewed artifact by its complete SHA-256 digest."""
+    expected = REVIEWED_METFORM_CACHE_SHA256.get(relative)
+    return bool(expected and not path.is_symlink() and path.is_file()
+                and sha256(path) == expected)
+
+
 def metform_icon_cache_candidate(relative: str, path: Path) -> bool:
     """Recognize a bounded cache header; do not certify the remainder."""
     if not re.fullmatch(r"wp-content/uploads/metform/cache/icons/font-awesome-[a-f0-9]{16}\.php", relative):
@@ -222,6 +235,8 @@ def file_audit(target: Path, case: Path) -> list[dict]:
             classification, reason = "CACHE_PLUGIN_REQUER_VALIDACAO", "MetForm icon cache candidate; origin and complete content not verified"
         if generic_match and not match:
             classification, reason = "WEB_SHELL_HEURISTIC_REQUIRES_REVIEW", "Potential dynamic execution or obfuscation pattern"
+        if upload_php and not match and not generic_match and reviewed_metform_cache(relative, path):
+            classification, reason = "LEGITIMO_VALIDADO", "Exact SHA-256 matches reviewed MetForm cache artifact; not plugin-wide trust"
         if hidden_php and not match and not generic_match and classification == "ARQUIVO_SUSPEITO_REQUER_VALIDACAO":
             classification, reason = "PHP_DIRETORIO_OCULTO_REQUER_VALIDACAO", "PHP within hidden directory"
         if relative.startswith("wp-content/wflogs/"):
@@ -270,7 +285,7 @@ def akismet_access_guard(content: str) -> bool:
             if not stack or stack[-1] != expected:
                 return False
             stack.pop()
-        elif re.fullmatch(r"(?:Require\s+all\s+denied|Deny\s+from\s+all|Order\s+allow,deny)", line, re.I):
+        elif re.fullmatch(r"(?:Require\s+all\s+denied|Deny\s+from\s+all|Order\s+(?:allow,deny|deny,allow))", line, re.I):
             if "assets" in stack:
                 return False
             deny = True
