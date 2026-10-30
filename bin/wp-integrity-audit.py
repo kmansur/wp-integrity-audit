@@ -317,11 +317,23 @@ def validate_source(source: Path, target: Path) -> Path:
     source = source.resolve(strict=True)
     if not source.is_dir() or source == target / "wp-content" or target in source.parents:
         raise AuditError("Source must be an independent clean directory")
+    # shutil.copytree follows symlinks unless explicitly forbidden.
+    # Reject special files and symlinks BEFORE copying any untrusted source.
+    for directory, dirs, files in os.walk(source, followlinks=False):
+        for name in dirs + files:
+            member = Path(directory) / name
+            mode = member.lstat().st_mode
+            if not (stat.S_ISREG(mode) or stat.S_ISDIR(mode)):
+                raise AuditError(f"Clean source has symlink or special file: {member}")
     for path in iter_files(source):
-        if path.suffix.lower() in (".php", ".inc", ".phtml"):
+        if path.suffix.lower() in (".php", ".inc", ".phtml", ".phar"):
             with path.open("rb") as stream:
-                if IOC.search(stream.read(262144).decode("utf-8", "replace")):
-                    raise AuditError(f"Known IOC in proposed clean source: {path}")
+                overlap = b""
+                while chunk := stream.read(65536):
+                    sample = overlap + chunk
+                    if IOC.search(sample.decode("utf-8", "replace")):
+                        raise AuditError(f"Known IOC in proposed clean source: {path}")
+                    overlap = sample[-256:]
     return source
 
 def stage_files(target: Path, source: Path, case: Path, replace: bool, sync: bool) -> Path:
@@ -406,8 +418,15 @@ def rotate_salts(path: Path) -> None:
 
 def sync_core(source: Path, target: Path) -> None:
     source = source.resolve(strict=True)
+    if source == target or target in source.parents or source in target.parents:
+        raise AuditError("Clean WordPress core must be independent of the target")
     if not all((source / x).exists() for x in ("wp-admin", "wp-includes", "wp-load.php")):
         raise AuditError("Invalid core source")
+    for directory, dirs, files in os.walk(source, followlinks=False):
+        for name in dirs + files:
+            mode = (Path(directory) / name).lstat().st_mode
+            if not (stat.S_ISREG(mode) or stat.S_ISDIR(mode)):
+                raise AuditError("Core source contains symlinks or special files")
     for dirname in ("wp-admin", "wp-includes"):
         shutil.copytree(source / dirname, target / dirname, dirs_exist_ok=True, symlinks=False)
     for path in source.iterdir():
@@ -502,6 +521,8 @@ def main() -> int:
                 return 0
             if os.geteuid() != 0:
                 raise AuditError("Recovery requires root; audit does not")
+            if args.mode == "recover" and processes:
+                raise AuditError("Matching suspicious processes are still active; isolate the host first")
             print("Recovery modifies files and/or database; independent verified backup is required.")
             ask("Confirm site isolation and independent backup")
             snapshot(target, case, cnf, dbname)
