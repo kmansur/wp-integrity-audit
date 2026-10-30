@@ -152,6 +152,9 @@ def file_audit(target: Path, case: Path) -> list[dict]:
         name = path.name
         unusual = name.startswith(PATTERN_NAMES) or name == "trace-inspector-pad.php" or "cipher-feeder" in name
         upload_php = relative.startswith("wp-content/uploads/") and path.suffix.lower() in (".php", ".phtml", ".phar")
+        hidden_php = (path.suffix.lower() in (".php", ".phtml", ".phar") and
+                      any(part.startswith(".") and part not in (".", "..", ".well-known")
+                          for part in Path(relative).parts[:-1]))
         match = None
         snippet = ""
         safe_text = ""
@@ -171,9 +174,11 @@ def file_audit(target: Path, case: Path) -> list[dict]:
                         overlap = sample[-256:]
             except OSError:
                 continue
-        if not (unusual or upload_php or match):
+        if not (unusual or upload_php or hidden_php or match):
             continue
         classification, reason = classify_file(relative, name, safe_text, match.group(0) if match else None)
+        if hidden_php and not match and classification == "ARQUIVO_SUSPEITO_REQUER_VALIDACAO":
+            classification, reason = "PHP_DIRETORIO_OCULTO_REQUER_VALIDACAO", "PHP within hidden directory"
         if relative.startswith("wp-content/wflogs/"):
             snippet = ""  # Wordfence configuration may contain secrets.
         try:
@@ -260,7 +265,7 @@ def audit_status(files: list[dict], processes: list[str],
         "validated_legitimate_files": sum(x.get("classification") == "LEGITIMO_VALIDADO" for x in files),
         "security_configuration_review": sum(x.get("classification") == "CONFIGURACAO_PLUGIN_SEGURANCA_REQUER_VALIDACAO" for x in files),
         "confirmed_compromised_files": 0,  # Heuristic file matches are not forensic confirmation.
-        "file_indicators_requiring_review": sum(x.get("classification") in ("IOC_REQUER_VALIDACAO", "ARQUIVO_SUSPEITO_REQUER_VALIDACAO", "PHP_UPLOAD_REQUER_VALIDACAO") for x in files),
+        "file_indicators_requiring_review": sum(x.get("classification") in ("IOC_REQUER_VALIDACAO", "ARQUIVO_SUSPEITO_REQUER_VALIDACAO", "PHP_UPLOAD_REQUER_VALIDACAO", "PHP_DIRETORIO_OCULTO_REQUER_VALIDACAO") for x in files),
         "suspicious_processes": len(processes),
     }
     if database is None:
