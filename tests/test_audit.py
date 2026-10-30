@@ -380,6 +380,45 @@ $table_prefix = 'wp_';
             self.assertEqual(len(results), 1)
             self.assertEqual(results[0]["classification"], "PHP_DIRETORIO_OCULTO_REQUER_VALIDACAO")
 
+    def test_core_integrity_with_synthetic_manifest(self):
+        import hashlib
+        import json
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "site"
+            case = Path(directory) / "case"
+            (root / "wp-includes").mkdir(parents=True)
+            case.mkdir()
+            version = root / "wp-includes" / "version.php"
+            version.write_text("<?php $wp_version = '6.8.2';")
+            core = root / "wp-load.php"
+            core.write_text("<?php /* synthetic */")
+            digest = hashlib.md5(core.read_bytes()).hexdigest()
+            manifest = {"checksums": {"wp-load.php": digest,
+                                      "wp-admin/missing.php": "a" * 32,
+                                      "wp-includes/version.php": "0" * 32,
+                                      "wp-content/plugin.php": "0" * 32}}
+            result = audit.core_integrity_audit(root, case, manifest)
+            kinds = {x["classification"] for x in result["findings"]}
+            self.assertIn("CORE_MODIFICADO_REQUER_REVISAO", kinds)
+            self.assertIn("CORE_AUSENTE_REQUER_REVISAO", kinds)
+            self.assertEqual(result["checked_files"], 2)
+            self.assertEqual(result["version"], "6.8.2")
+            self.assertTrue((case / "core-integrity.json").exists())
+
+    def test_core_integrity_without_version_is_unavailable(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "site"
+            case = Path(directory) / "case"
+            root.mkdir()
+            case.mkdir()
+            result = audit.core_integrity_audit(root, case)
+            self.assertEqual(result["status"], "UNAVAILABLE")
+
+    def test_host_inventory_rejects_arbitrary_directories(self):
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaises(audit.AuditError):
+                audit.host_persistence_inventory(Path(directory), [Path(directory)])
+
     def test_secret_redaction(self):
         self.assertNotIn("example-secret", audit.redact("password=example-secret"))
         self.assertNotIn("192.168.1.20", audit.redact("192.168.1.20"))
