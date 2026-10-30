@@ -208,3 +208,7 @@ WordPress.org plugin/theme lookup HTTP 404 is recorded as `NOT_FOUND_OFFICIAL_RE
 ## 0.12.0 coverage and provenance corrections
 
 The technical Core coverage field now reflects `component-version-evidence.json`, and Core outdated counts are separate from plugin/theme counts. An officially unlisted plugin is recorded as `PLUGIN_ORIGEM_NAO_CONFIRMADA_REQUER_REVISAO`, not malware. Where the main plugin header has no readable version, the inventory preserves the version-unidentified condition rather than inventing a local release. `LEGITIMO_VALIDADO` for large PHP caches requires full trusted-source or structural verification; a plausible header alone is not enough.
+
+## 0.13.0 verified artifact exceptions
+
+A previously inspected MetForm cache artifact is allowlisted by its **full SHA-256 hash plus exact relative path**, not merely by a generator comment. The exception covers only that reviewed byte-identical file; any cache update produces a new digest and must be reviewed independently. This is local evidence-based classification, **not** certification by the MetForm publisher. Akismet configuration recognition allows deny-by-default legacy/modern Apache rules and static-asset-only `FilesMatch` exceptions. Broad grants are rejected.
