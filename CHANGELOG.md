@@ -151,3 +151,5 @@ All project documentation and source commentary are in English. Versions follow 
 - Keep product-specific host inventory paths in internal `host-persistence.json`; avoid generic suspicion labels for ordinary host files.
 - Highlight explicit host indicators in optional probe review without overriding confirmed database residue status.
 - Extend report and CSV tests for per-domain case identifiers and sanitized management summaries.
+
+- Align the pre-existing technical-report security-configuration counter with the actual configuration inventory total.
