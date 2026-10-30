@@ -299,6 +299,10 @@ $table_prefix = 'wp_';
             document = json.loads((case / "report.json").read_text())
             self.assertEqual(document["status"], status)
             self.assertEqual(document["exit_code"], 10)
+            self.assertTrue((case / "report.csv").exists())
+            index = json.loads((case / "evidence-index.json").read_text())
+            self.assertEqual(index["database"][0]["id"], "DB-001")
+            self.assertEqual(index["database"][0]["table"], "wp_options")
             self.assertIn("## Executive summary", (case / "report.md").read_text())
 
     def test_secret_redaction(self):
