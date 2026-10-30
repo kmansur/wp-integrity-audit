@@ -277,6 +277,30 @@ $table_prefix = 'wp_';
         self.assertNotIn("192.168.1.10", sanitized)
         self.assertNotIn("test-secret", sanitized)
 
+    def test_final_status_contract_and_json(self):
+        """Residual family entries produce 10; unverified scope produces 40."""
+        with tempfile.TemporaryDirectory() as directory:
+            case = Path(directory)
+            db = [
+                {"kind": "family_option", "state": "RESIDUO_FAMILIA_REQUER_LIMPEZA",
+                 "length": "1", "name": "_transient_sc_spread_interval"},
+                {"kind": "historical_cache", "state": "HISTORICAL_REFERENCE",
+                 "length": "60", "name": "SimplePluginLogger_plugin_info_before_update"},
+                {"kind": "session_rows", "state": "PRESENT", "length": "1"},
+            ]
+            status, code, counts = audit.audit_status([], [], db)
+            self.assertEqual((status, code), ("RESIDUOS_REQUEREM_LIMPEZA", 10))
+            self.assertEqual(counts["confirmed_family_residues"], 1)
+            self.assertEqual(counts["historical_references"], 1)
+            self.assertEqual(counts["informational_records"], 1)
+            self.assertEqual(audit.audit_status([], [], None)[:2], ("AUDITORIA_INCOMPLETA", 40))
+            audit.make_report(case, "audit", [], [], db, "fixture_db", "wp_")
+            import json
+            document = json.loads((case / "report.json").read_text())
+            self.assertEqual(document["status"], status)
+            self.assertEqual(document["exit_code"], 10)
+            self.assertIn("## Executive summary", (case / "report.md").read_text())
+
     def test_secret_redaction(self):
         self.assertNotIn("example-secret", audit.redact("password=example-secret"))
         self.assertNotIn("192.168.1.20", audit.redact("192.168.1.20"))
