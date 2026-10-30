@@ -921,6 +921,41 @@ $table_prefix = 'wp_';
                 findings = audit.file_audit(target, case)
             self.assertNotEqual(findings[0]["classification"], "LEGITIMO_VALIDADO")
 
+    def test_management_report_tty_and_redirect_behavior(self):
+        with tempfile.TemporaryDirectory() as folder:
+            case = Path(folder)
+            (case / "report.md").write_text("# Public management report\n")
+            output = io.StringIO()
+            with unittest.mock.patch.object(audit.sys, "stdout", output):
+                audit.present_management_report(case, tty=True)
+            self.assertIn("--- start of report ---", output.getvalue())
+            self.assertIn("# Public management report", output.getvalue())
+            output = io.StringIO()
+            with unittest.mock.patch.object(audit.sys, "stdout", output):
+                audit.present_management_report(case, show=True, tty=False)
+            self.assertIn("Management report:", output.getvalue())
+            self.assertNotIn("# Public management report", output.getvalue())
+            output = io.StringIO()
+            with unittest.mock.patch.object(audit.sys, "stdout", output):
+                audit.present_management_report(case, show=True, no_show=True, tty=True)
+            self.assertNotIn("# Public management report", output.getvalue())
+
+    def test_pending_component_review_triggers_exit_40(self):
+        import json
+        with tempfile.TemporaryDirectory() as folder:
+            case = Path(folder) / "example-20261030T000000Z-abcdef"
+            case.mkdir()
+            (case / "component-version-evidence.json").write_text(json.dumps({
+                "coverage": {"local": "EXECUTED", "official": "EXECUTED", "core": "EXECUTED"},
+                "summary": {"core_outdated": 1},
+                "components": [{"state": "PLUGIN_ORIGEM_NAO_CONFIRMADA_REQUER_REVISAO"}]
+            }))
+            audit.make_report(case, "audit", [], [], [])
+            record = json.loads((case / "report.json").read_text())
+            self.assertEqual(record["exit_code"], 40)
+            self.assertEqual(record["status"], "REVISAO_NECESSARIA")
+            self.assertIn("Core verification: EXECUTED", (case / "report.md").read_text())
+
     def test_secret_redaction(self):
         self.assertNotIn("example-secret", audit.redact("password=example-secret"))
         self.assertNotIn("192.168.1.20", audit.redact("192.168.1.20"))
