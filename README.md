@@ -176,3 +176,7 @@ The default read-only audit now recognizes a limited set of generic PHP webshell
 ## Version 0.6.0: WordPress persistence and timeline
 
 Full passive audits now write `wordpress-persistence.json`, an inventory of MU-plugins and selected drop-ins, including relative paths, hashes and byte sizes. They also write `timeline.json`, a 30-day metadata timeline based on filesystem mtime/ctime. The latter is **not a creation-time history**, and no script code is executed. Both sources are investigative context and do not imply compromise by presence alone. These inventories currently run with the default full audit and retain private-case permissions. Mutating modes are still disabled.
+
+## Component version and provenance audit (0.7.0, experimental)
+
+The default read-only audit inventories local WordPress Core, plugin and theme versions. `--offline` skips all external component-version requests but preserves local inventories. `--skip-version-check` skips this entire new component step and reports reduced coverage. `--official-compare` explicitly enables the default HTTPS comparison. New private case outputs are `component-version-evidence.json`, `component-version-report.md` and `component-version-report.csv`, using `CORE-001`, `PLUGIN-###` and `THEME-###` IDs. API failures are not interpreted as missing/unofficial components. The current implementation **does not yet correlate active plugins/themes with database options or verify plugin/theme package checksums**; treat provenance as preliminary, not cryptographic authenticity.
