@@ -131,3 +131,7 @@ A WordPress.org plugin listing and a checksum manifest are separate sources. A l
 ## Streamed hashes (0.8.0)
 
 Official Core and plugin manifest comparisons and local main-file evidence use bounded streaming digests. Checksum mismatches still indicate review requirements, not confirmed malware. Neither file hashing nor the inventory traverses symlinked components by design.
+
+## Unexpected plugin executables (0.9.0)
+
+Review `checksum_findings` for `EXTRA_EXECUTABLE` results: they identify PHP-family files absent from an official plugin manifest for the installed version. Investigate plugin-specific generated code or custom extensions before deciding whether a finding is malicious. The auditor never removes the file.
