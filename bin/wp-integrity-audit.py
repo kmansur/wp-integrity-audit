@@ -273,6 +273,10 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
         lines.extend(["", "### Dynamic WordPress cron option", "",
                       "WordPress modifies cron automatically; changes in hash or size alone do not indicate compromise.",
                       "Examine indicator matches and collection time together.", ""])
+    lines.extend(["", "## Release recommendation", "",
+                  "**LIBERAÇÃO NÃO RECOMENDADA**",
+                  "An audit alone does not authorize reopening. A qualified operator must validate remediation, "
+                  "evidence completeness, persistence checks and backups before approving release.", ""])
     lines.extend(["", "## Classification legend", "",
                   "- `RESIDUO_FAMILIA_REQUER_LIMPEZA`: family-specific database residue.",
                   "- `HISTORICAL_REFERENCE`: historic cache reference, not proof of execution.",
