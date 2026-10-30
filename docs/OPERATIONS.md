@@ -149,3 +149,7 @@ Use the component evidence Core `verified_files` count and `coverage.core` field
 ## Reviewed-cache provenance
 
 The `LEGITIMO_VALIDADO` exception for the identified MetForm font-awesome cache requires an exact match to a review-recorded SHA-256 and exact path. Never add cache hashes from a filename alone; validate candidate source and contents before curating a new digest. Hash mismatch returns the artifact to manual review. Akismet `.htaccess` validation recognizes legacy `Order Deny,Allow` and scoped static-asset grants without authorizing PHP access.
+
+## Console management report (0.14.0)
+
+The CLI prints the management-report path after audits. A TTY displays `report.md` between clear delimiters; redirected stdout never displays the document body. `--no-show-report` always suppresses the body, including when `--show-report` is also present. The technical report is private and is never printed automatically. Scripts should continue to consume case `report.json` and the process exit code. Pending non-malware Core, configuration, or component-origin reviews produce review status and exit 40 rather than success.
