@@ -212,3 +212,5 @@ The technical Core coverage field now reflects `component-version-evidence.json`
 ## 0.13.0 verified artifact exceptions
 
 A previously inspected MetForm cache artifact is allowlisted by its **full SHA-256 hash plus exact relative path**, not merely by a generator comment. The exception covers only that reviewed byte-identical file; any cache update produces a new digest and must be reviewed independently. This is local evidence-based classification, **not** certification by the MetForm publisher. Akismet configuration recognition allows deny-by-default legacy/modern Apache rules and static-asset-only `FilesMatch` exceptions. Broad grants are rejected.
+
+The component management summary now separately counts plugins requiring source/version review (for example an unlisted Envato plugin or an unreadable Popup Maker version). These reviews do not, by themselves, assert malicious activity or change the audit exit code. A single previously inspected MetForm cache hash is the sole narrow exception; all changed bytes trigger renewed review.
