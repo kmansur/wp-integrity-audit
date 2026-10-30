@@ -1148,9 +1148,9 @@ def main() -> int:
         files = [] if is_audit and args.skip_files else file_audit(target, case)
         if not (is_audit and args.skip_config):
             configuration_audit(target, case)
-        if not (is_audit and args.skip_core):
+        if is_audit and not args.skip_core:
             core_integrity_audit(target, case)
-        if not (is_audit and args.skip_host_persistence):
+        if is_audit and not args.skip_host_persistence:
             if sys.platform != "linux":
                 raise AuditError("Host persistence inventory is supported only on Linux")
             host_persistence_inventory(case, [Path(p) for p in ("/etc/crontab", "/etc/cron.d", "/etc/cron.daily", "/etc/cron.hourly", "/etc/systemd/system", "/etc/php", "/etc/apache2")])
