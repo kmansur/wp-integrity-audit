@@ -247,6 +247,13 @@ $table_prefix = 'wp_';
             self.assertIn("NOT EVALUATED", report)
             self.assertNotIn("[LONG_VALUE_REDACTED]", report)
 
+    def test_sensitive_path_substrings_only(self):
+        path = "wp-content/uploads/" + "a" * 60 + "/192.168.1.10-password=test-secret.php"
+        sanitized = audit.sanitize_relative_path(path)
+        self.assertIn("a" * 60, sanitized)
+        self.assertNotIn("192.168.1.10", sanitized)
+        self.assertNotIn("test-secret", sanitized)
+
     def test_secret_redaction(self):
         self.assertNotIn("example-secret", audit.redact("password=example-secret"))
         self.assertNotIn("192.168.1.20", audit.redact("192.168.1.20"))
