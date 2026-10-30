@@ -128,3 +128,12 @@ All project documentation and source commentary are in English. Versions follow 
 - Include incomplete/mismatching WordPress Core checksum results in `report.json` and the executive summary.
 - Assign exit `40` for otherwise clean cases with unresolved Core discrepancies, without overriding confirmed family residues (exit `10`).
 - Add regression tests for both status precedences.
+
+## [0.3.0] - 2026-10-30
+
+### Changed
+- Run all implemented passive audit probes by default: WordPress files, configuration metadata, official Core checksum verification, host persistence metadata, Elementor, process indicators and database checks.
+- Replace opt-in `--check-core` / `--host-persistence` CLI with opt-out `--skip-core` / `--skip-host-persistence`; add `--skip-files`, `--skip-config`, `--skip-processes`, `--skip-elementor`, and `--skip-db` (alias `--files-only`).
+- Preserve explicitly selected recovery workflows and interactive approval; no mutation in the normal audit path.
+- Track omitted scopes in reports and return exit 40 for otherwise clean but incomplete audits.
+- Add CLI-default and omitted-coverage regression tests.
