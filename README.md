@@ -172,3 +172,7 @@ Post-recovery verification now evaluates actual active database marker states, k
 ## 0.5.0 safety gate and generic scanning
 
 The default read-only audit now recognizes a limited set of generic PHP webshell/obfuscation expressions and additional legacy script extensions. These are heuristic indicators requiring manual review. **All mutating modes are temporarily disabled** until end-to-end safety tests establish preservation of user uploads, Unix ownership, exact version synchronization and reliable rollback. No live recovery should be attempted with this build.
+
+## Version 0.6.0: WordPress persistence and timeline
+
+Full passive audits now write `wordpress-persistence.json`, an inventory of MU-plugins and selected drop-ins, including relative paths, hashes and byte sizes. They also write `timeline.json`, a 30-day metadata timeline based on filesystem mtime/ctime. The latter is **not a creation-time history**, and no script code is executed. Both sources are investigative context and do not imply compromise by presence alone. These inventories currently run with the default full audit and retain private-case permissions. Mutating modes are still disabled.
