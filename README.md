@@ -168,3 +168,7 @@ MetForm cache recognition inspects only a bounded header for contextual classifi
 ## Recovery safeguards (0.4.0)
 
 Post-recovery verification now evaluates actual active database marker states, known file IOCs and process indicators. Absent placeholders and ordinary WordPress session/application-password records do not by themselves fail the post-check. **Recovery remains experimental**: replacement ownership, upload preservation and exact-version sync must be proven in disposable tests before it is used on production sites. Do not infer that CI unit tests authorize recovery.
+
+## 0.5.0 safety gate and generic scanning
+
+The default read-only audit now recognizes a limited set of generic PHP webshell/obfuscation expressions and additional legacy script extensions. These are heuristic indicators requiring manual review. **All mutating modes are temporarily disabled** until end-to-end safety tests establish preservation of user uploads, Unix ownership, exact version synchronization and reliable rollback. No live recovery should be attempted with this build.
