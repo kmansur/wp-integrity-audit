@@ -810,6 +810,74 @@ def upload_permissions_audit(target: Path, case: Path) -> None:
                       json.dumps({"uid": st.st_uid, "gid": st.st_gid, "mode": oct(stat.S_IMODE(st.st_mode))}, indent=2))
 
 
+def compare_cases(old_case: Path, new_case: Path, output: Path) -> dict:
+    """Compare immutable case evidence by semantic identity, not ephemeral IDs."""
+    def load(case: Path, name: str):
+        case = case.resolve(strict=True)
+        if not case.is_dir() or case.is_symlink():
+            raise AuditError("Comparison source must be an existing case directory")
+        file = case / name
+        if file.is_symlink() or not file.is_file():
+            raise AuditError(f"Missing or symlinked case evidence: {name}")
+        with file.open(encoding="utf-8") as stream:
+            return json.load(stream)
+    old_summary, new_summary = load(old_case, "report.json"), load(new_case, "report.json")
+    if not old_summary.get("database_audited") or not new_summary.get("database_audited"):
+        raise AuditError("Comparison requires two complete database audits")
+    if old_summary.get("database") != new_summary.get("database"):
+        raise AuditError("Refusing comparison across different database names")
+    def keys(case: Path, name: str, source: str):
+        items = load(case, name)
+        if not isinstance(items, list):
+            raise AuditError("Invalid case evidence schema")
+        result = {}
+        for item in items:
+            key = (item.get("path") if source == "file" else
+                   (item.get("kind"), item.get("name")))
+            if not key or (source != "file" and not all(key)):
+                raise AuditError("Malformed comparison evidence key")
+            fingerprint = item.get("sha256") or item.get("state") or item.get("classification")
+            result[key] = fingerprint
+        return result
+    outcomes = {}
+    for label, filename in (("files", "file-evidence.json"), ("database", "database-evidence.json")):
+        before = keys(old_case, filename, label[:-1] if label == "files" else "database")
+        after = keys(new_case, filename, label[:-1] if label == "files" else "database")
+        stringify = lambda value: value if isinstance(value, str) else ":".join(value)
+        outcomes[label] = {
+            "removed": sorted(stringify(k) for k in before.keys() - after.keys()),
+            "added": sorted(stringify(k) for k in after.keys() - before.keys()),
+            "changed": sorted(stringify(k) for k in before.keys() & after.keys()
+                              if before[k] != after[k]),
+            "unchanged_count": sum(before[k] == after[k] for k in before.keys() & after.keys()),
+        }
+    report = {
+        "schema_version": 1,
+        "generated_at_utc": dt.datetime.now(dt.timezone.utc).isoformat(),
+        "old_status": old_summary.get("status"),
+        "new_status": new_summary.get("status"),
+        "database": old_summary.get("database"),
+        "diff": outcomes,
+        "note": "Changed hashes or dynamic cron values alone do not establish compromise or remediation.",
+    }
+    ensure_private_dir(output)
+    write_private(output / "comparison.json", json.dumps(report, indent=2, ensure_ascii=False))
+    lines = ["# WordPress Audit Case Comparison", "",
+             f"- Previous status: `{report['old_status']}`",
+             f"- Current status: `{report['new_status']}`",
+             "- Comparison is read-only for the source cases.", ""]
+    for category, differences in outcomes.items():
+        lines += [f"## {category.title()}", ""]
+        for change in ("added", "removed", "changed"):
+            lines += [f"### {change.title()} ({len(differences[change])})", ""]
+            lines += [f"- `{v}`" for v in differences[change]]
+        lines += [f"- Unchanged: {differences['unchanged_count']}", ""]
+    lines += ["## Interpretation", "", report["note"], "",
+              "Release decisions require independent review; this comparison never approves reopening.", ""]
+    write_private(output / "comparison.md", "\n".join(lines))
+    return report
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="WordPress Integrity Audit (Python)")
     modes = parser.add_mutually_exclusive_group()
@@ -825,8 +893,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--official-sync", action="store_true")
     parser.add_argument("--case-root", type=Path, default=Path("/var/lib/wp-integrity-audit/cases"))
     parser.add_argument("--files-only", action="store_true", help="Skip SQL checks explicitly when using --audit")
+    parser.add_argument("--compare", nargs=2, metavar=("OLD_CASE", "NEW_CASE"), type=Path,
+                        help="Compare two existing case directories without scanning a live site")
+    parser.add_argument("--compare-output", type=Path,
+                        help="Private output directory for comparison findings")
     parser.add_argument("--version", action="version", version=VERSION)
     args = parser.parse_args()
+    if args.compare:
+        if args.target is not None or args.mode != "audit" or args.files_only or args.source or args.core_source:
+            parser.error("--compare cannot be combined with a target or audit/recovery options")
+        return args
+    if args.compare_output:
+        parser.error("--compare-output requires --compare")
     if args.target is None:
         parser.error("TARGET is required")
     if args.files_only and args.mode != "audit":
@@ -843,6 +921,11 @@ def main() -> int:
     # Protect backup and report files from their first byte of creation.
     os.umask(0o077)
     args = parse_args()
+    if args.compare:
+        output = args.compare_output or (Path.cwd() / "wp-audit-comparison")
+        compare_cases(args.compare[0], args.compare[1], output)
+        print(f"Comparison created at {output}")
+        return 0
     target = validate_site(args.target)
     proposed_case_root = args.case_root.resolve()
     if proposed_case_root == target or target in proposed_case_root.parents:
