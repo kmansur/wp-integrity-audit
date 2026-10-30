@@ -53,7 +53,7 @@ python3 -m compileall -q bin tests
 python3 -m unittest discover -s tests -v
 ```
 
-GitHub Actions runs unit tests on Python 3.10–3.13 and a separate synthetic MySQL 8 integration job. These tests are not a substitute for full WordPress recovery and restore validation.
+GitHub Actions runs unit tests on Python 3.10–3.13 and a separate synthetic MySQL 8 integration job. These tests now include a disposable MySQL dump-and-restore verification, but remain insufficient to certify full live WordPress recovery, plugin compatibility and site availability.
 
 ## Security and privacy
 
