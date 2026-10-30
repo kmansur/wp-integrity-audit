@@ -821,6 +821,19 @@ $table_prefix = 'wp_';
             self.assertEqual(item["state"], "PLUGIN_COM_ARQUIVOS_MODIFICADOS")
             self.assertIn({"path": "rogue.php", "reason": "EXTRA_EXECUTABLE"}, item["checksum_findings"])
 
+    def test_core_unusable_manifest_never_passes(self):
+        import component_versions as cv
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            record = {"local_version": "6.8.3", "locale": "en_US",
+                      "state": "CORE_CHECKSUM_INDISPONIVEL", "query_status": "SKIPPED"}
+            with unittest.mock.patch.object(cv, "api_json", return_value=(
+                    "SUCCESS", {"checksums": {"../outside": "0" * 32}},
+                    "https://api.wordpress.org/core/checksums/1.0/")):
+                cv.check_core(root, record, False)
+            self.assertEqual(record["query_status"], "API_UNAVAILABLE")
+            self.assertNotEqual(record["state"], "CORE_VALIDADO")
+
     def test_secret_redaction(self):
         self.assertNotIn("example-secret", audit.redact("password=example-secret"))
         self.assertNotIn("192.168.1.20", audit.redact("192.168.1.20"))
