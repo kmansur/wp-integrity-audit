@@ -145,3 +145,7 @@ For official component metadata lookups, HTTP 404 represents a component not fou
 ## Coverage reconciliation (0.12.0)
 
 Use the component evidence Core `verified_files` count and `coverage.core` field for actual checksum execution. A Core update being available does not itself indicate tampering or invalidate a checksum match. Plugin origin-unconfirmed and local-version-unidentified states require provenance review, not automatic malware determination. For Akismet and MetForm artifacts, verify complete content or trusted provenance before granting legitimacy exemptions.
+
+## Reviewed-cache provenance
+
+The `LEGITIMO_VALIDADO` exception for the identified MetForm font-awesome cache requires an exact match to a review-recorded SHA-256 and exact path. Never add cache hashes from a filename alone; validate candidate source and contents before curating a new digest. Hash mismatch returns the artifact to manual review. Akismet `.htaccess` validation recognizes legacy `Order Deny,Allow` and scoped static-asset grants without authorizing PHP access.
