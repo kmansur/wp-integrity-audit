@@ -481,7 +481,8 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
     core_count = len(core.get("findings", []))
     config_count = sum(x.get("classification") == "CONFIGURACAO_REQUER_VALIDACAO" for x in configurations)
     config_inventoried = len(configurations)
-    summary["security_configuration_review"] = config_count + summary["security_configuration_review"]
+    summary["plugin_security_configuration_review"] = summary["security_configuration_review"]
+    summary["security_configuration_review"] = config_count
     host_indicators = sum(x.get("classification") == "HOST_INDICATOR_REQUIRES_INVESTIGATION" for x in host_records)
     host_review = sum(x.get("classification") == "HOST_PERSISTENCE_REQUIRES_CONTEXT" for x in host_records)
     host_known = sum(x.get("classification") == "COMPONENTE_DE_SEGURANCA_CONHECIDO" for x in host_records)
@@ -562,7 +563,7 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
         f"- Active database markers: **{summary['active_database_markers']}**",
         f"- Confirmed compromised files: **{summary['confirmed_compromised_files']}**",
         f"- Validated legitimate file patterns: **{summary['validated_legitimate_files']}**",
-        f"- Security configurations requiring validation: **{summary['security_configuration_review'] + config_count}**",
+        f"- Security configurations requiring validation: **{summary['security_configuration_review']}**",
         f"- Suspicious processes: **{summary['suspicious_processes']}**",
         f"- Core discrepancies: **{core_count}**",
         f"- Configuration files requiring review: **{config_count}**",
@@ -697,7 +698,7 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
         f"- External persistence indicators: **{host_indicators}**",
         f"- Host inventory records requiring review: **{host_review}**",
         "", "## Risk overview", "",
-        f"- Database risk: **{'HIGH' if summary['confirmed_family_residues'] else 'NOT DETERMINED'}**",
+        f"- Database risk: **{'HIGH' if summary['confirmed_family_residues'] or summary['active_database_markers'] else 'LOW — no selected database IOC' if audited else 'NOT DETERMINED'}**",
         f"- File risk: **{'REQUIRES REVIEW' if summary['file_indicators_requiring_review'] else 'LOW FOR SELECTED INDICATORS'}**",
         f"- Core risk: **{'MEDIUM — REVIEW REQUIRED' if core_count else 'NO EXPLICIT MISMATCH DETECTED' if core.get('status') == 'COMPLETE' else 'NOT DETERMINED'}**",
         f"- External persistence risk: **{persistence_risk}**",
