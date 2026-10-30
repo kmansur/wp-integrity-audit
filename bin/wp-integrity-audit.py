@@ -258,6 +258,7 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
         f"- Timestamp (UTC): {dt.datetime.now(dt.timezone.utc).isoformat()}",
         f"- File findings: {len(findings)}", f"- Process findings: {len(processes)}",
         f"- Database audit: **{'EXECUTED' if audited else 'NOT EXECUTED'}**",
+        f"- Database evaluation: {'COMPLETE TARGETED CHECKS' if audited else 'NOT EVALUATED'}",
         f"- Database dump: {'PERFORMED' if (case / 'database-before.sql').is_file() else 'NOT PERFORMED'}",
         f"- File snapshot: {'PERFORMED' if (case / 'site-before.tar.gz').is_file() else 'NOT PERFORMED'}",
         "", "## Filesystem evidence", "",
@@ -276,7 +277,7 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
                       "| Kind | Name | Count/size | State |",
                       "|---|---|---|---|"])
         for item in database:
-            lines.append(f"| {item['kind']} | {item['name']} | {item['length']} | {item.get('state','')} |")
+            lines.append(f"| {item['kind']} | {item.get('name', '(not supplied)')} | {item['length']} | {item.get('state','')} |")
         lines.extend(["", "### Evidence details", ""])
         for item in database:
             if not item.get("sha256"):
