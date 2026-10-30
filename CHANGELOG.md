@@ -300,3 +300,18 @@ All project documentation and source commentary are in English. Versions follow 
 
 - Add a management counter for plugins requiring provenance/version review, separate from confirmed malware and outdated-version counts.
 - Extend regression coverage for an exact reviewed cache SHA-256 matching versus a modified digest.
+
+## [0.14.0] - 2026-10-30
+
+### Added
+- Show `report.md` automatically on an interactive standard-output terminal after audit completion.
+- Add `--show-report` and `--no-show-report`; explicit suppression has priority and redirected output never prints the report body.
+- Print the management report path without exposing the internal technical report.
+
+### Fixed
+- Set `REVISAO_NECESSARIA` with exit code 40 when Core updates, component provenance/version reviews, or configuration reviews remain outstanding, without claiming malware.
+- Use component Core verification coverage in the technical report, avoiding the retired legacy probe's `NOT EXECUTED` label.
+- Align management release recommendation with actual exit status.
+
+### Tests
+- Cover TTY/non-TTY behavior, explicit suppression and unresolved-component exit semantics.
