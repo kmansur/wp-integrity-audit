@@ -74,3 +74,8 @@ All project documentation and source commentary are in English. Versions follow 
 - Limit exported snippets to known IOC tokens; deliberately withhold arbitrary encoded/decoded content to avoid leaking credentials.
 - Report separate counts for family residues, historical references and stored session records.
 - Add database integration regression tests for naming, classification, checksums and report contents.
+
+### Report clarity and safe scalar evidence
+- Classify two allowlisted numeric `sc_*` transient keys as `ESCALAR_TEXTO_NUMERO_NAO_CODIFICADO` and show their safe scalar value only after strict length and digit validation.
+- Keep arbitrary family options and credential-like values masked; include a regression fixture with a fake private token.
+- Render SQL evidence details as individual Markdown sections after the completed summary table instead of breaking table layout.
