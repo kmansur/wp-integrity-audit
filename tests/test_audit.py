@@ -717,6 +717,28 @@ $table_prefix = 'wp_';
                 cv.check_core(root, record, False)
             self.assertEqual(record["state"], "CORE_MODIFICADO_REQUER_REVISAO")
 
+    def test_component_plugin_premium_and_custom_source_no_network(self):
+        import component_versions as cv
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            (root / "wp-content/plugins/custom").mkdir(parents=True)
+            (root / "wp-content/plugins/custom/custom.php").write_text(
+                "<?php\n/* Plugin Name: Local Custom\nVersion: 1.2.3\nUpdate URI: https://vendor.example/plugin */")
+            records = cv.local_components(root, "plugin", set())
+            self.assertEqual(len(records), 1)
+            self.assertEqual(records[0]["state"], "PLUGIN_PREMIUM_REQUER_FONTE_CONFIAVEL")
+            self.assertFalse(records[0]["active"])
+
+    def test_component_database_metadata_no_php_evaluation(self):
+        with unittest.mock.patch.object(audit, "query_db", return_value=[
+            ["active_plugins", '613a313a7b693a303b733a31373a22616b69736d65742f616b69736d65742e706870223b7d'],
+            ["template", "706172656e74"],
+            ["stylesheet", "6368696c64"]]):
+            active, template, stylesheet = audit.component_db_metadata("config", "wordpress", "wp_")
+        self.assertEqual(template, "parent")
+        self.assertEqual(stylesheet, "child")
+        self.assertIsInstance(active, set)
+
     def test_secret_redaction(self):
         self.assertNotIn("example-secret", audit.redact("password=example-secret"))
         self.assertNotIn("192.168.1.20", audit.redact("192.168.1.20"))
