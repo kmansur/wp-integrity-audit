@@ -88,3 +88,5 @@ Two exact, known family transient keys (`_transient_sc_spread_interval` and `_tr
 A completed targeted scan is **not** a production-release authorization. A dynamic WordPress cron entry is recorded as informational evidence (SHA-256, byte count, UTC collection time and recognized marker count) without treating ordinary hash changes as malware. The report displays the tool's own SHA-256 to tie output to a specific installed version. Values from non-allowlisted options remain masked.
 
 Planned but not yet implemented: optional independently validated forensic dump, broader posts/postmeta and host-persistence collection, structured process/network inventory, CSV export, stable dedicated exit codes, module split and automated release decision. Until these features are validated, retain isolation and use human sign-off for site release.
+
+Audit reports now explicitly state whether a database dump and full-file snapshot were performed. Pure audit modes leave both as `NOT PERFORMED`; snapshot generation remains limited to explicitly confirmed mutating recovery workflows. No forensic snapshot is implied by an ordinary read-only audit.
