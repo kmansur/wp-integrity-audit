@@ -192,3 +192,7 @@ All component-version evidence and generated report labels are in English. Read-
 ## 0.8.0 checksum hardening
 
 Component-version scanning now streams file hashes in bounded 1 MiB blocks. It does not execute WordPress code or download executable packages, and refuses symlinks while hashing. Version inventory remains pre-release until full disposable WordPress scenario testing and explicit provenance/coverage acceptance are complete.
+
+## 0.9.0 official plugin extra-file detection
+
+When an official plugin checksum manifest is available, the component audit now reports executable files present in the plugin directory but absent from the manifest as `EXTRA_EXECUTABLE` evidence. These remain review findings, not malware confirmation. Plugins without an official manifest are not treated as infected merely because their origin cannot be verified.
