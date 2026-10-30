@@ -79,3 +79,7 @@ Official Core mismatch or checksum retrieval failure is reported in `optional_pr
 ## Full passive scan is the default (0.3.0)
 
 `python3 bin/wp-integrity-audit.py /srv/www/wordpress` runs all passive checks implemented by the tool. Disable specific checks using `--skip-core`, `--skip-host-persistence`, `--skip-db`, `--skip-files`, `--skip-config`, `--skip-processes` and `--skip-elementor`. The legacy `--files-only` spelling remains an alias of `--skip-db`. Optional Core checks require outgoing HTTPS connectivity to api.wordpress.org. No PHP or WP-CLI invocation is performed. Recovery commands are explicit and separately confirmed; they never run as a side effect of an audit. An audit with skipped coverage is treated as incomplete unless confirmed residue already requires remediation.
+
+## Interpreting supplementary audit evidence
+
+The WordPress Core section in report.md shows each reference discrepancy, and the WordPress configuration section contains relative paths and hashes without configuration content. The external persistence section displays counts only; system paths and security product names remain in the private host-persistence.json. A recognized IOC is not necessarily proof of execution. The CSV includes separate domain and case_id fields; store case IDs alongside domain names to correlate executions.
