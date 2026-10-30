@@ -32,3 +32,34 @@ jobs:
         run: python -m unittest discover -s tests -v
       - name: Verify CLI help
         run: python bin/wp-integrity-audit.py --help
+
+  mysql-integration:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: synthetic-test-password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -psynthetic-test-password"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install MySQL client tools
+        run: sudo apt-get update && sudo apt-get install -y default-mysql-client
+      - name: Run synthetic MySQL integration tests
+        env:
+          WP_AUDIT_INTEGRATION: '1'
+          WP_AUDIT_DB_HOST: '127.0.0.1'
+          WP_AUDIT_DB_USER: 'root'
+          WP_AUDIT_DB_PASSWORD: 'synthetic-test-password'
+        run: python -m unittest discover -s tests -p 'test_integration.py' -v
