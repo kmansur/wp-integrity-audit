@@ -98,3 +98,8 @@ All project documentation and source commentary are in English. Versions follow 
 - Reserve `COMPROMETIMENTO_CONFIRMADO` / exit 20 for independently confirmed evidence; heuristic markers alone are incomplete investigations.
 - Return 10 for family residues and 40 when the user intentionally omits database checks.
 - Introduce regression coverage for the status contract, JSON summary and read-only CLI return codes.
+
+### Case evidence indexing
+- Repair previous CI failures caused by a missing explicit `NOT EVALUATED` label and incomplete synthetic evidence records.
+- Generate deterministic per-case FILE/DB evidence identifiers and a separate JSON index with SQL table and column provenance.
+- Generate a single-row CSV audit summary for fleet consolidation; add unit regression checks.
