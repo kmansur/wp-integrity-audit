@@ -136,3 +136,9 @@ A normal invocation (`python3 bin/wp-integrity-audit.py /path/to/wordpress`) now
 The management summary now reports Core discrepancy counts, WordPress configuration review counts and external host IOC counts from the corresponding JSON evidence files. Core findings and WordPress-local configuration paths and SHA-256 hashes are listed in report.md. Host inventory file paths are excluded from its host-persistence summary and retained in the protected host-persistence.json for internal technical review.
 
 report.json includes domain, case_id, core_discrepancies, configuration_review_count and host_persistence_indicators. The CSV keeps domain and case_id in separate columns. Ordinary host configuration files are classified INVENTARIADO_SEM_INDICADOR; only an explicit known family IOC match receives HOST_INDICATOR_REQUIRES_INVESTIGATION. A lack of matching known IOCs is not a guarantee of host integrity.
+
+## Client-facing and internal reports
+
+The case now generates `report.md` as a management-oriented summary without host paths, detailed infrastructure inventories, or vendor/product names. `technical-report.md` contains detailed WordPress Core discrepancies, local configuration paths and hashes, database evidence and classification notes. `host-persistence.json` remains internal-only; the reports show aggregate host counts. `report.json` contains separate `domain` and `case_id` fields and evidence-derived Core, configuration and host counters; `report.csv` also separates `domain` and `case_id`.
+
+The host inventory classifies ordinary entries as `INVENTARIADO_SEM_INDICADOR` and only labels bounded recognized-family matches `HOST_INDICATOR_REQUIRES_INVESTIGATION`. Ordinary entries are not certified benign. The management risk overview is qualitative; it must not be used as a release authorization.
