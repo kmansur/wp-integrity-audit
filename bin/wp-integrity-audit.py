@@ -48,6 +48,17 @@ def redact(value: object) -> str:
     value = re.sub(r"(?<!\d)(?:\d{1,3}\.){3}\d{1,3}(?!\d)", "[IP_REDACTED]", value)
     return value[:240]
 
+def sanitize_relative_path(path: str) -> str:
+    """Keep evidentiary relative paths but mask explicit sensitive substrings.
+
+    Never use generic length/entropy heuristics for filenames. The source
+    is always relative to the audited WordPress root, not an absolute host path.
+    """
+    value = SENSITIVE.sub(lambda m: m.group(1) + "=[REDACTED]", path)
+    value = re.sub(r"(?<!\\d)(?:\\d{1,3}\\.){3}\\d{1,3}(?!\\d)", "[IP_REDACTED]", value)
+    return value.replace("|", "/").replace("\\n", " ").replace("\\r", " ")
+
+
 def sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as stream:
@@ -190,14 +201,14 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
         f"- Timestamp (UTC): {dt.datetime.now(dt.timezone.utc).isoformat()}",
         f"- File findings: {len(findings)}", f"- Process findings: {len(processes)}",
         f"- Database audit: **{'EXECUTED' if audited else 'NOT EXECUTED'}**",
-        f"- Database findings: {len(database) if audited else 'NOT EVALUATED'}",
+        f"- Database findings: {sum(1 for x in database if x.get('state') not in ('NOT_FOUND','ABSENT')) if audited else 'NOT EVALUATED'}",
         "", "## Filesystem evidence", "",
         "| Relative path | Classification | SHA-256 |",
         "|---|---|---|",
     ]
     for finding in findings:
         # Preserve actual relative file paths, including long directory names.
-        path = finding["path"].replace("|", "/").replace("\n", " ")
+        path = sanitize_relative_path(finding["path"])
         lines.append(f"| `{path}` | {finding['classification']} | {finding['sha256']} |")
     if audited:
         lines.extend(["", "## Database evidence (metadata only)", "",
