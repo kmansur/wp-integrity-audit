@@ -90,3 +90,11 @@ A completed targeted scan is **not** a production-release authorization. A dynam
 Planned but not yet implemented: optional independently validated forensic dump, broader posts/postmeta and host-persistence collection, structured process/network inventory, CSV export, stable dedicated exit codes, module split and automated release decision. Until these features are validated, retain isolation and use human sign-off for site release.
 
 Audit reports now explicitly state whether a database dump and full-file snapshot were performed. Pure audit modes leave both as `NOT PERFORMED`; snapshot generation remains limited to explicitly confirmed mutating recovery workflows. No forensic snapshot is implied by an ordinary read-only audit.
+
+## Standardized audit results (pre-release)
+
+The default audit creates `report.md` and `report.json`. Both include a final status and an executive summary, with separate family-residue, historical, informational, active-marker, file-pattern and process counters.
+
+Audit exit codes: `0` means no known explicit markers under the completed targeted audit; `10` means family residues require remediation; `20` is reserved for independently confirmed compromise (the current heuristic detector does **not** assert this automatically); `30` means an audit/connection error; `40` means incomplete evidence, including an intentional `--files-only` run or indicators requiring investigation. These are process return codes, not shell error strings. Automation should not equate code 0 with permission to reopen a site.
+
+The `report.json` contains high-level summary and result status only; detailed evidence remains in separately protected case files. This stage does not yet provide CSV consolidation, optional forensic dumps or a full host-persistence audit.
