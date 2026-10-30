@@ -11,6 +11,7 @@ All project documentation and source commentary are in English. Versions follow 
 - Record the tool's SHA-256 in the report, explain dynamic WordPress cron behavior and add a classification legend.
 - Extend MySQL integration tests for the report formatting and classification.
 - Record a separate informational cron fingerprint with SHA-256, size, UTC capture time and known marker count, even when no IOC matches.
+- Add an explicit `LIBERAÇÃO NÃO RECOMENDADA` release-gate warning to audit reports and a regression assertion.
 
 
 ## [0.2.0] - 2026-10-30 (pre-release)
