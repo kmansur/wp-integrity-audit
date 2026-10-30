@@ -130,7 +130,7 @@ def known_upload_guard(path: Path) -> bool:
 
 
 def metform_icon_cache_candidate(relative: str, path: Path) -> bool:
-    """Recognize the guarded MetForm cache header, without trusting its body."""
+    """Recognize a bounded cache header; do not certify the remainder."""
     if not re.fullmatch(r"wp-content/uploads/metform/cache/icons/font-awesome-[a-f0-9]{16}\.php", relative):
         return False
     try:
