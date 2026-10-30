@@ -103,3 +103,5 @@ Akismet .htaccess is accepted as a known guard only when the entire non-comment 
 ## Guarded MetForm and Akismet variants
 
 MetForm cache headers may contain a generator comment and `defined('ABSPATH') || exit;` before the return-array statement. This is a contextual cache candidate only; the full file and trusted generator must be verified before `LEGITIMO_VALIDADO` is appropriate. Akismet access rules may nest Apache legacy and modern authorization modules under `FilesMatch`. The validator rejects unknown grammar and broad executable-extension grants rather than treating them as automatically safe.
+
+For MetForm candidates, first verify the installed plugin generator and the full-file content; a matching header alone is never release evidence. Known family indicators anywhere in scanned content override cache classification.
