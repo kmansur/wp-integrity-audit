@@ -221,12 +221,18 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
                       "|---|---|---|---|"])
         for item in database:
             lines.append(f"| {item['kind']} | {item['name']} | {item['length']} | {item.get('state','')} |")
-            if item.get("sha256"):
-                lines.append(f"\n- `{item['name']}`: SHA-256 `{item['sha256']}`; "
-                             f"length `{item['value_length_bytes']}` bytes; "
-                             f"classification `{item['value_classification']}`; "
-                             f"safe IOC excerpt `{item['safe_excerpt']}`; "
-                             f"decoded excerpt `{item['decoded_excerpt']}`")
+        lines.extend(["", "### Evidence details", ""])
+        for item in database:
+            if not item.get("sha256"):
+                continue
+            lines.extend([
+                f"#### `{item['name']}`", "",
+                f"- SHA-256: `{item['sha256']}`",
+                f"- Value length: {item['value_length_bytes']} bytes",
+                f"- Classification: `{item['value_classification']}`",
+                f"- Safe evidence: `{item['safe_excerpt']}`",
+                f"- Decoded excerpt: `{item['decoded_excerpt']}`", "",
+            ])
     lines.extend(["", "## Technical opinion", ""])
     critical = [x for x in findings if x["classification"] == "IOC_REQUER_VALIDACAO"]
     if audited:
@@ -350,8 +356,17 @@ def database_audit(option_file: str, dbname: str, prefix: str, case: Path,
                     classification = "BASE64_CANDIDATE"
                 else:
                     classification = "PLAIN_OR_UNKNOWN"
-                # Only approved IOC tokens may be displayed; regex redaction
-                # of arbitrary database data is not a sufficient security boundary.
+                # Display scalar values only for two exact, known numeric
+                # indicators. Never expose generic sc_* values or cache data.
+                scalar_name = name in ("_transient_sc_spread_interval",
+                                       "_transient_timeout_sc_spread_interval")
+                scalar_safe = (kind == "family_option" and scalar_name and
+                               bool(re.fullmatch(r"[0-9]{1,20}", prefix_value)) and
+                               meta.get("value_length_bytes") == len(prefix_value))
+                if scalar_safe:
+                    classification = "ESCALAR_TEXTO_NUMERO_NAO_CODIFICADO"
+                # Only approved IOC tokens or explicitly allowlisted numeric
+                # values may be displayed; do not print arbitrary DB data.
                 known_tokens = ("cipher-feeder", "sc_cron_guard", "sc_cron_fetch",
                                 "sc_persist_manifest", "trace-inspector-pad")
                 safe_tokens = [token for token in known_tokens if token in prefix_value]
@@ -363,7 +378,8 @@ def database_audit(option_file: str, dbname: str, prefix: str, case: Path,
                     "sha256": meta.get("sha256"),
                     "value_length_bytes": meta.get("value_length_bytes"),
                     "value_classification": classification if meta else "NOT_AVAILABLE",
-                    "safe_excerpt": ", ".join(safe_tokens) if safe_tokens else "[OMITTED_BY_POLICY]",
+                    "safe_excerpt": (prefix_value if scalar_safe else
+                                     ", ".join(safe_tokens) if safe_tokens else "[OMITTED_BY_POLICY]"),
                     "decoded_excerpt": "[OMITTED_BY_POLICY]",
                 })
         else:
