@@ -164,3 +164,5 @@ All project documentation and source commentary are in English. Versions follow 
 - Extend the evidence index with CORE-, CONFIG-, HOST- and PROC- identifiers, and expand regression tests.
 
 - Fix literal backslash escaping in directive patterns to ensure real Apache/PHP configuration directives are detected.
+
+- Add an additive `status_detail` field for simultaneous family residues and Core discrepancies, preserving stable primary status and exit code.
