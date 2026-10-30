@@ -110,6 +110,24 @@ class MySQLFixtureTests(unittest.TestCase):
         self.assertEqual(self.query("SELECT COUNT(*) FROM wp_options WHERE option_name='sc_fake'"), [["0"]])
         self.assertEqual(self.query("SELECT COUNT(*) FROM wp_usermeta WHERE meta_key='session_tokens'"), [["0"]])
 
+    def test_recovery_snapshot_contains_site_and_database(self):
+        """Check archive/dump integrity using only the disposable CI database."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "wordpress"
+            case = Path(directory) / "case"
+            root.mkdir()
+            case.mkdir(mode=0o700)
+            (root / "wp-content").mkdir()
+            (root / "wp-content" / "fixture.txt").write_text("synthetic file")
+            audit.snapshot(root, case, self.cnf, self.dbname)
+            self.assertTrue((case / "site-before.tar.gz").is_file())
+            self.assertTrue((case / "database-before.sql").is_file())
+            self.assertGreater((case / "database-before.sql").stat().st_size, 100)
+            import tarfile
+            with tarfile.open(case / "site-before.tar.gz") as archive:
+                self.assertIn("site/wp-content/fixture.txt", archive.getnames())
+            self.assertIn("wp_options", (case / "database-before.sql").read_text(errors="replace"))
+
     def test_refuses_to_delete_malicious_serialized_option(self):
         self.query("UPDATE wp_options SET option_value='cipher-feeder' WHERE option_name='cron'")
         with self.assertRaises(audit.AuditError):
