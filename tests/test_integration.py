@@ -1,0 +1,106 @@
+"""Synthetic MySQL and WordPress integration tests (opt in via WP_AUDIT_INTEGRATION).
+
+These tests run only against an isolated CI database. Never point at production.
+"""
+import importlib.util
+import json
+import os
+from pathlib import Path
+import subprocess
+import tempfile
+import unittest
+
+spec = importlib.util.spec_from_file_location(
+    "wp_integrity_audit", Path(__file__).resolve().parents[1] / "bin" / "wp-integrity-audit.py"
+)
+audit = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(audit)
+
+
+@unittest.skipUnless(os.getenv("WP_AUDIT_INTEGRATION") == "1", "Requires disposable MySQL fixture")
+class MySQLFixtureTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.directory = tempfile.TemporaryDirectory()
+        cls.case = Path(cls.directory.name) / "evidence"
+        cls.case.mkdir(mode=0o700)
+        cls.config = {
+            "host": os.getenv("WP_AUDIT_DB_HOST", "127.0.0.1"),
+            "user": os.getenv("WP_AUDIT_DB_USER", "root"),
+            "password": os.getenv("WP_AUDIT_DB_PASSWORD", "synthetic-test-password"),
+        }
+        cls.dbname = "wp_audit_fixture"
+        cls.client_ctx = audit.database_client(cls.config, cls.case)
+        cls.cnf = cls.client_ctx.__enter__()
+        command = ["mysql", f"--defaults-extra-file={cls.cnf}", "-e"]
+        subprocess.run(command + [f"CREATE DATABASE IF NOT EXISTS {cls.dbname}"], check=True)
+        cls.query("""
+            CREATE TABLE IF NOT EXISTS wp_options (
+                option_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                option_name VARCHAR(191) NOT NULL UNIQUE,
+                option_value LONGTEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS wp_users (
+                ID BIGINT AUTO_INCREMENT PRIMARY KEY,
+                user_login VARCHAR(191) NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS wp_usermeta (
+                umeta_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                user_id BIGINT NOT NULL,
+                meta_key VARCHAR(191), meta_value LONGTEXT
+            );
+            DELETE FROM wp_options;
+            DELETE FROM wp_users;
+            DELETE FROM wp_usermeta;
+            INSERT INTO wp_options(option_name,option_value) VALUES
+                ('active_plugins','a:1:{i:0;s:19:"legitimate/plugin.php";}'),
+                ('cron','a:0:{}'),
+                ('sc_fake','indicator'),
+                ('malware_reference','cipher-feeder');
+            INSERT INTO wp_users(user_login) VALUES ('admin_abcdef');
+            INSERT INTO wp_usermeta(user_id,meta_key,meta_value) VALUES
+                (1,'session_tokens','session'),(1,'wp_application_passwords','api');
+        """)
+
+    @classmethod
+    def tearDownClass(cls):
+        try:
+            subprocess.run(["mysql", f"--defaults-extra-file={cls.cnf}", "-e",
+                            f"DROP DATABASE IF EXISTS {cls.dbname}"], check=True)
+        finally:
+            cls.client_ctx.__exit__(None, None, None)
+            cls.directory.cleanup()
+
+    @classmethod
+    def query(cls, sql):
+        return audit.query_db(cls.cnf, cls.dbname, sql)
+
+    def test_readonly_audit_detects_fixture(self):
+        findings = audit.database_audit(self.cnf, self.dbname, "wp_", self.case)
+        kinds = {item["kind"] for item in findings}
+        self.assertIn("suspicious_users", kinds)
+        self.assertIn("family_option", kinds)
+        self.assertIn("marker_option", kinds)
+        self.assertIn("session_rows", kinds)
+        self.assertFalse((self.case / "database-before.sql").exists())
+
+    def test_safe_cleanup_preserves_legitimate_options(self):
+        audit.sql_cleanup(self.cnf, self.dbname, "wp_", self.case)
+        values = dict(self.query(
+            "SELECT option_name, option_value FROM wp_options WHERE option_name IN ('active_plugins','cron')"
+        ))
+        self.assertIn("active_plugins", values)
+        self.assertIn("cron", values)
+        self.assertEqual(self.query("SELECT COUNT(*) FROM wp_options WHERE option_name='sc_fake'"), [["0"]])
+        self.assertEqual(self.query("SELECT COUNT(*) FROM wp_usermeta WHERE meta_key='session_tokens'"), [["0"]])
+
+    def test_refuses_to_delete_malicious_serialized_option(self):
+        self.query("UPDATE wp_options SET option_value='cipher-feeder' WHERE option_name='cron'")
+        with self.assertRaises(audit.AuditError):
+            audit.sql_cleanup(self.cnf, self.dbname, "wp_", self.case)
+        self.assertEqual(self.query("SELECT option_value FROM wp_options WHERE option_name='cron'"),
+                         [["cipher-feeder"]])
+
+
+if __name__ == "__main__":
+    unittest.main()
