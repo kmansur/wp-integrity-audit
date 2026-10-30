@@ -155,3 +155,10 @@ All project documentation and source commentary are in English. Versions follow 
 - Align the pre-existing technical-report security-configuration counter with the actual configuration inventory total.
 
 - Add regression assertions that management reporting excludes internal host and WordPress Core file paths.
+
+### Evidence consistency and triage
+- Reconcile the management and JSON security-configuration counters, avoiding a zero result when configuration findings exist.
+- Record explicit persistence risk level with a caution that no known IOC does not prove absence of host persistence.
+- Distinguish recognized BitNinja security-product inventory, unclassified host configuration and explicit indicators.
+- Detect security-relevant configuration directive categories without disclosing values, URLs or credentials.
+- Extend the evidence index with CORE-, CONFIG-, HOST- and PROC- identifiers, and expand regression tests.
