@@ -20,6 +20,7 @@ All project documentation and source commentary are in English. Versions follow 
 - Tests cover synthetic database backups, full-file scanning, symlink handling and salt rotation.
 - Forensic case roots inside a WordPress document root are rejected.
 - WordPress.org package downloads now enforce the trusted HTTPS host after redirects.
+- Recovery preflight validates literal WordPress salts and core-source paths before starting mutations.
 - File scans read full PHP-like file content in bounded chunks, rather than checking only the first portion.
 
 ### Known limitations
