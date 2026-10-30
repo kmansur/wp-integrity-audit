@@ -132,6 +132,52 @@ def compare_official(record: dict) -> None:
         record["query_status"] = "OFFICIAL_OUTDATED" if version_tuple(record["local_version"]) < version_tuple(official) else "OFFICIAL_MATCH"
         record["state"] = ("PLUGIN_OFICIAL_DESATUALIZADO" if kind == "plugin" else "TEMA_OFICIAL_DESATUALIZADO") if record["query_status"] == "OFFICIAL_OUTDATED" else ("PLUGIN_REQUER_REVISAO" if kind == "plugin" else "TEMA_REQUER_REVISAO")
 
+def official_plugin_checksums(record: dict, target: Path) -> None:
+    """Compare official plugin MD5 manifest; never download executable packages."""
+    slug, version = record["slug"], record["local_version"]
+    if not version or not re.fullmatch(r"[A-Za-z0-9_.-]+", slug) or not VERSION_RE.fullmatch(version):
+        return
+    url = f"https://downloads.wordpress.org/plugin-checksums/{slug}/{version}.json"
+    record["checksum_query_url"] = url
+    try:
+        request = urllib.request.Request(url, headers={"User-Agent": "wp-integrity-audit/version-audit"})
+        with urllib.request.urlopen(request, timeout=12) as response:
+            final = urllib.parse.urlparse(response.geturl())
+            if final.scheme != "https" or final.hostname != "downloads.wordpress.org":
+                record["checksum_status"] = "API_UNAVAILABLE"
+                return
+            payload = response.read(3_000_001)
+        if len(payload) > 3_000_000:
+            record["checksum_status"] = "API_UNAVAILABLE"
+            return
+        data = json.loads(payload)
+        checksums = data.get("files") if isinstance(data, dict) else None
+        if not isinstance(checksums, dict) or not checksums:
+            record["checksum_status"] = "UNAVAILABLE"
+            return
+        changed = []
+        root = target / "wp-content" / "plugins" / slug
+        for name, digest in checksums.items():
+            if not isinstance(name, str) or name.startswith("/") or ".." in Path(name).parts:
+                continue
+            expected = digest.get("md5") if isinstance(digest, dict) else digest
+            if not isinstance(expected, str) or not re.fullmatch("[0-9a-fA-F]{32}", expected):
+                continue
+            file = root / name
+            if file.is_symlink() or not file.is_file():
+                changed.append({"path": name, "reason": "MISSING"})
+            elif hashlib.md5(file.read_bytes()).hexdigest() != expected.lower():
+                changed.append({"path": name, "reason": "MODIFIED"})
+        record["checksum_findings"] = changed
+        record["checksum_status"] = "MODIFIED" if changed else "MATCH"
+        if changed:
+            record["state"] = "PLUGIN_COM_ARQUIVOS_MODIFICADOS"
+    except urllib.error.HTTPError as error:
+        record["checksum_status"] = "UNAVAILABLE" if error.code == 404 else "API_UNAVAILABLE"
+    except (OSError, ValueError, TimeoutError):
+        record["checksum_status"] = "API_UNAVAILABLE"
+
+
 def version_tuple(value: str) -> tuple[int, ...]:
     return tuple(int(x) for x in re.findall(r"\d+", value)[:5])
 
@@ -188,6 +234,8 @@ def audit(target: Path, case: Path, *, offline: bool = False,
                 rec["query_status"] = "PREMIUM_OR_CUSTOM_COMPONENT"
                 continue
             compare_official(rec)
+            if rec["type"] == "plugin" and rec["source"] == "wordpress.org":
+                official_plugin_checksums(rec, target)
     if skip_core:
         core["state"] = "CORE_CHECKSUM_INDISPONIVEL"
         core["query_status"] = "SKIPPED"
