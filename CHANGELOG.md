@@ -103,3 +103,8 @@ All project documentation and source commentary are in English. Versions follow 
 - Repair previous CI failures caused by a missing explicit `NOT EVALUATED` label and incomplete synthetic evidence records.
 - Generate deterministic per-case FILE/DB evidence identifiers and a separate JSON index with SQL table and column provenance.
 - Generate a single-row CSV audit summary for fleet consolidation; add unit regression checks.
+
+### Case comparison
+- Add read-only `--compare OLD_CASE NEW_CASE` with optional `--compare-output`.
+- Write private Markdown and JSON comparison reports identifying new, removed and changed file/database evidence.
+- Reject comparisons with incomplete database audits or mismatched database names; add synthetic regression tests.
