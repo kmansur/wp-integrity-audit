@@ -9,6 +9,11 @@ on:
       - 'tests/**'
       - '.github/workflows/python-ci.yml'
 
+# Supersede obsolete runs while iterating on this development branch.
+concurrency:
+  group: python-ci-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
