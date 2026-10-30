@@ -326,6 +326,8 @@ def validate_source(source: Path, target: Path) -> Path:
             if not (stat.S_ISREG(mode) or stat.S_ISDIR(mode)):
                 raise AuditError(f"Clean source has symlink or special file: {member}")
     for path in iter_files(source):
+        if path.name.startswith(PATTERN_NAMES) or "cipher-feeder" in path.name or path.name == "trace-inspector-pad.php":
+            raise AuditError(f"Known IOC filename in clean source: {path}")
         if path.suffix.lower() in (".php", ".inc", ".phtml", ".phar"):
             with path.open("rb") as stream:
                 overlap = b""
@@ -396,6 +398,8 @@ def sql_cleanup(option_file: str, dbname: str, prefix: str, case: Path) -> None:
 
 def rotate_salts(path: Path) -> None:
     """Atomically rewrite literal auth keys without executing wp-config.php."""
+    if path.is_symlink():
+        raise AuditError("Refusing to rewrite symlinked wp-config.php")
     keys = ("AUTH_KEY", "SECURE_AUTH_KEY", "LOGGED_IN_KEY", "NONCE_KEY",
             "AUTH_SALT", "SECURE_AUTH_SALT", "LOGGED_IN_SALT", "NONCE_SALT")
     data = path.read_text(encoding="utf-8")
@@ -412,7 +416,8 @@ def rotate_salts(path: Path) -> None:
             stream.flush()
             os.fsync(stream.fileno())
         os.chown(temp, original.st_uid, original.st_gid)
-        os.chmod(temp, stat.S_IMODE(original.st_mode))
+        # Never retain permissions broader than owner/group read access.
+        os.chmod(temp, stat.S_IMODE(original.st_mode) & 0o640)
         os.replace(temp, path)
     finally:
         Path(temp).unlink(missing_ok=True)
