@@ -162,3 +162,5 @@ All project documentation and source commentary are in English. Versions follow 
 - Distinguish recognized BitNinja security-product inventory, unclassified host configuration and explicit indicators.
 - Detect security-relevant configuration directive categories without disclosing values, URLs or credentials.
 - Extend the evidence index with CORE-, CONFIG-, HOST- and PROC- identifiers, and expand regression tests.
+
+- Fix literal backslash escaping in directive patterns to ensure real Apache/PHP configuration directives are detected.
