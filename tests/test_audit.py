@@ -626,6 +626,20 @@ $table_prefix = 'wp_';
             self.assertEqual(matches[0]["classification"], "IOC_REQUER_VALIDACAO")
             self.assertEqual(audit.audit_status(matches, [], [])[1], 40)
 
+    def test_post_recovery_blockers_clean_placeholders(self):
+        clean = [
+            {"kind": "family_option", "state": "NOT_FOUND"},
+            {"kind": "marker_option", "state": "ABSENT"},
+            {"kind": "session_rows", "state": "PRESENT", "length": "1"},
+            {"kind": "application_password_rows", "state": "PRESENT", "length": "1"},
+        ]
+        self.assertEqual(audit.post_recovery_blockers(clean, [], []), [])
+        dirty = clean + [{"kind": "family_option", "state": "RESIDUO_FAMILIA_REQUER_LIMPEZA"}]
+        self.assertIn("database:family_option", audit.post_recovery_blockers(dirty, [], []))
+        self.assertIn("file_ioc", audit.post_recovery_blockers(
+            clean, [{"classification": "IOC_REQUER_VALIDACAO"}], []))
+        self.assertIn("process_ioc", audit.post_recovery_blockers(clean, [], ["test-process"]))
+
     def test_secret_redaction(self):
         self.assertNotIn("example-secret", audit.redact("password=example-secret"))
         self.assertNotIn("192.168.1.20", audit.redact("192.168.1.20"))
