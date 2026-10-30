@@ -297,3 +297,6 @@ All project documentation and source commentary are in English. Versions follow 
 - Recognize one previously inspected MetForm Font Awesome cache only when its exact file path and full SHA-256 digest match the case-specific reviewed artifact; no blanket trust of generated caches.
 - Support Akismet legacy `Order Deny,Allow` alongside modern authorization modules and tightly scoped static assets.
 - Continue treating changed MetForm caches as requiring review, and reject unscoped Akismet grants.
+
+- Add a management counter for plugins requiring provenance/version review, separate from confirmed malware and outdated-version counts.
+- Extend regression coverage for an exact reviewed cache SHA-256 matching versus a modified digest.
