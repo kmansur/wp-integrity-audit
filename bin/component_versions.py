@@ -132,9 +132,15 @@ def compare_official(record: dict) -> None:
         return
     if status == "NOT_FOUND_OFFICIAL_REPOSITORY" or not data or not data.get("version"):
         record["query_status"] = "NOT_FOUND_OFFICIAL_REPOSITORY"
-        record["state"] = "PLUGIN_NAO_ENCONTRADO_NO_REPOSITORIO" if kind == "plugin" else "TEMA_NAO_ENCONTRADO_NO_REPOSITORIO"
+        record["state"] = "PLUGIN_ORIGEM_NAO_CONFIRMADA_REQUER_REVISAO" if kind == "plugin" else "TEMA_NAO_ENCONTRADO_NO_REPOSITORIO"
         return
     official = str(data["version"])
+    if kind == "plugin" and not record.get("local_version"):
+        record["state"] = "PLUGIN_VERSAO_NAO_IDENTIFICADA"
+        record["official_version"] = official
+        record["source"] = "wordpress.org"
+        record["query_status"] = "OFFICIAL_MATCH"
+        return
     record["official_version"] = official
     record["source"] = "wordpress.org"
     if not record["local_version"]:
@@ -304,8 +310,11 @@ def audit(target: Path, case: Path, *, offline: bool = False,
                 "UNAVAILABLE" if any(r["query_status"] == "API_UNAVAILABLE" for r in records)
                 else "EXECUTED", "reason": "Offline mode" if offline else None,
                 "status": "AUDITORIA_LOCAL_SEM_CONSULTA_OFICIAL" if offline else "EXECUTED"}
+    coverage["core"] = ("SKIPPED" if offline or skip_core else
+                        "EXECUTED" if core.get("verified_files", 0) > 0 else "UNAVAILABLE")
     result = {"coverage": coverage, "components": records,
               "summary": {"core_version": core["local_version"],
+                          "core_outdated": int(core["state"] == "CORE_DESATUALIZADO" or core.get("version_query_status") == "OFFICIAL_OUTDATED"),
                           "plugins_checked": len(plugins), "themes_checked": len(themes),
                           "plugins_outdated": sum(r["state"] == "PLUGIN_OFICIAL_DESATUALIZADO" for r in plugins),
                           "themes_outdated": sum(r["state"] == "TEMA_OFICIAL_DESATUALIZADO" for r in themes),
@@ -315,7 +324,7 @@ def audit(target: Path, case: Path, *, offline: bool = False,
     (case / "component-version-evidence.json").write_text(json.dumps(result, indent=2, ensure_ascii=False))
     lines = ["# Component versions and provenance", "", f"- WordPress installed: {core['local_version'] or 'Unknown'}",
              f"- WordPress expected: {core['official_version'] or 'Not determined'}",
-             f"- Core: {core['state']}", f"- Plugins checked: {len(plugins)}",
+             f"- Core: {core['state']}", f"- Core outdated: {result['summary']['core_outdated']}", f"- Plugins checked: {len(plugins)}",
              f"- Plugins outdated: {result['summary']['plugins_outdated']}",
              f"- Themes checked: {len(themes)}", f"- Themes outdated: {result['summary']['themes_outdated']}",
              f"- Official consultation: {coverage['official']}", "",
@@ -360,6 +369,8 @@ def append_management_section(case: Path) -> None:
             f"- Official consultation: {coverage['official']}",
             f"- Omission reason: {coverage.get('reason') or 'None'}",
             f"- Installed WordPress: {summary.get('core_version') or 'Unknown'}",
+            f"- Core verification: {coverage.get('core', 'NOT EXECUTED')}",
+            f"- Core outdated: {summary.get('core_outdated', 0)}",
             f"- Plugins checked: {summary.get('plugins_checked', 0)}",
             f"- Outdated plugins: {summary.get('plugins_outdated', 0)}",
             f"- Premium/custom plugins: {summary.get('plugins_premium_custom', 0)}",
