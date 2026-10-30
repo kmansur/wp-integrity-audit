@@ -618,6 +618,13 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
     component_result = json.loads(component_path.read_text()) if component_path.is_file() else None
     summary["component_versions"] = component_result["summary"] if component_result else None
     summary["component_coverage"] = component_result["coverage"] if component_result else {"local": "SKIPPED", "official": "SKIPPED"}
+    critical_component_review = bool(component_result and any(
+        item.get("state") in ("CORE_MODIFICADO_REQUER_REVISAO", "CORE_AUSENTE_REQUER_REVISAO",
+                              "PLUGIN_COM_ARQUIVOS_MODIFICADOS", "TEMA_COM_ARQUIVOS_MODIFICADOS")
+        for item in component_result["components"]))
+    summary["critical_component_review"] = critical_component_review
+    if critical_component_review and exit_code == 0:
+        status, exit_code = "AUDITORIA_INCOMPLETA", 40
     write_private(case / "report.json", json.dumps({
         "schema_version": 1, "tool_version": VERSION,
         "tool_sha256": sha256(Path(__file__)), "mode": mode,
