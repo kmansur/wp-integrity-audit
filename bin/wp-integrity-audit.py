@@ -134,7 +134,7 @@ def metform_icon_cache_candidate(relative: str, path: Path) -> bool:
     if not re.fullmatch(r"wp-content/uploads/metform/cache/icons/font-awesome-[a-f0-9]{16}\.php", relative):
         return False
     try:
-        if path.is_symlink() or not path.is_file() or not 100 <= path.stat().st_size <= 8388608:
+        if path.is_symlink() or not path.is_file() or not 64 <= path.stat().st_size <= 8388608:
             return False
         with path.open("rb") as stream:
             head = stream.read(4096).decode("utf-8", "replace")
