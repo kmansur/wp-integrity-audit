@@ -106,6 +106,8 @@ def local_components(target: Path, kind: str, active_plugins: set[str] | None = 
         default_state = ("PLUGIN_REQUER_REVISAO" if kind == "plugin" else "TEMA_REQUER_REVISAO")
         if parent and kind == "theme":
             default_state = "TEMA_FILHO_CUSTOMIZADO"
+        elif kind == "plugin" and not local_version:
+            default_state = "PLUGIN_VERSAO_NAO_IDENTIFICADA"
         elif custom_uri:
             default_state = "PLUGIN_PREMIUM_REQUER_FONTE_CONFIAVEL" if kind == "plugin" else "TEMA_PREMIUM_REQUER_FONTE_CONFIAVEL"
         record = {"component_id": f'{"PLUGIN" if kind == "plugin" else "THEME"}-{len(result)+1:03d}',
