@@ -288,6 +288,10 @@ def official_sync(target: Path, stage: Path, case: Path) -> None:
             if parsed.scheme != "https" or parsed.hostname not in ("downloads.wordpress.org", "wordpress.org"):
                 raise AuditError("Untrusted WordPress package host")
             with urllib.request.urlopen(url, timeout=60) as response:
+                # urllib follows redirects; validate the final destination too.
+                final = urllib.parse.urlparse(response.geturl())
+                if final.scheme != "https" or final.hostname not in ("downloads.wordpress.org", "wordpress.org"):
+                    raise AuditError("WordPress package redirected outside trusted HTTPS hosts")
                 data = response.read(50_000_001)
             if len(data) > 50_000_000:
                 raise AuditError("Download exceeds configured size limit")
