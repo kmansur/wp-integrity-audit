@@ -65,3 +65,12 @@ All project documentation and source commentary are in English. Versions follow 
 - Add fixture regressions for two family residues, historical references, cron, plugins and session counts.
 
 - Count only positive database records in the report summary, retaining explicit `NOT_FOUND` and `ABSENT` checks in JSON; protect sensitive path fragments without destroying long filename context.
+
+### Database evidence enrichment
+- Preserve exact WordPress option names (including the SimplePluginLogger historic update cache) without entropy redaction.
+- Include database name and physical options/usermeta table names in the client report.
+- Distinguish `RESIDUO_FAMILIA_REQUER_LIMPEZA` from historical and informational evidence.
+- Gather full-value SHA-256, byte length and bounded encoding metadata for candidate option records.
+- Limit exported snippets to known IOC tokens; deliberately withhold arbitrary encoded/decoded content to avoid leaking credentials.
+- Report separate counts for family residues, historical references and stored session records.
+- Add database integration regression tests for naming, classification, checksums and report contents.
