@@ -476,11 +476,14 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
     domain, case_id = (case_match.group(1), case_match.group(2)) if case_match else (case.name, case.name)
     if optional_issues and exit_code == 0:
         status, exit_code = "AUDITORIA_INCOMPLETA", 40
+    status_detail = ("RESIDUOS_REQUEREM_LIMPEZA_E_CORE_REQUER_REVISAO"
+                     if status == "RESIDUOS_REQUEREM_LIMPEZA" and core_count else status)
     write_private(case / "report.json", json.dumps({
         "schema_version": 1, "tool_version": VERSION,
         "tool_sha256": sha256(Path(__file__)), "mode": mode,
         "collected_at_utc": dt.datetime.now(dt.timezone.utc).isoformat(),
-        "status": status, "exit_code": exit_code, "summary": summary,
+        "status": status, "status_detail": status_detail,
+        "exit_code": exit_code, "summary": summary,
         "optional_probe_review": optional_issues,
         "domain": domain, "case_id": case_id,
         "core_discrepancies": core_count, "configuration_review_count": config_count,
@@ -523,6 +526,7 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
         "# WordPress Integrity Audit", "",
         "## Executive summary", "",
         f"- Final status: **{status}**",
+        f"- Detailed status: **{status_detail}**",
         f"- Exit code: **{exit_code}**",
         f"- Confirmed family residues: **{summary['confirmed_family_residues']}**",
         f"- Historical references: **{summary['historical_references']}**",
