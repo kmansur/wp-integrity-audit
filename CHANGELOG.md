@@ -198,3 +198,10 @@ All project documentation and source commentary are in English. Versions follow 
 
 ### Safety
 - Recovery remains experimental and requires disposable-environment acceptance tests for file ownership, upload carry-over and exact-version official synchronization before production use.
+
+## [0.5.0] - 2026-10-30
+
+### Security
+- Disable `--apply-files`, `--apply-db` and `--recover` until ownership, uploads preservation, exact package versions and rollback are verified end-to-end in disposable fixtures.
+- Extend read-only file inspection to `.php5`, `.php7`, `.php8`, `.pht` and `.phps` and add generic obfuscated/dynamic webshell heuristics. These remain review heuristics, not proof of compromise.
+- Add synthetic test of generic PHP5 detection and unchanged incomplete-audit exit-code semantics.
