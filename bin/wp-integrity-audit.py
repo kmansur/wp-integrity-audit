@@ -223,6 +223,45 @@ def file_audit(target: Path, case: Path) -> list[dict]:
 
 
 
+def akismet_access_guard(content: str) -> bool:
+    """Recognize only narrowly constrained deny-by-default Akismet asset rules."""
+    # Restrict every nonempty line to access directives and FilesMatch blocks.
+    lines = [line.strip() for line in content.splitlines()
+             if line.strip() and not line.lstrip().startswith("#")]
+    if not lines or len(lines) > 30:
+        return False
+    allowed = (r"</?FilesMatch(?:\s+\"[^\"]{1,200}\")?\s*>",
+               r"Require\s+all\s+(?:granted|denied)",
+               r"Order\s+allow,deny", r"Deny\s+from\s+all",
+               r"Allow\s+from\s+all")
+    if not all(any(re.fullmatch(p, line, re.I) for p in allowed) for line in lines):
+        return False
+    # A deny-by-default rule must be explicit, and grants must be scoped to assets.
+    has_deny = any(re.fullmatch(r"Require\s+all\s+denied|Deny\s+from\s+all", line, re.I)
+                   for line in lines)
+    inside_assets = False
+    has_grant = False
+    for line in lines:
+        if line.lower().startswith("<filesmatch"):
+            if inside_assets:
+                return False
+            pattern = line[len("<FilesMatch"):].strip().rstrip(">").strip().strip('"')
+            if not re.search(r"(?:css|js|png|jpg|jpeg|gif|svg|webp)", pattern, re.I):
+                return False
+            if re.search(r"(?:php|phtml|phar|cgi|pl|sh)", pattern, re.I):
+                return False
+            inside_assets = True
+        elif line.lower() == "</filesmatch>":
+            if not inside_assets:
+                return False
+            inside_assets = False
+        elif re.fullmatch(r"Require\s+all\s+granted|Allow\s+from\s+all", line, re.I):
+            if not inside_assets:
+                return False
+            has_grant = True
+    return has_deny and has_grant and not inside_assets
+
+
 def configuration_audit(target: Path, case: Path) -> list[dict]:
     """Read-only configuration inventory. Never export configuration contents.
 
@@ -254,6 +293,10 @@ def configuration_audit(target: Path, case: Path) -> list[dict]:
                 indicators = [key for key, pattern in patterns.items() if re.search(pattern, content)]
             classification = ("CONFIGURACAO_REQUER_VALIDACAO" if indicators
                               else "CONFIGURACAO_INVENTARIADA_SEM_INDICADOR")
+            if (relative == "wp-content/plugins/akismet/.htaccess"
+                    and info.st_size <= 1048576 and akismet_access_guard(content)):
+                classification = "LEGITIMO_VALIDADO"
+                indicators = []
             findings.append({
                 "indicators": indicators,
                 "path": relative,
