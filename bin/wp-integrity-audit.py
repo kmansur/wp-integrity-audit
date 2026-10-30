@@ -232,7 +232,10 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
                 f"- Classification: `{item['value_classification']}`",
                 f"- Safe evidence: `{item['safe_excerpt']}`",
                 f"- Interpreted value: `{item['safe_excerpt'] if item.get('value_classification') == 'ESCALAR_TEXTO_NUMERO_NAO_CODIFICADO' else '[NOT_EXPOSED]'}`",
-                f"- Decoded excerpt: `{item['decoded_excerpt']}`", "",
+                f"- Decoded excerpt: `{item['decoded_excerpt']}`",
+                *([f"- Collection time (UTC): `{item['collected_at_utc']}`",
+                   f"- Known cron marker matches: {len(item['indicator_matches'])}"]
+                  if item.get("kind") == "cron_metadata" else []), "",
             ])
     lines.extend(["", "## Technical opinion", ""])
     critical = [x for x in findings if x["classification"] == "IOC_REQUER_VALIDACAO"]
