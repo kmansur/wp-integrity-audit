@@ -348,6 +348,27 @@ $table_prefix = 'wp_';
             with self.assertRaises(audit.AuditError):
                 audit.compare_cases(a, b, base / "out")
 
+    def test_configuration_inventory_does_not_export_contents(self):
+        import json
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            site = base / "site"
+            case = base / "case"
+            site.mkdir()
+            case.mkdir()
+            private = site / ".user.ini"
+            private.write_text("auto_prepend_file=/private/secret-value.php")
+            (site / "wp-content").mkdir()
+            (site / "wp-content" / ".htaccess").write_text("Deny from all")
+            evidence = audit.configuration_audit(site, case)
+            self.assertEqual(len(evidence), 2)
+            serialized = (case / "configuration-evidence.json").read_text()
+            self.assertNotIn("secret-value", serialized)
+            self.assertNotIn("auto_prepend_file=", serialized)
+            self.assertEqual(len(evidence[0]["sha256"]), 64)
+            self.assertIn("CONFIGURACAO_REQUER_VALIDACAO",
+                          {x["classification"] for x in evidence})
+
     def test_secret_redaction(self):
         self.assertNotIn("example-secret", audit.redact("password=example-secret"))
         self.assertNotIn("192.168.1.20", audit.redact("192.168.1.20"))
