@@ -169,6 +169,7 @@ def official_plugin_checksums(record: dict, target: Path) -> None:
                 record["state"] = "PLUGIN_OFICIAL_SEM_CHECKSUM"
             return
         changed = []
+        verified = 0
         root = target / "wp-content" / "plugins" / slug
         for name, digest in checksums.items():
             if not isinstance(name, str) or name.startswith("/") or ".." in Path(name).parts:
@@ -176,11 +177,16 @@ def official_plugin_checksums(record: dict, target: Path) -> None:
             expected = digest.get("md5") if isinstance(digest, dict) else digest
             if not isinstance(expected, str) or not re.fullmatch("[0-9a-fA-F]{32}", expected):
                 continue
+            verified += 1
             file = root / name
             if file.is_symlink() or not file.is_file():
                 changed.append({"path": name, "reason": "MISSING"})
             elif file_digest(file, "md5") != expected.lower():
                 changed.append({"path": name, "reason": "MODIFIED"})
+        if not verified:
+            record["checksum_status"] = "UNAVAILABLE"
+            return
+        record["checksum_verified_files"] = verified
         # Inspect extra executable files omitted from official plugin manifests.
         declared = set(checksums)
         for file in root.rglob("*"):
@@ -214,17 +220,23 @@ def check_core(target: Path, record: dict, offline: bool) -> None:
         return
     checksums = data["checksums"]
     mismatch = []
+    verified = 0
     for relative, expected in checksums.items():
         if not isinstance(relative, str) or not re.fullmatch(r"[a-fA-F0-9]{32}", str(expected)):
             continue
         if (Path(relative).is_absolute() or ".." in Path(relative).parts or
                 relative.startswith("wp-content/") or relative == "wp-config.php"):
             continue
+        verified += 1
         path = target / relative
         if not path.is_file() or path.is_symlink():
             mismatch.append({"path": relative, "reason": "MISSING"})
         elif file_digest(path, "md5") != expected.lower():
             mismatch.append({"path": relative, "reason": "MODIFIED"})
+    if verified == 0:
+        record["query_status"] = "API_UNAVAILABLE"
+        return
+    record["verified_files"] = verified
     names = set(checksums)
     for folder in ("wp-admin", "wp-includes"):
         for file in (target / folder).rglob("*"):
