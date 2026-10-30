@@ -433,9 +433,25 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
     core, configurations, host_records = supplementary_evidence(case)
     core_count = len(core.get("findings", []))
     config_count = len(configurations)
+    summary["security_configuration_review"] = config_count + summary["security_configuration_review"]
     host_indicators = sum(x.get("classification") == "HOST_INDICATOR_REQUIRES_INVESTIGATION" for x in host_records)
     host_review = sum(x.get("classification") == "HOST_PERSISTENCE_REQUIRES_CONTEXT" for x in host_records)
-    host_legitimate = len(host_records) - host_indicators - host_review
+    host_known = sum(x.get("classification") == "COMPONENTE_DE_SEGURANCA_CONHECIDO" for x in host_records)
+    host_unclassified = len(host_records) - host_indicators - host_review - host_known
+    host_legitimate = host_known + host_unclassified
+    persistence_risk = ("NOT DETERMINED" if not (case / "host-persistence.json").is_file()
+                        else "REVIEW REQUIRED" if host_indicators or host_review
+                        else "LOW — no known indicators found")
+    summary["host_known_security_components"] = host_known
+    summary["host_unclassified_inventory"] = host_unclassified
+    summary["host_persistence_indicators"] = host_indicators
+    summary["persistence_risk"] = persistence_risk
+    for index, item in enumerate(core.get("findings", []), 1):
+        item["evidence_id"] = f"CORE-{index:03d}"
+    for index, item in enumerate(configurations, 1):
+        item["evidence_id"] = f"CONFIG-{index:03d}"
+    for index, item in enumerate(host_records, 1):
+        item["evidence_id"] = f"HOST-{index:03d}"
     case_match = re.fullmatch(r"(.+)-(\d{8}T\d{6}Z-[a-f0-9]{6})", case.name)
     domain, case_id = (case_match.group(1), case_match.group(2)) if case_match else (case.name, case.name)
     if optional_issues and exit_code == 0:
@@ -449,6 +465,7 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
         "domain": domain, "case_id": case_id,
         "core_discrepancies": core_count, "configuration_review_count": config_count,
         "host_persistence_indicators": host_indicators, "host_persistence_review": host_review,
+        "persistence_risk": persistence_risk,
         "database": db_name if audited else None,
         "table_prefix": db_prefix if audited else None,
         "database_audited": audited,
@@ -623,7 +640,8 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
         f"- Database risk: **{'HIGH' if summary['confirmed_family_residues'] else 'NOT DETERMINED'}**",
         f"- File risk: **{'REQUIRES REVIEW' if summary['file_indicators_requiring_review'] else 'LOW FOR SELECTED INDICATORS'}**",
         f"- Core risk: **{'MEDIUM — REVIEW REQUIRED' if core_count else 'NO EXPLICIT MISMATCH DETECTED' if core.get('status') == 'COMPLETE' else 'NOT DETERMINED'}**",
-        "- External persistence risk: **NOT DETERMINED**",
+        f"- External persistence risk: **{persistence_risk}**",
+        "- No known indicators found does not prove absence of persistence.",
         "", "## Recommendation", "",
         "**LIBERAÇÃO NÃO RECOMENDADA**",
         "Known family residues or unresolved review findings require approved remediation and subsequent verification.",
