@@ -53,3 +53,5 @@ All project documentation and source commentary are in English. Versions follow 
 - Recognize specific Sucuri, WPForms and Simple History guard patterns and quarantine Wordfence configuration snippets from the report.
 - Preserve relative file paths, including long names, and generate an evidence-based technical opinion.
 - Add fixture regressions for two family residues, historical references, cron, plugins and session counts.
+
+- Count only positive database records in the report summary, retaining explicit `NOT_FOUND` and `ABSENT` checks in JSON; protect sensitive path fragments without destroying long filename context.
