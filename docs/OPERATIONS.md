@@ -11,7 +11,7 @@ Use authorized sites or offline forensic copies. Case files are created with res
 
 ## File and database recovery
 
-Recovery is a development feature and must only be exercised on disposable WordPress fixtures until end-to-end tests exist. Provide an independent, tested backup before running. The tool creates its own archive and SQL dump, but **these have not been proven restorable**. Quarantine paths are recorded in the private case folder. Reopening an incident site requires operator review of process persistence, users, permissions, plugin provenance, core integrity, and external credentials.
+Recovery is a development feature and must only be exercised on disposable WordPress fixtures until end-to-end tests exist. Provide an independent, tested backup before running. The tool creates its own archive and SQL dump, but **these have not been proven restorable**. Quarantine paths are outside the document root and recorded in the private case folder. Successful recovery requires a post-operation file/process/DB scan, though this is not proof of a clean site. Reopening an incident site requires operator review of process persistence, users, permissions, plugin provenance, core integrity, and external credentials.
 
 ## Flags
 
