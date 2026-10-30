@@ -181,6 +181,14 @@ def official_plugin_checksums(record: dict, target: Path) -> None:
                 changed.append({"path": name, "reason": "MISSING"})
             elif file_digest(file, "md5") != expected.lower():
                 changed.append({"path": name, "reason": "MODIFIED"})
+        # Inspect extra executable files omitted from official plugin manifests.
+        declared = set(checksums)
+        for file in root.rglob("*"):
+            if file.is_symlink() or not file.is_file():
+                continue
+            relative = file.relative_to(root).as_posix()
+            if relative not in declared and file.suffix.lower() in (".php", ".phtml", ".phar", ".php5", ".pht"):
+                changed.append({"path": relative, "reason": "EXTRA_EXECUTABLE"})
         record["checksum_findings"] = changed
         record["checksum_status"] = "MODIFIED" if changed else "MATCH"
         if changed:
