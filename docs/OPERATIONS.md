@@ -87,3 +87,7 @@ The WordPress Core section in report.md shows each reference discrepancy, and th
 ## Report distribution boundaries
 
 `report.md` is intended for managerial review; `technical-report.md`, `database-evidence.json`, `configuration-evidence.json`, and `host-persistence.json` are internal technical evidence and require restricted access. `report.json` and `report.csv` are machine-readable summaries. Check every file before distributing it to a client: field names and WordPress site names may still reveal contextual details. Host IOC matching is heuristic and classification `INVENTARIADO_SEM_INDICADOR` is not proof that a system component is trustworthy.
+
+## Configuration and host triage semantics
+
+`CONFIGURACAO_REQUER_VALIDACAO` is used for recognized handler, PHP setting, auto prepend/append, external rewrite or access-control directives; the evidence contains indicator category names, not directive values. Ordinary config files are `CONFIGURACAO_INVENTARIADA_SEM_INDICADOR`. Host inventory distinguishes `COMPONENTE_DE_SEGURANCA_CONHECIDO`, `INVENTARIADO_SEM_INDICADOR`, and `HOST_INDICATOR_REQUIRES_INVESTIGATION`. Known security-product naming is a contextual classification, not authenticity validation. Private host paths should never be distributed with the management report.
