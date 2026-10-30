@@ -281,3 +281,14 @@ All project documentation and source commentary are in English. Versions follow 
 - Differentiate HTTP 404 for official plugin/theme metadata (component not found) from HTTP 5xx/transport errors (API unavailable).
 - A Core checksum HTTP 404 remains unavailable, not a plugin/theme absence result.
 - Add mocked HTTP failure regression cases without external requests.
+
+## [0.12.0] - 2026-10-30
+
+### Fixed
+- Use the actual component checksum coverage in the technical report instead of reporting the retired separate Core probe as `NOT EXECUTED`.
+- Expose independent `core_outdated` count, preserving plugin/theme outdated counts.
+- Flag officially unlisted plugins as origin-unconfirmed review, and plugins without a parseable local version as version-unidentified.
+- Add synthetic regression coverage for an installed Core release with verified checksums and a newer upstream release.
+
+### Security
+- The generated MetForm icon-cache header and the Akismet plugin path are not by themselves cryptographic proof of safe content. Continue requiring strict review before marking large PHP caches legitimate.
