@@ -164,3 +164,7 @@ A MetForm PHP return-array header and absence of a small set of known IOCs do no
 The MetForm icon-cache recognizer accepts an expected generator comment followed by an `ABSPATH` exit guard and PHP `return array` header. This is still only `CACHE_PLUGIN_REQUER_VALIDACAO` and requires whole-file source verification; it never authorizes a clean status by itself. The Akismet `.htaccess` recognizer now supports nested `IfModule` blocks for Apache authorization compatibility while rejecting unknown directives, executable-extension grants and unscoped access grants. Unrecognized safe variations remain reviewable, rather than silently trusted.
 
 MetForm cache recognition inspects only a bounded header for contextual classification; the separate full-file IOC scan still takes precedence. An apparent MetForm cache with a family indicator elsewhere in its contents must remain under investigation. Full source verification against the installed plugin generator is an outstanding prerequisite for trusted-cache classification.
+
+## Recovery safeguards (0.4.0)
+
+Post-recovery verification now evaluates actual active database marker states, known file IOCs and process indicators. Absent placeholders and ordinary WordPress session/application-password records do not by themselves fail the post-check. **Recovery remains experimental**: replacement ownership, upload preservation and exact-version sync must be proven in disposable tests before it is used on production sites. Do not infer that CI unit tests authorize recovery.
