@@ -403,6 +403,8 @@ def optional_probe_review(case: Path) -> list[str]:
             records = json.load(stream)
         if not isinstance(records, list):
             issues.append("Invalid host persistence inventory")
+        elif any(item.get("classification") == "HOST_INDICATOR_REQUIRES_INVESTIGATION" for item in records):
+            issues.append("External host persistence indicators require investigation")
     return issues
 
 
