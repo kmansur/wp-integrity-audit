@@ -501,6 +501,9 @@ def main() -> int:
     os.umask(0o077)
     args = parse_args()
     target = validate_site(args.target)
+    proposed_case_root = args.case_root.resolve()
+    if proposed_case_root == target or target in proposed_case_root.parents:
+        raise AuditError("Forensic case root must be outside the WordPress document root")
     case_root = ensure_private_dir(args.case_root)
     lock = case_root / ".audit.lock"
     with lock.open("a+") as lockfile:
