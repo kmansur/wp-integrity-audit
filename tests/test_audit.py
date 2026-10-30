@@ -71,6 +71,29 @@ $table_prefix = 'wp_';
                 audit.safe_zip_extract(reader, Path(directory) / "output")
             self.assertEqual((Path(directory) / "output/plugin/hello.php").read_text(), "<?php")
 
+    def test_cli_audit_end_to_end(self):
+        """Smoke-test the real CLI without DB or root privileges."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "example" / "public_html"
+            case_root = Path(directory) / "cases"
+            root.mkdir(parents=True)
+            for folder in ("wp-admin", "wp-includes", "wp-content"):
+                (root / folder).mkdir()
+            (root / "wp-load.php").write_text("<?php")
+            (root / "wp-config.php").write_text("<?php")
+            (root / "wp-content" / "sample.php").write_text("<?php // cipher-feeder")
+            import subprocess
+            result = subprocess.run(
+                ["python3", str(SCRIPT), "--audit", str(root), "--case-root", str(case_root)],
+                capture_output=True, text=True
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            cases = [p for p in case_root.iterdir() if p.is_dir()]
+            self.assertEqual(len(cases), 1)
+            self.assertTrue((cases[0] / "report.md").is_file())
+            self.assertTrue((cases[0] / "file-evidence.json").is_file())
+            self.assertFalse((cases[0] / "database-before.sql").exists())
+
     def test_secret_redaction(self):
         self.assertNotIn("example-secret", audit.redact("password=example-secret"))
         self.assertNotIn("192.168.1.20", audit.redact("192.168.1.20"))
