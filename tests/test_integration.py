@@ -143,6 +143,29 @@ class MySQLFixtureTests(unittest.TestCase):
         self.assertIn("Confirmed family residues:", report)
         self.assertIn("Historical references:", report)
 
+    def test_numeric_transient_excerpts_and_markdown_layout(self):
+        """Only allowlisted scalar transient values are shown in reports."""
+        self.query("""
+            INSERT INTO wp_options(option_name,option_value) VALUES
+              ('_transient_sc_spread_interval','1'),
+              ('_transient_timeout_sc_spread_interval','1793545906'),
+              ('sc_private_token','super-secret-value');
+        """)
+        evidence = audit.database_audit(self.cnf, self.dbname, "wp_", self.case)
+        indexed = {item["name"]: item for item in evidence if item["kind"] == "family_option"}
+        self.assertEqual(indexed["_transient_sc_spread_interval"]["safe_excerpt"], "1")
+        self.assertEqual(indexed["_transient_timeout_sc_spread_interval"]["safe_excerpt"], "1793545906")
+        self.assertEqual(indexed["_transient_sc_spread_interval"]["value_classification"],
+                         "ESCALAR_TEXTO_NUMERO_NAO_CODIFICADO")
+        self.assertEqual(indexed["sc_private_token"]["safe_excerpt"], "[OMITTED_BY_POLICY]")
+        audit.make_report(self.case, "audit", [], [], evidence, self.dbname, "wp_")
+        report = (self.case / "report.md").read_text()
+        self.assertIn("#### `_transient_sc_spread_interval`", report)
+        self.assertIn("- Safe evidence: `1`", report)
+        self.assertIn("### Evidence details", report)
+        self.assertNotIn("super-secret-value", report)
+        self.assertIn("|---|---|---|---|\n", report)
+
     def test_safe_cleanup_preserves_legitimate_options(self):
         audit.sql_cleanup(self.cnf, self.dbname, "wp_", self.case)
         values = dict(self.query(
