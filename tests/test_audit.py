@@ -783,6 +783,20 @@ $table_prefix = 'wp_';
             self.assertEqual(item["state"], "PLUGIN_OFICIAL_SEM_CHECKSUM")
             self.assertEqual(item["checksum_status"], "UNAVAILABLE")
 
+    def test_component_checksum_streaming(self):
+        import component_versions as cv
+        import hashlib
+        with tempfile.TemporaryDirectory() as folder:
+            file = Path(folder) / "large.php"
+            payload = b"safe-test-content" * 100000
+            file.write_bytes(payload)
+            self.assertEqual(cv.file_digest(file), hashlib.sha256(payload).hexdigest())
+            self.assertEqual(cv.file_digest(file, "md5"), hashlib.md5(payload).hexdigest())
+            link = Path(folder) / "linked.php"
+            link.symlink_to(file)
+            with self.assertRaises(OSError):
+                cv.file_digest(link)
+
     def test_secret_redaction(self):
         self.assertNotIn("example-secret", audit.redact("password=example-secret"))
         self.assertNotIn("192.168.1.20", audit.redact("192.168.1.20"))
