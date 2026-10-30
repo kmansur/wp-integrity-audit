@@ -31,7 +31,7 @@ sudo python3 bin/wp-integrity-audit.py --apply-db /srv/fixture/wordpress
 sudo python3 bin/wp-integrity-audit.py --recover /srv/fixture/wordpress --source /srv/fixtures/clean-wp-content --core-source /srv/fixtures/clean-wordpress
 ```
 
-Mutating modes require interactive confirmations; no `--yes` bypass exists. Reports default to `/var/lib/wp-integrity-audit/cases`, and are created with restrictive permissions.
+Mutating modes require interactive confirmations; no `--yes` bypass exists. Reports default to `/var/lib/wp-integrity-audit/cases`, and are created with restrictive permissions. Case roots inside the WordPress document root are rejected.
 
 ## Critical differences from the legacy Bash script
 
