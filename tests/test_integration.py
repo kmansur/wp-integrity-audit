@@ -100,6 +100,28 @@ class MySQLFixtureTests(unittest.TestCase):
         self.assertIn("session_rows", kinds)
         self.assertFalse((self.case / "database-before.sql").exists())
 
+    def test_full_audit_distinguishes_residues_and_historical_cache(self):
+        """Reproduce the reported two residues and non-executing history."""
+        self.query("""
+            INSERT INTO wp_options(option_name,option_value) VALUES
+              ('sc_second','family marker'),
+              ('SimplePluginLogger_plugin_info_before_update','trace-inspector-pad');
+        """)
+        result = audit.database_audit(self.cnf, self.dbname, "wp_", self.case)
+        by_kind = {}
+        for item in result:
+            by_kind.setdefault(item["kind"], []).append(item)
+        self.assertEqual(sum(x["state"] != "NOT_FOUND" for x in by_kind["family_option"]), 2)
+        self.assertEqual(by_kind["historical_cache"][0]["state"], "HISTORICAL_REFERENCE")
+        self.assertEqual(by_kind["cron_marker"][0]["state"], "NOT_FOUND")
+        self.assertEqual(by_kind["active_plugins_marker"][0]["state"], "NOT_FOUND")
+        self.assertEqual(by_kind["session_rows"][0]["length"], "1")
+        audit.make_report(self.case, "audit", [], [], result)
+        report = (self.case / "report.md").read_text()
+        self.assertIn("Database audit: **EXECUTED**", report)
+        self.assertIn("Family-specific option/transient residues: **2**", report)
+        self.assertIn("not evidence of active execution", report)
+
     def test_safe_cleanup_preserves_legitimate_options(self):
         audit.sql_cleanup(self.cnf, self.dbname, "wp_", self.case)
         values = dict(self.query(
