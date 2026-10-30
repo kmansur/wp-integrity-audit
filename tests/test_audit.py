@@ -535,6 +535,28 @@ $table_prefix = 'wp_';
             self.assertIn("HANDLER_OVERRIDE", evidence)
             self.assertNotIn("application/x-httpd-php", evidence)
 
+    def test_upload_guard_and_metform_cache_are_distinct(self):
+        with tempfile.TemporaryDirectory() as folder:
+            site = Path(folder) / "site"
+            case = Path(folder) / "case"
+            icons = site / "wp-content/uploads/metform/cache/icons"
+            icons.mkdir(parents=True)
+            case.mkdir()
+            (icons / "index.php").write_bytes(b"<?php\\n// Silence is golden.\\n")
+            (icons / "font-awesome-38edd54e30815111.php").write_bytes(
+                b"<?php return array('fa-home' => 'icon');")
+            (icons / "other.php").write_bytes(b"<?php eval($_GET['x']);")
+            records = {item["path"].rsplit("/", 1)[-1]: item
+                       for item in audit.file_audit(site, case)}
+            self.assertEqual(records["index.php"]["classification"], "LEGITIMO_VALIDADO")
+            self.assertEqual(records["font-awesome-38edd54e30815111.php"]["classification"],
+                             "CACHE_PLUGIN_REQUER_VALIDACAO")
+            self.assertEqual(records["other.php"]["classification"],
+                             "PHP_UPLOAD_REQUER_VALIDACAO")
+            status, code, summary = audit.audit_status(list(records.values()), [], [])
+            self.assertEqual(code, 40)
+            self.assertEqual(summary["file_indicators_requiring_review"], 2)
+
     def test_secret_redaction(self):
         self.assertNotIn("example-secret", audit.redact("password=example-secret"))
         self.assertNotIn("192.168.1.20", audit.redact("192.168.1.20"))
