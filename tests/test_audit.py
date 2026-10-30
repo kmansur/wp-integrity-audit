@@ -690,7 +690,7 @@ $table_prefix = 'wp_';
                 result = cv.audit(root, case, offline=True)
             self.assertEqual(result["coverage"]["status"], "AUDITORIA_LOCAL_SEM_CONSULTA_OFICIAL")
             self.assertEqual(result["components"][0]["locale"], "pt_BR")
-            self.assertEqual(result["components"][-1]["state"], "TEMA_FILHO_CUSTOMIZADO")
+            self.assertEqual(next(x for x in result["components"] if x["slug"] == "child")["state"], "TEMA_FILHO_CUSTOMIZADO")
             self.assertEqual(result["summary"]["plugins_checked"], 1)
             self.assertEqual(len((case / "component-version-report.csv").read_text().splitlines()), 5)
 
