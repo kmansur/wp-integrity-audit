@@ -369,6 +369,17 @@ $table_prefix = 'wp_';
             self.assertIn("CONFIGURACAO_REQUER_VALIDACAO",
                           {x["classification"] for x in evidence})
 
+    def test_hidden_directory_php_is_review_only(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "site"
+            case = Path(directory) / "case"
+            (root / "wp-content" / ".hidden-cache").mkdir(parents=True)
+            case.mkdir()
+            (root / "wp-content" / ".hidden-cache" / "test.php").write_text("<?php echo 'test';")
+            results = audit.file_audit(root, case)
+            self.assertEqual(len(results), 1)
+            self.assertEqual(results[0]["classification"], "PHP_DIRETORIO_OCULTO_REQUER_VALIDACAO")
+
     def test_secret_redaction(self):
         self.assertNotIn("example-secret", audit.redact("password=example-secret"))
         self.assertNotIn("192.168.1.20", audit.redact("192.168.1.20"))
