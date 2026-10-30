@@ -1143,14 +1143,12 @@ def mark_incomplete_case(case: Path, skipped: list[str]) -> None:
     write_private(report_file, json.dumps(document, indent=2, ensure_ascii=False))
     for markdown in (case / "report.md", case / "technical-report.md"):
         previous = markdown.read_text(encoding="utf-8")
-    previous = previous.replace("## Audit metadata", "## Omitted checks\n\n" +
-                                "\n".join(f"- {name}" for name in skipped) +
-                                "\n\n## Audit metadata", 1)
-    if document["exit_code"] == 40:
-        previous = previous.replace("Final status: **SEM_MARCADOR_EXPLICITO**",
-                                    "Final status: **AUDITORIA_INCOMPLETA**", 1)
-        previous = previous.replace("Exit code: **0**", "Exit code: **40**", 1)
-    write_private(markdown, previous)
+        previous += "\n## Omitted checks\n\n" + "\n".join(f"- {name}" for name in skipped) + "\n"
+        if document["exit_code"] == 40:
+            previous = previous.replace("Final status: **SEM_MARCADOR_EXPLICITO**",
+                                        "Final status: **AUDITORIA_INCOMPLETA**", 1)
+            previous = previous.replace("Exit code: **0**", "Exit code: **40**", 1)
+        write_private(markdown, previous)
     csv_file = case / "report.csv"
     rows = list(csv.reader(csv_file.read_text(encoding="utf-8").splitlines()))
     if len(rows) == 2 and "status" in rows[0]:
