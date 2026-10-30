@@ -89,3 +89,5 @@ All project documentation and source commentary are in English. Versions follow 
 - Classify two allowlisted numeric `sc_*` transient keys as `ESCALAR_TEXTO_NUMERO_NAO_CODIFICADO` and show their safe scalar value only after strict length and digit validation.
 - Keep arbitrary family options and credential-like values masked; include a regression fixture with a fake private token.
 - Render SQL evidence details as individual Markdown sections after the completed summary table instead of breaking table layout.
+
+- Remove duplicated database audit status from the client report and explicitly state whether SQL dump and file snapshot evidence were generated.
