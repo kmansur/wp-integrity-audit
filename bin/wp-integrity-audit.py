@@ -225,8 +225,18 @@ def snapshot(target: Path, case: Path, option_file: str, dbname: str) -> None:
     with tarfile.open(tarpath, "w:gz", dereference=False) as archive:
         archive.add(target, arcname="site", recursive=True)
     os.chmod(tarpath, 0o600)
+    # Read each archived regular file through the decompressor; merely
+    # listing tar headers does not detect a corrupt compressed file body.
     with tarfile.open(tarpath, "r:gz") as archive:
-        archive.getmembers()
+        for member in archive:
+            if not member.isfile():
+                continue
+            stream = archive.extractfile(member)
+            if stream is None:
+                raise AuditError("Unreadable archived regular file")
+            with stream:
+                while stream.read(1048576):
+                    pass
     write_private(case / "site-before.sha256", sha256(tarpath) + "  site-before.tar.gz\n")
     dump = case / "database-before.sql"
     descriptor = os.open(dump, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
