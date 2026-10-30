@@ -5,6 +5,7 @@ from pathlib import Path
 import stat
 import tempfile
 import unittest
+import unittest.mock
 import zipfile
 
 SCRIPT = Path(__file__).resolve().parents[1] / "bin" / "wp-integrity-audit.py"
@@ -669,6 +670,52 @@ $table_prefix = 'wp_';
             self.assertEqual(len(timeline), 3)
             content = json.loads((case / "timeline.json").read_text())
             self.assertIn("not creation time", content["timestamp_note"])
+
+    def test_component_versions_offline_and_child_theme(self):
+        import json
+        import component_versions as cv
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "site"
+            case = Path(directory) / "case"
+            (root / "wp-includes").mkdir(parents=True)
+            (root / "wp-content/plugins/akismet").mkdir(parents=True)
+            (root / "wp-content/themes/parent").mkdir(parents=True)
+            (root / "wp-content/themes/child").mkdir(parents=True)
+            case.mkdir()
+            (root / "wp-includes/version.php").write_text("<?php $wp_version = '6.8.3'; $wp_local_package = 'pt_BR';")
+            (root / "wp-content/plugins/akismet/akismet.php").write_text("<?php\n/* Plugin Name: Akismet\nVersion: 5.7.2 */")
+            (root / "wp-content/themes/parent/style.css").write_text("/* Theme Name: Parent\nVersion: 1.0 */")
+            (root / "wp-content/themes/child/style.css").write_text("/* Theme Name: Child\nVersion: 2.0\nTemplate: parent */")
+            with unittest.mock.patch.object(cv, "api_json", side_effect=AssertionError("Network access in offline mode")):
+                result = cv.audit(root, case, offline=True)
+            self.assertEqual(result["coverage"]["status"], "AUDITORIA_LOCAL_SEM_CONSULTA_OFICIAL")
+            self.assertEqual(result["components"][0]["locale"], "pt_BR")
+            self.assertEqual(result["components"][-1]["state"], "TEMA_FILHO_CUSTOMIZADO")
+            self.assertEqual(result["summary"]["plugins_checked"], 1)
+            self.assertEqual(len((case / "component-version-report.csv").read_text().splitlines()), 5)
+
+    def test_component_official_api_failure_is_not_absence(self):
+        import component_versions as cv
+        item = {"type": "plugin", "slug": "akismet", "local_version": "5.7.2",
+                "official_version": None, "source": "unknown", "state": "PLUGIN_REQUER_REVISAO",
+                "query_status": "SKIPPED"}
+        with unittest.mock.patch.object(cv, "api_json", return_value=("API_UNAVAILABLE", None, "https://api.wordpress.org/")):
+            cv.compare_official(item)
+        self.assertEqual(item["query_status"], "API_UNAVAILABLE")
+        self.assertEqual(item["state"], "PLUGIN_REQUER_REVISAO")
+
+    def test_modified_core_checksum_is_review_only(self):
+        import component_versions as cv
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "wp-includes").mkdir()
+            (root / "wp-admin").mkdir()
+            (root / "wp-includes/version.php").write_text("<?php $wp_version = '6.8.3';")
+            record = cv.local_core(root)
+            with unittest.mock.patch.object(cv, "api_json", return_value=(
+                "SUCCESS", {"checksums": {"wp-includes/version.php": "0" * 32}}, "https://api.wordpress.org/")):
+                cv.check_core(root, record, False)
+            self.assertEqual(record["state"], "CORE_MODIFICADO_REQUER_REVISAO")
 
     def test_secret_redaction(self):
         self.assertNotIn("example-secret", audit.redact("password=example-secret"))
