@@ -70,3 +70,5 @@ This rewrite starts at `0.1.0` (development/pre-release). It does not supersede 
 The database matrix checks family-specific options (`sc_*`), historical `SimplePluginLogger_plugin_info_before_update` references, serialized `cron` and `active_plugins` markers, WordPress sessions, application passwords and suspicious login patterns. Report conclusions are computed from the collected records, not from assumptions about the site. Known plugin guard files receive specific contextual classes; those classifications are **pattern recognition, not cryptographic proof of legitimacy**. Wordfence `wflogs` configuration contents are never excerpted.
 
 Relative paths are preserved to support incident triage. Reports may still contain client-specific filenames and need review before disclosure.
+
+The report's `Database findings` count includes only positive records, while every SQL check remains explicitly represented in `database-evidence.json`. Sensitive substrings in relative paths are masked without removing long, legitimate directory names.
