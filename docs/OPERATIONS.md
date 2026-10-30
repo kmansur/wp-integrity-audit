@@ -135,3 +135,5 @@ Official Core and plugin manifest comparisons and local main-file evidence use b
 ## Unexpected plugin executables (0.9.0)
 
 Review `checksum_findings` for `EXTRA_EXECUTABLE` results: they identify PHP-family files absent from an official plugin manifest for the installed version. Investigate plugin-specific generated code or custom extensions before deciding whether a finding is malicious. The auditor never removes the file.
+
+Checksum results are considered verified only when at least one valid checksum entry was actually evaluated. An empty or malformed manifest cannot produce a successful component integrity claim. Check `verified_files` / `checksum_verified_files` counters alongside comparison states.
