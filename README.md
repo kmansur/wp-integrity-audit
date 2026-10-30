@@ -112,3 +112,5 @@ Comparison never scans or changes the live WordPress site. Both source cases mus
 ## WordPress configuration inventory
 
 Read-only audit modes now write `configuration-evidence.json` for configuration files inside the WordPress tree (`.htaccess`, `.user.ini`, `php.ini`, `web.config` and related names). Only relative paths, metadata, modes and SHA-256 values are collected; file contents are never exported. This inventory does not inspect host-wide Apache/PHP-FPM configuration, and a configuration file's presence does not demonstrate compromise.
+
+Hidden-directory PHP files now receive `PHP_DIRETORIO_OCULTO_REQUER_VALIDACAO` unless stronger indicators apply. This is a contextual review flag, not a compromise finding; `.well-known` is excluded from the hidden-directory heuristic.
