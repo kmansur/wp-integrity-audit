@@ -98,3 +98,7 @@ The default audit creates `report.md` and `report.json`. Both include a final st
 Audit exit codes: `0` means no known explicit markers under the completed targeted audit; `10` means family residues require remediation; `20` is reserved for independently confirmed compromise (the current heuristic detector does **not** assert this automatically); `30` means an audit/connection error; `40` means incomplete evidence, including an intentional `--files-only` run or indicators requiring investigation. These are process return codes, not shell error strings. Automation should not equate code 0 with permission to reopen a site.
 
 The `report.json` contains high-level summary and result status only; detailed evidence remains in separately protected case files. This stage does not yet provide CSV consolidation, optional forensic dumps or a full host-persistence audit.
+
+## Evidence indexing and CSV
+
+Each case now includes `evidence-index.json` with deterministic `FILE-001` / `DB-001` references, SQL table/column provenance, and relative file paths. A one-row `report.csv` provides a privacy-conscious fleet-summary alongside `report.json` and `report.md`. Evidence IDs are unique within a case, not across different collections; use the case directory identifier as the namespace.
