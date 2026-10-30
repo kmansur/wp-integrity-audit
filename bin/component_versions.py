@@ -321,6 +321,7 @@ def audit(target: Path, case: Path, *, offline: bool = False,
                           "plugins_outdated": sum(r["state"] == "PLUGIN_OFICIAL_DESATUALIZADO" for r in plugins),
                           "themes_outdated": sum(r["state"] == "TEMA_OFICIAL_DESATUALIZADO" for r in themes),
                           "unlisted": sum(r["query_status"] == "NOT_FOUND_OFFICIAL_REPOSITORY" for r in records),
+                          "plugins_requiring_provenance_review": sum(p["state"] in ("PLUGIN_ORIGEM_NAO_CONFIRMADA_REQUER_REVISAO", "PLUGIN_VERSAO_NAO_IDENTIFICADA", "PLUGIN_PREMIUM_REQUER_FONTE_CONFIAVEL") for p in plugins),
                           "plugins_premium_custom": sum(r["state"] in ("PLUGIN_PREMIUM_REQUER_FONTE_CONFIAVEL", "PLUGIN_CUSTOMIZADO") for r in plugins),
                           "themes_premium_custom": sum(r["state"] in ("TEMA_PREMIUM_REQUER_FONTE_CONFIAVEL", "TEMA_CUSTOMIZADO", "TEMA_FILHO_CUSTOMIZADO") for r in themes)}}
     (case / "component-version-evidence.json").write_text(json.dumps(result, indent=2, ensure_ascii=False))
@@ -376,6 +377,7 @@ def append_management_section(case: Path) -> None:
             f"- Plugins checked: {summary.get('plugins_checked', 0)}",
             f"- Outdated plugins: {summary.get('plugins_outdated', 0)}",
             f"- Premium/custom plugins: {summary.get('plugins_premium_custom', 0)}",
+            f"- Plugins requiring provenance/version review: {summary.get('plugins_requiring_provenance_review', 0)}",
             f"- Themes checked: {summary.get('themes_checked', 0)}",
             f"- Outdated themes: {summary.get('themes_outdated', 0)}",
             f"- Premium/custom themes: {summary.get('themes_premium_custom', 0)}",
