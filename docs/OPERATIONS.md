@@ -91,3 +91,7 @@ The WordPress Core section in report.md shows each reference discrepancy, and th
 ## Configuration and host triage semantics
 
 `CONFIGURACAO_REQUER_VALIDACAO` is used for recognized handler, PHP setting, auto prepend/append, external rewrite or access-control directives; the evidence contains indicator category names, not directive values. Ordinary config files are `CONFIGURACAO_INVENTARIADA_SEM_INDICADOR`. Host inventory distinguishes `COMPONENTE_DE_SEGURANCA_CONHECIDO`, `INVENTARIADO_SEM_INDICADOR`, and `HOST_INDICATOR_REQUIRES_INVESTIGATION`. Known security-product naming is a contextual classification, not authenticity validation. Private host paths should never be distributed with the management report.
+
+## MetForm cache review
+
+`CACHE_PLUGIN_REQUER_VALIDACAO` is a preliminary classification: validate the local MetForm plugin source and entire cache file before claiming it is legitimate. This heuristic neither executes PHP nor evaluates the returned array. `index.php` uploads guard recognition requires exact source contents and excludes files containing extra code. Preserve any known malicious artifacts outside the served document root as internal evidence, and verify web-server aliases separately.
