@@ -542,7 +542,7 @@ $table_prefix = 'wp_';
             icons = site / "wp-content/uploads/metform/cache/icons"
             icons.mkdir(parents=True)
             case.mkdir()
-            (icons / "index.php").write_bytes(b"<?php\\n// Silence is golden.\\n")
+            (icons / "index.php").write_bytes(b"<?php\n// Silence is golden.\n")
             (icons / "font-awesome-38edd54e30815111.php").write_bytes(
                 b"<?php return array('fa-home' => 'icon');")
             (icons / "other.php").write_bytes(b"<?php eval($_GET['x']);")
