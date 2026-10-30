@@ -57,3 +57,7 @@ Full scalar values are included only for `_transient_sc_spread_interval` and `_t
 ## Evidence references and CSV
 
 `evidence-index.json` maps case-local `FILE-###` and `DB-###` identifiers to relative file paths or physical SQL tables and columns. `report.csv` is a single-row aggregate suitable for an external collector; group by case directory because IDs restart on each run. The detailed SQL evidence remains in `database-evidence.json`.
+
+## Read-only case comparison
+
+Use `--compare OLD_CASE NEW_CASE --compare-output PATH` on two prior complete audit directories. Both must identify the same database; differences are based on relative file paths and option-name/kind pairs rather than run-local evidence IDs. The tool produces `comparison.md` and `comparison.json`, without contacting the production site. Changes in dynamic cron hashes require manual interpretation.
