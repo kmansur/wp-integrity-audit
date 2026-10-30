@@ -1046,6 +1046,21 @@ def stage_files(target: Path, source: Path, case: Path, replace: bool, sync: boo
         shutil.rmtree(stage, ignore_errors=True)
         raise
 
+def post_recovery_blockers(database: list[dict], files: list[dict],
+                           processes: list[str]) -> list[str]:
+    """Return active post-recovery indicators; ignore absent and informational rows."""
+    blockers = []
+    active_kinds = {"family_option", "marker_option", "cron_marker", "active_plugins_marker"}
+    for item in database:
+        if item.get("kind") in active_kinds and item.get("state") not in ("NOT_FOUND", "ABSENT"):
+            blockers.append("database:" + str(item.get("kind")))
+    if any(item.get("classification") == "IOC_REQUER_VALIDACAO" for item in files):
+        blockers.append("file_ioc")
+    if processes:
+        blockers.append("process_ioc")
+    return blockers
+
+
 def swap_files(target: Path, stage: Path, case: Path) -> Path:
     old = target / "wp-content"
     # Quarantine MUST remain outside the HTTP document root.
@@ -1451,13 +1466,7 @@ def main() -> int:
                 if args.mode == "recover":
                     # Findings remain findings, not proof; require manual
                     # containment review before declaring recovery complete.
-                    unresolved = [x for x in database if
-                                  x.get("kind") in ("family_option", "marker_option", "cron_marker",
-                                                    "active_plugins_marker") and
-                                  x.get("state") not in ("NOT_FOUND", "ABSENT")]
-                    outstanding = [x for x in post_files if
-                                   x.get("classification") == "IOC_REQUER_VALIDACAO"]
-                    if unresolved or outstanding or post_processes:
+                    if post_recovery_blockers(database, post_files, post_processes):
                         raise AuditError("Post-recovery indicators remain; keep the site isolated")
             except BaseException:
                 # File rollback is safe only before any database modification.
