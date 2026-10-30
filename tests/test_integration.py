@@ -75,6 +75,22 @@ class MySQLFixtureTests(unittest.TestCase):
     def query(cls, sql):
         return audit.query_db(cls.cnf, cls.dbname, sql)
 
+    def setUp(self):
+        """Reset synthetic data before every test to make tests order-independent."""
+        self.query("""
+            DELETE FROM wp_options;
+            DELETE FROM wp_users;
+            DELETE FROM wp_usermeta;
+            INSERT INTO wp_options(option_name, option_value) VALUES
+              ('active_plugins','a:1:{i:0;s:21:"legitimate/plugin.php";}'),
+              ('cron','a:0:{}'),
+              ('sc_fake','indicator'),
+              ('malware_reference','cipher-feeder');
+            INSERT INTO wp_users(user_login) VALUES ('admin_abcdef');
+            INSERT INTO wp_usermeta(user_id,meta_key,meta_value) VALUES
+              (1,'session_tokens','session'), (1,'wp_application_passwords','api');
+        """)
+
     def test_readonly_audit_detects_fixture(self):
         findings = audit.database_audit(self.cnf, self.dbname, "wp_", self.case)
         kinds = {item["kind"] for item in findings}
