@@ -233,3 +233,9 @@ All project documentation and source commentary are in English. Versions follow 
 - Plugin active state and active theme are not yet linked to read-only database options.
 - Official plugin/theme full-tree checksums and provenance validation of premium components are not yet implemented.
 - Component version results are additional evidence; complete release semantics and report integration require CI and real WordPress fixture validation.
+
+### Continued in 0.7.0
+- Correlate plugin activation and active parent/child theme with read-only `active_plugins`, `template` and `stylesheet` options (without PHP evaluation or unserialization).
+- Verify WordPress.org plugin manifest MD5 checksums at the installed plugin version, without downloading plugin code; classify changed files as requiring review.
+- Propagate critical Core/plugin integrity differences into incomplete-review exit semantics.
+- Expand component report columns to include parent themes, query outcomes and provenance.
