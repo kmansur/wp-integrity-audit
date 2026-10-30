@@ -325,6 +325,8 @@ $table_prefix = 'wp_';
                     "status": "RESIDUOS_REQUEREM_LIMPEZA"}))
                 (directory / "file-evidence.json").write_text(json.dumps(files))
                 (directory / "database-evidence.json").write_text(json.dumps(options))
+            with self.assertRaises(audit.AuditError):
+                audit.compare_cases(before, after, before / "nested-output")
             result = audit.compare_cases(before, after, output)
             self.assertEqual(result["diff"]["files"]["added"], ["new.php"])
             self.assertEqual(result["diff"]["files"]["removed"], ["old.php"])
