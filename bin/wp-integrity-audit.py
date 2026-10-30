@@ -210,9 +210,26 @@ def configuration_audit(target: Path, case: Path) -> list[dict]:
             continue
         try:
             info = path.stat()
+            # Detect relevant directives without recording values, URLs or secrets.
+            patterns = {
+                "HANDLER_OVERRIDE": r"(?im)^\\s*(?:AddHandler|SetHandler)\\b",
+                "PHP_CONFIGURATION_OVERRIDE": r"(?im)^\\s*(?:php_value|php_flag)\\b",
+                "PHP_AUTO_PREPEND_APPEND": r"(?im)\\b(?:auto_prepend_file|auto_append_file)\\b",
+                "REWRITE_TO_EXTERNAL_URL": r"(?im)^\\s*RewriteRule\\s+\\S+\\s+https?://",
+                "PHP_UPLOAD_ACCESS_RULE": r"(?im)<FilesMatch\\b[^>]*\\.(?:php|phtml)",
+                "ACCESS_OVERRIDE": r"(?im)^\\s*Require\\s+all\\s+granted\\b",
+            }
+            indicators = []
+            if info.st_size <= 1048576 and path.name != ".htpasswd":
+                with path.open("r", encoding="utf-8", errors="replace") as stream:
+                    content = stream.read()
+                indicators = [key for key, pattern in patterns.items() if re.search(pattern, content)]
+            classification = ("CONFIGURACAO_REQUER_VALIDACAO" if indicators
+                              else "CONFIGURACAO_INVENTARIADA_SEM_INDICADOR")
             findings.append({
+                "indicators": indicators,
                 "path": relative,
-                "classification": "CONFIGURACAO_REQUER_VALIDACAO",
+                "classification": classification,
                 "source": "filesystem",
                 "size": info.st_size,
                 "sha256": sha256(path),
@@ -432,7 +449,8 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
     optional_issues = optional_probe_review(case)
     core, configurations, host_records = supplementary_evidence(case)
     core_count = len(core.get("findings", []))
-    config_count = len(configurations)
+    config_count = sum(x.get("classification") == "CONFIGURACAO_REQUER_VALIDACAO" for x in configurations)
+    config_inventoried = len(configurations)
     summary["security_configuration_review"] = config_count + summary["security_configuration_review"]
     host_indicators = sum(x.get("classification") == "HOST_INDICATOR_REQUIRES_INVESTIGATION" for x in host_records)
     host_review = sum(x.get("classification") == "HOST_PERSISTENCE_REQUIRES_CONTEXT" for x in host_records)
