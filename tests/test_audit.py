@@ -640,6 +640,18 @@ $table_prefix = 'wp_';
             clean, [{"classification": "IOC_REQUER_VALIDACAO"}], []))
         self.assertIn("process_ioc", audit.post_recovery_blockers(clean, [], ["test-process"]))
 
+    def test_generic_webshell_patterns_and_legacy_php_extensions(self):
+        with tempfile.TemporaryDirectory() as folder:
+            site = Path(folder) / "site"
+            case = Path(folder) / "case"
+            site.mkdir()
+            case.mkdir()
+            (site / "loader.php5").write_text("<?php eval(base64_decode('cGF5bG9hZA=='));")
+            evidence = audit.file_audit(site, case)
+            self.assertEqual(len(evidence), 1)
+            self.assertEqual(evidence[0]["classification"], "WEB_SHELL_HEURISTIC_REQUIRES_REVIEW")
+            self.assertEqual(audit.audit_status(evidence, [], [])[1], 40)
+
     def test_secret_redaction(self):
         self.assertNotIn("example-secret", audit.redact("password=example-secret"))
         self.assertNotIn("192.168.1.20", audit.redact("192.168.1.20"))
