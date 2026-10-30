@@ -153,3 +153,5 @@ All project documentation and source commentary are in English. Versions follow 
 - Extend report and CSV tests for per-domain case identifiers and sanitized management summaries.
 
 - Align the pre-existing technical-report security-configuration counter with the actual configuration inventory total.
+
+- Add regression assertions that management reporting excludes internal host and WordPress Core file paths.
