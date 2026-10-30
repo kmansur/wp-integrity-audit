@@ -10,7 +10,6 @@ from __future__ import annotations
 import argparse
 import contextlib
 import csv
-import component_versions
 import io
 import datetime as dt
 import fcntl
@@ -18,12 +17,14 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import component_versions
 import re
 import secrets
 import shutil
 import stat
 import subprocess
-import sys
 import tarfile
 import tempfile
 import urllib.parse
@@ -613,6 +614,10 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
         status, exit_code = "AUDITORIA_INCOMPLETA", 40
     status_detail = ("RESIDUOS_REQUEREM_LIMPEZA_E_CORE_REQUER_REVISAO"
                      if status == "RESIDUOS_REQUEREM_LIMPEZA" and core_count else status)
+    component_path = case / "component-version-evidence.json"
+    component_result = json.loads(component_path.read_text()) if component_path.is_file() else None
+    summary["component_versions"] = component_result["summary"] if component_result else None
+    summary["component_coverage"] = component_result["coverage"] if component_result else {"local": "SKIPPED", "official": "SKIPPED"}
     write_private(case / "report.json", json.dumps({
         "schema_version": 1, "tool_version": VERSION,
         "tool_sha256": sha256(Path(__file__)), "mode": mode,
