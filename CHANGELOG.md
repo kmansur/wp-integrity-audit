@@ -45,3 +45,11 @@ All project documentation and source commentary are in English. Versions follow 
 ## [Legacy baseline] - 2026-10-30
 
 - Initial Bash implementation, original version `2026.10.28.18`.
+
+### Audit coverage and classification
+- Run targeted database inspection by default with `--audit`; add explicit `--files-only` for filesystem-only inspection.
+- Distinguish skipped database analysis from zero findings and fail if mandatory database checks cannot execute.
+- Inspect family-specific options, historical plugin-update cache, cron, active plugins, stored sessions, application passwords and suspicious administrator names.
+- Recognize specific Sucuri, WPForms and Simple History guard patterns and quarantine Wordfence configuration snippets from the report.
+- Preserve relative file paths, including long names, and generate an evidence-based technical opinion.
+- Add fixture regressions for two family residues, historical references, cron, plugins and session counts.
