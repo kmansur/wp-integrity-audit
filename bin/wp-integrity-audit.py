@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import csv
+import io
 import datetime as dt
 import fcntl
 import hashlib
@@ -193,6 +195,24 @@ def process_audit(case: Path) -> list[str]:
     write_private(case / "process-evidence.json", json.dumps(matches, indent=2))
     return matches
 
+def attach_evidence_ids(files: list[dict], database: list[dict] | None,
+                        db_name: str | None, db_prefix: str | None) -> None:
+    """Attach deterministic per-case evidence references and SQL provenance."""
+    for index, entry in enumerate(files, 1):
+        entry["evidence_id"] = f"FILE-{index:03d}"
+        entry["source"] = "filesystem"
+    for index, entry in enumerate(database or [], 1):
+        entry["evidence_id"] = f"DB-{index:03d}"
+        entry["source"] = "database"
+        entry["database"] = db_name
+        kind = entry.get("kind", "")
+        suffix = ("users" if kind == "suspicious_users" else
+                  "usermeta" if kind in ("session_rows", "application_password_rows") else "options")
+        entry["source_table"] = (db_prefix or "") + suffix
+        entry["source_column"] = ("user_login" if suffix == "users" else
+                                  "meta_key" if suffix == "usermeta" else "option_value")
+
+
 def audit_status(files: list[dict], processes: list[str],
                  database: list[dict] | None) -> tuple[str, int, dict]:
     """Conservative audit outcomes; do not interpret historical references as activity."""
@@ -228,6 +248,7 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
                 database: list[dict] | None = None, db_name: str | None = None, db_prefix: str | None = None) -> None:
     """Generate a precise coverage statement and evidence-based technical opinion."""
     audited = database is not None
+    attach_evidence_ids(findings, database, db_name, db_prefix)
     status, exit_code, summary = audit_status(findings, processes, database)
     write_private(case / "report.json", json.dumps({
         "schema_version": 1, "tool_version": VERSION,
@@ -238,6 +259,26 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
         "table_prefix": db_prefix if audited else None,
         "database_audited": audited,
         "database_credentials_exposed": False,
+    }, indent=2, ensure_ascii=False))
+    # Persist a normalized audit summary for fleet-wide CSV aggregation.
+    csv_stream = io.StringIO()
+    writer = csv.writer(csv_stream)
+    writer.writerow(["domain", "status", "exit_code", "family_residues",
+                     "historical_references", "informational_records",
+                     "active_database_markers", "file_review", "suspicious_processes",
+                     "release_recommended", "tool_version"])
+    writer.writerow([case.name, status, exit_code, summary["confirmed_family_residues"],
+                     summary["historical_references"], summary["informational_records"],
+                     summary["active_database_markers"],
+                     summary["file_indicators_requiring_review"], summary["suspicious_processes"],
+                     "NO", VERSION])
+    write_private(case / "report.csv", csv_stream.getvalue())
+    write_private(case / "evidence-index.json", json.dumps({
+        "files": [{"id": entry["evidence_id"], "path": sanitize_relative_path(entry["path"]),
+                   "classification": entry["classification"]} for entry in findings],
+        "database": [{"id": entry["evidence_id"], "name": entry.get("name"),
+                      "table": entry["source_table"], "column": entry["source_column"],
+                      "state": entry.get("state")} for entry in (database or [])],
     }, indent=2, ensure_ascii=False))
     lines = [
         "# WordPress Integrity Audit", "",
