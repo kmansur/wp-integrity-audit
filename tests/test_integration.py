@@ -122,6 +122,27 @@ class MySQLFixtureTests(unittest.TestCase):
         self.assertIn("Family-specific option/transient residues: **2**", report)
         self.assertIn("not evidence of active execution", report)
 
+    def test_detailed_evidence_preserves_history_and_value_hashes(self):
+        self.query("""
+            INSERT INTO wp_options(option_name,option_value) VALUES
+                ('SimplePluginLogger_plugin_info_before_update','trace-inspector-pad');
+        """)
+        rows = audit.database_audit(self.cnf, self.dbname, "wp_", self.case)
+        history = next(x for x in rows if x["kind"] == "historical_cache")
+        residue = next(x for x in rows if x["kind"] == "family_option")
+        self.assertEqual(history["name"], "SimplePluginLogger_plugin_info_before_update")
+        self.assertEqual(history["state"], "HISTORICAL_REFERENCE")
+        self.assertEqual(history["safe_excerpt"], "[OMITTED_BY_POLICY]")
+        self.assertEqual(residue["state"], "RESIDUO_FAMILIA_REQUER_LIMPEZA")
+        self.assertEqual(len(residue["sha256"]), 64)
+        self.assertEqual(residue["value_length_bytes"], len("indicator"))
+        audit.make_report(self.case, "audit", [], [], rows, self.dbname, "wp_")
+        report = (self.case / "report.md").read_text()
+        self.assertIn("wp_options", report)
+        self.assertIn("wp_usermeta", report)
+        self.assertIn("Confirmed family residues:", report)
+        self.assertIn("Historical references:", report)
+
     def test_safe_cleanup_preserves_legitimate_options(self):
         audit.sql_cleanup(self.cnf, self.dbname, "wp_", self.case)
         values = dict(self.query(
