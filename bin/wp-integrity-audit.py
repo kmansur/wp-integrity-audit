@@ -31,7 +31,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 
-VERSION = "0.11.0"
+VERSION = "0.12.0"
 IOC = re.compile(r"SC_ADV_BEGIN|--sc-cli|--sc-succ|trace-inspector-pad|cipher-feeder|_sc_fpc|sc_cron_guard|sc_persist_manifest|sc_own_manifest|function ceya")
 PATTERN_NAMES = (".sc_", ".gr_", ".gk_", ".kk_", ".wp-object-cache")
 SCRIPT_EXTENSIONS = {".php", ".phtml", ".phar", ".inc", ".php5", ".php7", ".php8", ".pht", ".phps"}
@@ -826,7 +826,7 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
         "Known family residues or unresolved review findings require approved remediation and subsequent verification.",
         "", "## Coverage", "",
         f"- Database audit: {'EXECUTED' if audited else 'NOT EXECUTED'}",
-        f"- Core verification: {core.get('status', 'NOT EXECUTED')}",
+        f"- Core verification: {summary['component_coverage'].get('core', core.get('status', 'NOT EXECUTED'))}",
         f"- Database dump: {'PERFORMED' if (case / 'database-before.sql').is_file() else 'NOT PERFORMED'}",
         f"- File snapshot: {'PERFORMED' if (case / 'site-before.tar.gz').is_file() else 'NOT PERFORMED'}",
         "", "Detailed infrastructure evidence is retained in the internal technical report.", "",
