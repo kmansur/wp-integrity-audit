@@ -32,7 +32,7 @@ IOC = re.compile(r"SC_ADV_BEGIN|--sc-cli|--sc-succ|trace-inspector-pad|cipher-fe
 PATTERN_NAMES = (".sc_", ".gr_", ".gk_", ".kk_", ".wp-object-cache")
 SENSITIVE = re.compile(r"(?i)(password|passwd|secret|token|api[_-]?key)\s*[:=]\s*[^\s,;]+")
 LONG_VALUE = re.compile(r"(?<![\w])[A-Za-z0-9_/-]{40,}(?![\w])")
-DB_KEY = re.compile(r"""define\s*\(\s*['"](?P<name>DB_NAME|DB_USER|DB_PASSWORD|DB_HOST)['"]\s*,\s*(?P<quote>['"])(?P<value>(?:\\.|(?!(?P=quote)).)*) (?P=quote)\s*\)""".replace(" *)", "*)"), re.S)
+DB_KEY = re.compile(r"""define\s*\(\s*['"](?P<name>DB_NAME|DB_USER|DB_PASSWORD|DB_HOST)['"]\s*,\s*(?P<quote>['"])(?P<value>(?:\\.|(?!(?P=quote)).)*)(?P=quote)\s*\)""", re.S)
 SQL_TABLE_PREFIX = re.compile(r"\$table_prefix\s*=\s*['\"]([A-Za-z0-9_]+)['\"]")
 
 class AuditError(RuntimeError):
