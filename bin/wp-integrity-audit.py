@@ -302,7 +302,7 @@ def core_integrity_audit(target: Path, case: Path, checksum_manifest: dict | Non
 def host_persistence_inventory(case: Path, roots: list[Path]) -> list[dict]:
     """Bounded Linux persistence metadata collection, without reading secrets."""
     findings = []
-    allowed = ("/etc/cron", "/etc/systemd/system", "/etc/php",
+    allowed = ("/etc/cron", "/etc/crontab", "/etc/systemd/system", "/etc/php",
                "/etc/apache2", "/etc/profile", "/etc/bash.bashrc")
     for root in roots:
         root = Path(root)
@@ -1043,13 +1043,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--version", action="version", version=VERSION)
     args = parser.parse_args()
     if args.compare:
-        if args.target is not None or args.mode != "audit" or args.files_only or args.source or args.core_source:
+        if args.target is not None or args.mode != "audit" or args.files_only or args.source or args.core_source or args.check_core or args.host_persistence:
             parser.error("--compare cannot be combined with a target or audit/recovery options")
         return args
     if args.compare_output:
         parser.error("--compare-output requires --compare")
     if args.target is None:
         parser.error("TARGET is required")
+    if (args.check_core or args.host_persistence) and args.mode != "audit":
+        parser.error("--check-core and --host-persistence require --audit")
     if args.files_only and args.mode != "audit":
         parser.error("--files-only is valid only with --audit")
     if args.mode in ("apply-files", "recover") and not args.source:
