@@ -29,7 +29,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 
-VERSION = "0.3.0"
+VERSION = "0.4.0"
 IOC = re.compile(r"SC_ADV_BEGIN|--sc-cli|--sc-succ|trace-inspector-pad|cipher-feeder|_sc_fpc|sc_cron_guard|sc_persist_manifest|sc_own_manifest|function ceya")
 PATTERN_NAMES = (".sc_", ".gr_", ".gk_", ".kk_", ".wp-object-cache")
 SENSITIVE = re.compile(r"(?i)(password|passwd|secret|token|api[_-]?key)\s*[:=]\s*[^\s,;]+")
@@ -235,7 +235,7 @@ def akismet_access_guard(content: str) -> bool:
     denied = False
     granted = False
     for line in lines:
-        module = re.fullmatch(r'<IfModule\s+!?([A-Za-z0-9_]+)\s*>', line, re.I)
+        module = re.fullmatch(r'<IfModule\s+!?([A-Za-z0-9_.]+)\s*>', line, re.I)
         match = re.fullmatch(r'<FilesMatch\s+"([^"]{1,200})"\s*>', line, re.I)
         if module:
             if module.group(1).lower() not in ("mod_authz_core.c", "mod_access_compat.c"):
@@ -1451,11 +1451,12 @@ def main() -> int:
                 if args.mode == "recover":
                     # Findings remain findings, not proof; require manual
                     # containment review before declaring recovery complete.
-                    unresolved = [x for x in database if x["kind"] in
-                                  ("family_option", "marker_option", "session_rows",
-                                   "application_password_rows")]
+                    unresolved = [x for x in database if
+                                  x.get("kind") in ("family_option", "marker_option", "cron_marker",
+                                                    "active_plugins_marker") and
+                                  x.get("state") not in ("NOT_FOUND", "ABSENT")]
                     outstanding = [x for x in post_files if
-                                   x["classification"] == "IOC_REQUIRES_VALIDATION"]
+                                   x.get("classification") == "IOC_REQUER_VALIDACAO"]
                     if unresolved or outstanding or post_processes:
                         raise AuditError("Post-recovery indicators remain; keep the site isolated")
             except BaseException:
