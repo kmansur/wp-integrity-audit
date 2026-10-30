@@ -190,6 +190,29 @@ $table_prefix = 'wp_';
                 audit.stage_files(target, source, case, False, False)
             self.assertEqual(list(root.glob(".wp-content-stage-*")), [])
 
+    def test_swap_failure_restores_original_content(self):
+        """A missing stage must not leave wp-content absent."""
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            site = base / "site"
+            case = base / "case"
+            site.mkdir()
+            case.mkdir()
+            (site / "wp-content").mkdir()
+            (site / "wp-content" / "original.txt").write_text("unchanged")
+            with self.assertRaises(OSError):
+                audit.swap_files(site, base / "missing-stage", case)
+            self.assertEqual((site / "wp-content" / "original.txt").read_text(), "unchanged")
+            self.assertFalse(list(base.glob(".site.wp-content-quarantine-*")))
+
+    def test_case_files_not_written_with_public_permissions(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            case = audit.ensure_private_dir(base / "cases")
+            audit.write_private(case / "evidence.txt", "synthetic private report")
+            self.assertEqual(stat.S_IMODE(case.stat().st_mode), 0o700)
+            self.assertEqual(stat.S_IMODE((case / "evidence.txt").stat().st_mode), 0o600)
+
     def test_secret_redaction(self):
         self.assertNotIn("example-secret", audit.redact("password=example-secret"))
         self.assertNotIn("192.168.1.20", audit.redact("192.168.1.20"))
