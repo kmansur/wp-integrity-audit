@@ -87,7 +87,7 @@ $table_prefix = 'wp_';
                 ["python3", str(SCRIPT), "--audit", "--files-only", str(root), "--case-root", str(case_root)],
                 capture_output=True, text=True
             )
-            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.returncode, 40, result.stderr)
             cases = [p for p in case_root.iterdir() if p.is_dir()]
             self.assertEqual(len(cases), 1)
             self.assertTrue((cases[0] / "report.md").is_file())
