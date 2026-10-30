@@ -274,3 +274,10 @@ All project documentation and source commentary are in English. Versions follow 
 - Require at least one usable plugin checksum entry before declaring plugin checksum validation successful.
 - Record the number of checksum entries actually evaluated.
 - Add a regression test for a traversal-only Core manifest.
+
+## [0.11.0] - 2026-10-30
+
+### Fixed
+- Differentiate HTTP 404 for official plugin/theme metadata (component not found) from HTTP 5xx/transport errors (API unavailable).
+- A Core checksum HTTP 404 remains unavailable, not a plugin/theme absence result.
+- Add mocked HTTP failure regression cases without external requests.
