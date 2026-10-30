@@ -127,3 +127,7 @@ Version inspection consults WordPress.org component metadata and official plugin
 For Core reporting, the checksum manifest is requested for the installed version and locale, while the official version-check endpoint provides the latest advertised version. These are independent results; an outdated but checksum-matching Core and a modified Core are different states. A failure to reach either endpoint must not silently imply that WordPress is current.
 
 A WordPress.org plugin listing and a checksum manifest are separate sources. A listed plugin can lack a checksum manifest for its installed version; report `PLUGIN_OFICIAL_SEM_CHECKSUM` rather than asserting modifications. Modified files require actual checksum differences. Premium/custom component totals are contextual inventory, not a malware count.
+
+## Streamed hashes (0.8.0)
+
+Official Core and plugin manifest comparisons and local main-file evidence use bounded streaming digests. Checksum mismatches still indicate review requirements, not confirmed malware. Neither file hashing nor the inventory traverses symlinked components by design.
