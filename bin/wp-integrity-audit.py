@@ -31,7 +31,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 
-VERSION = "0.13.0"
+VERSION = "0.14.0"
 IOC = re.compile(r"SC_ADV_BEGIN|--sc-cli|--sc-succ|trace-inspector-pad|cipher-feeder|_sc_fpc|sc_cron_guard|sc_persist_manifest|sc_own_manifest|function ceya")
 PATTERN_NAMES = (".sc_", ".gr_", ".gk_", ".kk_", ".wp-object-cache")
 SCRIPT_EXTENSIONS = {".php", ".phtml", ".phar", ".inc", ".php5", ".php7", ".php8", ".pht", ".phps"}
@@ -642,6 +642,17 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
                               "PLUGIN_COM_ARQUIVOS_MODIFICADOS", "TEMA_COM_ARQUIVOS_MODIFICADOS")
         for item in component_result["components"]))
     summary["critical_component_review"] = critical_component_review
+    component_review = bool(component_result and any(item.get("state") in (
+        "PLUGIN_ORIGEM_NAO_CONFIRMADA_REQUER_REVISAO", "PLUGIN_VERSAO_NAO_IDENTIFICADA",
+        "PLUGIN_PREMIUM_REQUER_FONTE_CONFIAVEL", "TEMA_NAO_ENCONTRADO_NO_REPOSITORIO",
+        "TEMA_REQUER_REVISAO", "PLUGIN_REQUER_REVISAO") for item in component_result["components"]))
+    outdated_core = bool(component_result and component_result["summary"].get("core_outdated"))
+    summary["component_review_required"] = component_review
+    summary["core_outdated"] = outdated_core
+    review_pending = bool(config_count or component_review or outdated_core)
+    summary["review_pending"] = review_pending
+    if review_pending and exit_code == 0:
+        status, exit_code, status_detail = "REVISAO_NECESSARIA", 40, "NON_MALWARE_REVIEW_FINDINGS"
     if critical_component_review and exit_code == 0:
         status, exit_code, status_detail = "AUDITORIA_INCOMPLETA", 40, "CORE_OR_COMPONENT_INTEGRITY_REQUIRES_REVIEW"
     write_private(case / "report.json", json.dumps({
@@ -841,8 +852,8 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
         f"- External persistence risk: **{persistence_risk}**",
         "- No known indicators found does not prove absence of persistence.",
         "", "## Recommendation", "",
-        "**LIBERAÇÃO NÃO RECOMENDADA**",
-        "Known family residues or unresolved review findings require approved remediation and subsequent verification.",
+        "**RELEASE REQUIRES REVIEW**" if exit_code else "**NO EXPLICIT MARKERS; RELEASE STILL REQUIRES OPERATOR APPROVAL**",
+        "Resolve all review findings and validate deployment readiness before release." if exit_code else "No selected indicators were found; this is not a guarantee of a clean site.",
         "", "## Coverage", "",
         f"- Database audit: {'EXECUTED' if audited else 'NOT EXECUTED'}",
         f"- Core verification: {summary['component_coverage'].get('core', core.get('status', 'NOT EXECUTED'))}",
@@ -1431,6 +1442,8 @@ def parse_args() -> argparse.Namespace:
     # Mutating operations always require separate explicit mode and confirmation.
     parser.add_argument("--skip-version-check", action="store_true", help="Disable Core, plugin and theme version checks")
     parser.add_argument("--offline", action="store_true", help="Disable external WordPress.org consultations")
+    parser.add_argument("--show-report", action="store_true", help="Print management report on a terminal")
+    parser.add_argument("--no-show-report", action="store_true", help="Never print management report")
     parser.add_argument("--official-compare", action="store_true", help="Explicitly enable official comparison")
     parser.add_argument("--skip-core", action="store_true", help="Skip official WordPress Core checksum comparison")
     parser.add_argument("--skip-host-persistence", action="store_true", help="Skip Linux persistence metadata inventory")
@@ -1465,6 +1478,22 @@ def parse_args() -> argparse.Namespace:
     if args.official_sync and args.mode not in ("apply-files", "recover"):
         parser.error("--official-sync requires file replacement")
     return args
+
+def present_management_report(case: Path, *, show: bool = False,
+                              no_show: bool = False, tty: bool | None = None) -> None:
+    """Display only the management report on TTY; never leak it to pipelines."""
+    path = case / "report.md"
+    print(f"Management report: {path}")
+    interactive = sys.stdout.isatty() if tty is None else tty
+    if no_show or not interactive:
+        return
+    if not path.is_file() or path.is_symlink():
+        print("Management report unavailable", file=sys.stderr)
+        return
+    print("\n--- start of report ---")
+    print(path.read_text(encoding="utf-8"), end="\n")
+    print("--- end of report ---")
+
 
 def main() -> int:
     # Protect backup and report files from their first byte of creation.
@@ -1515,7 +1544,8 @@ def main() -> int:
             make_report(case, args.mode, files, processes)
             component_versions.append_management_section(case)
             mark_incomplete_case(case, omitted)
-            print("Partial audit complete; database NOT EXECUTED")
+            print("Audit complete; database NOT EXECUTED")
+            present_management_report(case, show=args.show_report, no_show=args.no_show_report)
             return 40
         config, prefix = parse_wordpress(target / "wp-config.php")
         dbname = config["DB_NAME"]
@@ -1540,7 +1570,8 @@ def main() -> int:
                     mark_incomplete_case(case, omitted)
                 with (case / "report.json").open(encoding="utf-8") as stream:
                     outcome = json.load(stream)
-                print("Database audit complete: status=" + outcome["status"] + "; exit=" + str(outcome["exit_code"]))
+                print("Audit complete: status=" + outcome["status"] + "; exit=" + str(outcome["exit_code"]))
+                present_management_report(case, show=args.show_report, no_show=args.no_show_report)
                 return outcome["exit_code"]
             if os.geteuid() != 0:
                 raise AuditError("Recovery requires root; audit does not")
