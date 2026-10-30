@@ -172,3 +172,10 @@ All project documentation and source commentary are in English. Versions follow 
 - Add restricted `CACHE_PLUGIN_REQUER_VALIDACAO` classification for a MetForm Font Awesome cache candidate when its path and PHP return-array header match.
 - Keep potential cache findings in required-review counts and return-code precedence; no blanket uploads exemption.
 - Add synthetic guard, cache and unrelated PHP regression cases.
+
+### Akismet and SQL risk improvements
+- Fix newline escapes in the exact-upload-guard fixture that caused the prior multi-Python unit-test failure.
+- Recognize narrowly constrained Akismet deny-by-default .htaccess asset access rules, with rejection tests for broad PHP grants.
+- Eliminate duplicate security-configuration counts between JSON and Markdown.
+- Show scoped low database risk when completed targeted checks find no selected database IOC; WordPress session rows remain informational.
+- Keep MetForm icon caches under review until their full contents and trusted generator are verified.
