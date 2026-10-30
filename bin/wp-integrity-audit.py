@@ -352,11 +352,8 @@ def stage_files(target: Path, source: Path, case: Path, replace: bool, sync: boo
         if not replace and any((stage / part).is_dir() and list((stage / part).iterdir())
                                for part in ("plugins", "themes")):
             raise AuditError("Source has plugins/themes; explicitly specify --replace-plugins-themes")
-        for path in iter_files(stage):
-            if path.suffix.lower() in (".php", ".phtml", ".inc"):
-                with path.open("rb") as stream:
-                    if IOC.search(stream.read(262144).decode("utf-8", "replace")):
-                        raise AuditError("Known IOC found in staged content")
+        # Re-check the entire stage, including official downloads.
+        validate_source(stage, target)
         return stage
     except BaseException:
         shutil.rmtree(stage, ignore_errors=True)
@@ -588,14 +585,15 @@ def main() -> int:
                     raise AuditError("Serialized WordPress options require manual, targeted remediation")
             ask("Confirm all planned site/database modifications")
             quarantine = None
-            database_changed = False
+            database_started = False
             try:
                 if stage is not None:
                     quarantine = swap_files(target, stage, case)
                     stage = None
                 if args.mode in ("apply-db", "recover"):
+                    # A failed SQL client may have committed before raising.
+                    database_started = True
                     sql_cleanup(cnf, dbname, prefix, case)
-                    database_changed = True
                 if args.mode == "recover":
                     if args.core_source:
                         sync_core(args.core_source, target)
@@ -622,7 +620,7 @@ def main() -> int:
                 # File rollback is safe only before any database modification.
                 # Once the DB was changed, retain evidence and require an
                 # operator-controlled recovery from the verified snapshots.
-                if quarantine is not None and not database_changed:
+                if quarantine is not None and not database_started:
                     current = target / "wp-content"
                     if current.exists():
                         failed = target.parent / ("." + target.name + ".wp-content.failed-" + case.name)
