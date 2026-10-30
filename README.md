@@ -186,3 +186,5 @@ The version inventory also reads selected WordPress database option values (`act
 WordPress Core version comparison also consults the official HTTPS version-check service; an outdated release is reported separately from checksum mismatches, which retain priority. Any API failure is reported as unavailable rather than as proof of a nonofficial component.
 
 Officially listed plugins without a downloadable checksum manifest receive `PLUGIN_OFICIAL_SEM_CHECKSUM` when their installed version matches the official version. Missing manifests are not considered evidence of modification. The management report counts components flagged as premium/customized separately from unavailable API results.
+
+All component-version evidence and generated report labels are in English. Read-only component results are supplementary and require validation on a disposable full WordPress test installation prior to production acceptance.
