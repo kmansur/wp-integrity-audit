@@ -852,6 +852,33 @@ $table_prefix = 'wp_';
                 self.assertIsNone(data)
                 self.assertTrue(url.startswith("https://api.wordpress.org/"))
 
+    def test_component_core_coverage_and_outdated_summary(self):
+        import component_versions as cv
+        import hashlib
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder) / "site"
+            case = Path(folder) / "case"
+            (root / "wp-includes").mkdir(parents=True)
+            (root / "wp-admin").mkdir()
+            (root / "wp-content/plugins").mkdir(parents=True)
+            (root / "wp-content/themes").mkdir()
+            case.mkdir()
+            version_file = root / "wp-includes/version.php"
+            version_file.write_text("<?php $wp_version = '7.1.3';")
+            digest = hashlib.md5(version_file.read_bytes()).hexdigest()
+            def api(endpoint, params, **kwargs):
+                if endpoint == "/core/checksums/1.0/":
+                    return "SUCCESS", {"checksums": {"wp-includes/version.php": digest}}, "https://api.wordpress.org"
+                if endpoint == "/core/version-check/1.7/":
+                    return "SUCCESS", {"offers": [{"current": "7.1.4"}]}, "https://api.wordpress.org"
+                raise AssertionError(endpoint)
+            with unittest.mock.patch.object(cv, "api_json", side_effect=api):
+                result = cv.audit(root, case)
+            self.assertEqual(result["coverage"]["core"], "EXECUTED")
+            self.assertEqual(result["summary"]["core_outdated"], 1)
+            self.assertEqual(result["summary"]["plugins_outdated"], 0)
+            self.assertEqual(result["components"][0]["state"], "CORE_DESATUALIZADO")
+
     def test_secret_redaction(self):
         self.assertNotIn("example-secret", audit.redact("password=example-secret"))
         self.assertNotIn("192.168.1.20", audit.redact("192.168.1.20"))
