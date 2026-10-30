@@ -315,10 +315,16 @@ def host_persistence_inventory(case: Path, roots: list[Path]) -> list[dict]:
         for file in candidates:
             try:
                 info = file.stat()
+                # Scan bounded text for explicit family IOCs; never export file content.
+                indicator = False
+                if info.st_size <= 1048576:
+                    with file.open("rb") as stream:
+                        indicator = bool(IOC.search(stream.read().decode("utf-8", "replace")))
                 findings.append({"path": str(file), "size": info.st_size,
                                  "mode": oct(stat.S_IMODE(info.st_mode)),
                                  "sha256": sha256(file), "source": "host_metadata",
-                                 "classification": "HOST_PERSISTENCE_REQUIRES_CONTEXT"})
+                                 "classification": ("HOST_INDICATOR_REQUIRES_INVESTIGATION" if indicator
+                                                    else "INVENTARIADO_SEM_INDICADOR")})
             except OSError:
                 continue
     write_private(case / "host-persistence.json", json.dumps(findings, indent=2))
