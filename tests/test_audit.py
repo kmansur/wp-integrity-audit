@@ -175,6 +175,21 @@ $table_prefix = 'wp_';
             with self.assertRaises(audit.AuditError):
                 audit.rotate_salts(link)
 
+    def test_stage_rejects_indicator_after_first_256kb(self):
+        """Stage validation must not truncate scanning to the beginning."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            target = root / "target"
+            source = root / "source"
+            case = root / "case"
+            (target / "wp-content").mkdir(parents=True)
+            source.mkdir()
+            case.mkdir()
+            (source / "late.php").write_text("x" * 350000 + " SC_ADV_BEGIN")
+            with self.assertRaises(audit.AuditError):
+                audit.stage_files(target, source, case, False, False)
+            self.assertEqual(list(root.glob(".wp-content-stage-*")), [])
+
     def test_secret_redaction(self):
         self.assertNotIn("example-secret", audit.redact("password=example-secret"))
         self.assertNotIn("192.168.1.20", audit.redact("192.168.1.20"))
