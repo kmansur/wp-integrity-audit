@@ -504,12 +504,15 @@ def main() -> int:
                 if query_db(cnf, dbname, sql):
                     raise AuditError("Serialized WordPress options require manual, targeted remediation")
             ask("Confirm all planned site/database modifications")
+            quarantine = None
+            database_changed = False
             try:
                 if stage is not None:
-                    swap_files(target, stage, case)
+                    quarantine = swap_files(target, stage, case)
                     stage = None
                 if args.mode in ("apply-db", "recover"):
                     sql_cleanup(cnf, dbname, prefix, case)
+                    database_changed = True
                 if args.mode == "recover":
                     if args.core_source:
                         sync_core(args.core_source, target)
@@ -517,6 +520,17 @@ def main() -> int:
                 upload_permissions_audit(target, case)
                 database = database_audit(cnf, dbname, prefix, case, post=True)
                 make_report(case, args.mode, files, processes, database)
+            except BaseException:
+                # File rollback is safe only before any database modification.
+                # Once the DB was changed, retain evidence and require an
+                # operator-controlled recovery from the verified snapshots.
+                if quarantine is not None and not database_changed:
+                    current = target / "wp-content"
+                    if current.exists():
+                        failed = target / ("wp-content.failed-" + case.name)
+                        current.rename(failed)
+                    quarantine.rename(current)
+                raise
             finally:
                 if stage is not None:
                     shutil.rmtree(stage, ignore_errors=True)
