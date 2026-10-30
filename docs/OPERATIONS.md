@@ -75,3 +75,7 @@ Run `--audit --host-persistence TARGET` to record selected Linux configuration m
 ## Optional probe exit-status precedence
 
 Official Core mismatch or checksum retrieval failure is reported in `optional_probe_review`. If the primary targeted audit has no markers, the status becomes `AUDITORIA_INCOMPLETA` (40). Confirmed family residues continue to return `RESIDUOS_REQUEREM_LIMPEZA` (10), while also listing Core review issues. Check `report.json`, not only the shell exit status, before taking action.
+
+## Full passive scan is the default (0.3.0)
+
+`python3 bin/wp-integrity-audit.py /srv/www/wordpress` runs all passive checks implemented by the tool. Disable specific checks using `--skip-core`, `--skip-host-persistence`, `--skip-db`, `--skip-files`, `--skip-config`, `--skip-processes` and `--skip-elementor`. The legacy `--files-only` spelling remains an alias of `--skip-db`. Optional Core checks require outgoing HTTPS connectivity to api.wordpress.org. No PHP or WP-CLI invocation is performed. Recovery commands are explicit and separately confirmed; they never run as a side effect of an audit. An audit with skipped coverage is treated as incomplete unless confirmed residue already requires remediation.
