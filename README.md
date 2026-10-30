@@ -124,3 +124,9 @@ Hidden-directory PHP files now receive `PHP_DIRETORIO_OCULTO_REQUER_VALIDACAO` u
 ## Optional probe status integration
 
 When `--check-core` is requested, unavailability or mismatches in official checksums are exposed in the executive summary and `report.json` (`optional_probe_review`). If there are no higher-priority family residues, these findings return status `AUDITORIA_INCOMPLETA` and exit code `40`. Existing confirmed family residues retain status `RESIDUOS_REQUEREM_LIMPEZA` (exit `10`), with optional issues listed alongside them. A clean checksum result is not proof of site integrity.
+
+## Version 0.3.0: full passive audit by default
+
+A normal invocation (`python3 bin/wp-integrity-audit.py /path/to/wordpress`) now runs all implemented passive scans: WordPress files, configuration metadata, Core checksum verification, Linux host-persistence metadata, Elementor asset checks, matching processes and SQL indicators. No remediation is performed. **The Core check contacts the official WordPress checksum API over HTTPS; use `--skip-core` in offline environments.** Disable unwanted checks with `--skip-core`, `--skip-host-persistence`, `--skip-db` (alias `--files-only`), `--skip-files`, `--skip-config`, `--skip-processes` or `--skip-elementor`. Skipped checks are documented in the case report and an otherwise clean report becomes `AUDITORIA_INCOMPLETA` (exit 40). Confirmed family residues continue to return exit 10.
+
+**Important:** Host-persistence scans read selected /etc paths and may require filesystem permissions. File contents remain excluded from the host inventory. Destructive `--apply-files`, `--apply-db`, and `--recover` require explicit selection and interactive approval; they are never part of a default audit. The `--compare` workflow remains separately invoked.
