@@ -187,3 +187,14 @@ All project documentation and source commentary are in English. Versions follow 
 - Strengthen MetForm regression coverage: a plausible generated-cache header containing a known IOC later in the file must retain IOC classification, never legitimate-cache status.
 
 - Align the previous MetForm synthetic cache fixture with the supported guarded-header grammar.
+
+## [0.4.0] - 2026-10-30
+
+### Fixed
+- Prevent absent database placeholders and informational session/application-password rows from falsely blocking post-recovery verification.
+- Block post-recovery success when files contain `IOC_REQUER_VALIDACAO`, fixing an inconsistent string constant.
+- Parse Akismet Apache module names containing dots, including `mod_authz_core.c`.
+- Add clean and contaminated post-recovery blocker regression tests.
+
+### Safety
+- Recovery remains experimental and requires disposable-environment acceptance tests for file ownership, upload carry-over and exact-version official synchronization before production use.
