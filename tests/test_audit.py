@@ -303,7 +303,7 @@ $table_prefix = 'wp_';
             index = json.loads((case / "evidence-index.json").read_text())
             self.assertEqual(index["database"][0]["id"], "DB-001")
             self.assertEqual(index["database"][0]["table"], "wp_options")
-            self.assertIn("## Executive summary", (case / "report.md").read_text())
+            self.assertIn("Management Summary", (case / "report.md").read_text())
 
     def test_compare_cases_reports_added_removed_and_changed(self):
         import json
