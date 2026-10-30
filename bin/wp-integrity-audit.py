@@ -379,7 +379,8 @@ def database_audit(option_file: str, dbname: str, prefix: str, case: Path,
                     "value_length_bytes": meta.get("value_length_bytes"),
                     "value_classification": classification if meta else "NOT_AVAILABLE",
                     "safe_excerpt": (prefix_value if scalar_safe else
-                                     ", ".join(safe_tokens) if safe_tokens else "[OMITTED_BY_POLICY]"),
+                                     "[OMITTED_BY_POLICY]" if kind == "historical_cache"
+                                     else ", ".join(safe_tokens) if safe_tokens else "[OMITTED_BY_POLICY]"),
                     "decoded_excerpt": "[OMITTED_BY_POLICY]",
                 })
         else:
