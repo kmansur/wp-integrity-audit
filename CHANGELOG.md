@@ -4,6 +4,15 @@ All project documentation and source commentary are in English. Versions follow 
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-30 (pre-release)
+
+### Changed
+- Combined default audit now includes database checks. Use `--files-only` to omit them explicitly.
+- Report coverage and technical conclusions distinguish historical references, active markers and unaudited areas.
+- Context-aware classification for recognized plugin guards, retaining relative paths.
+
+
+
 ### Added
 - Synthetic MySQL integration test that restores a generated SQL backup into a second isolated database and verifies WordPress fixture records.
 
