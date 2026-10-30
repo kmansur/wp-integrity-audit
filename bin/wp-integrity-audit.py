@@ -29,7 +29,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 
-VERSION = "0.4.0"
+VERSION = "0.5.0"
 IOC = re.compile(r"SC_ADV_BEGIN|--sc-cli|--sc-succ|trace-inspector-pad|cipher-feeder|_sc_fpc|sc_cron_guard|sc_persist_manifest|sc_own_manifest|function ceya")
 PATTERN_NAMES = (".sc_", ".gr_", ".gk_", ".kk_", ".wp-object-cache")
 SENSITIVE = re.compile(r"(?i)(password|passwd|secret|token|api[_-]?key)\s*[:=]\s*[^\s,;]+")
@@ -1358,6 +1358,8 @@ def main() -> int:
         compare_cases(args.compare[0], args.compare[1], output)
         print(f"Comparison created at {output}")
         return 0
+    if args.mode in ("apply-files", "apply-db", "recover"):
+        raise AuditError("Mutating modes are disabled pending verified upload, ownership and rollback safety")
     target = validate_site(args.target)
     proposed_case_root = args.case_root.resolve()
     if proposed_case_root == target or target in proposed_case_root.parents:
