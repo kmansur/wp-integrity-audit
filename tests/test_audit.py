@@ -448,6 +448,37 @@ $table_prefix = 'wp_';
             self.assertEqual(result["exit_code"], 10)
             self.assertTrue(result["optional_probe_review"])
 
+    def test_all_passive_checks_enabled_by_default(self):
+        from unittest.mock import patch
+        with patch("sys.argv", ["wp-integrity-audit.py", "/tmp/example-site"]):
+            options = audit.parse_args()
+        self.assertEqual(options.mode, "audit")
+        for flag in ("skip_db", "skip_files", "skip_config", "skip_core",
+                     "skip_host_persistence", "skip_processes", "skip_elementor"):
+            self.assertFalse(getattr(options, flag))
+
+    def test_skip_switches_are_explicit(self):
+        from unittest.mock import patch
+        with patch("sys.argv", ["wp-integrity-audit.py", "--skip-core",
+                                 "--skip-host-persistence", "--skip-db",
+                                 "/tmp/example-site"]):
+            options = audit.parse_args()
+        self.assertTrue(options.skip_core)
+        self.assertTrue(options.skip_host_persistence)
+        self.assertTrue(options.skip_db)
+
+    def test_skipped_checks_keep_clean_case_incomplete(self):
+        import json
+        with tempfile.TemporaryDirectory() as folder:
+            case = Path(folder)
+            audit.make_report(case, "audit", [], [], [], "fixture", "wp_")
+            audit.mark_incomplete_case(case, ["core", "database"])
+            doc = json.loads((case / "report.json").read_text())
+            self.assertEqual(doc["status"], "AUDITORIA_INCOMPLETA")
+            self.assertEqual(doc["exit_code"], 40)
+            self.assertEqual(doc["omitted_checks"], ["core", "database"])
+            self.assertIn("## Omitted checks", (case / "report.md").read_text())
+
     def test_secret_redaction(self):
         self.assertNotIn("example-secret", audit.redact("password=example-secret"))
         self.assertNotIn("192.168.1.20", audit.redact("192.168.1.20"))
