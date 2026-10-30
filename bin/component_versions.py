@@ -17,6 +17,17 @@ STATIC_ROOT = {"index.php", "wp-activate.php", "wp-blog-header.php", "wp-comment
                "wp-cron.php", "wp-links-opml.php", "wp-load.php", "wp-login.php", "wp-mail.php",
                "wp-settings.php", "wp-signup.php", "wp-trackback.php", "xmlrpc.php"}
 
+def file_digest(path: Path, algorithm: str = "sha256") -> str:
+    """Stream file hashes without loading entire components into memory."""
+    if path.is_symlink() or not path.is_file():
+        raise OSError("Cannot hash symlink or nonregular file")
+    digest = hashlib.new(algorithm)
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1048576), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def headers(path: Path) -> dict:
     if path.is_symlink() or not path.is_file():
         return {}
@@ -99,7 +110,7 @@ def local_components(target: Path, kind: str, active_plugins: set[str] | None = 
                   "official_version": None, "source": "declared-custom-update-uri" if custom_uri else "unknown", "state": default_state,
                   "query_status": "SKIPPED", "query_url": None,
                   "main_file": main.relative_to(target).as_posix() if main else None,
-                  "main_file_sha256": hashlib.sha256(main.read_bytes()).hexdigest() if main and main.is_file() and not main.is_symlink() else None,
+                  "main_file_sha256": file_digest(main) if main and main.is_file() and not main.is_symlink() else None,
                   "active": (None if active_plugins is None else any(p.startswith(slug + "/") for p in active_plugins)) if kind == "plugin" else (slug == stylesheet),
                   "parent_theme": parent, "child_theme": bool(parent),
                   "update_uri_present": bool(update_uri)}
@@ -168,7 +179,7 @@ def official_plugin_checksums(record: dict, target: Path) -> None:
             file = root / name
             if file.is_symlink() or not file.is_file():
                 changed.append({"path": name, "reason": "MISSING"})
-            elif hashlib.md5(file.read_bytes()).hexdigest() != expected.lower():
+            elif file_digest(file, "md5") != expected.lower():
                 changed.append({"path": name, "reason": "MODIFIED"})
         record["checksum_findings"] = changed
         record["checksum_status"] = "MODIFIED" if changed else "MATCH"
@@ -204,7 +215,7 @@ def check_core(target: Path, record: dict, offline: bool) -> None:
         path = target / relative
         if not path.is_file() or path.is_symlink():
             mismatch.append({"path": relative, "reason": "MISSING"})
-        elif hashlib.md5(path.read_bytes()).hexdigest() != expected.lower():
+        elif file_digest(path, "md5") != expected.lower():
             mismatch.append({"path": relative, "reason": "MODIFIED"})
     names = set(checksums)
     for folder in ("wp-admin", "wp-includes"):
