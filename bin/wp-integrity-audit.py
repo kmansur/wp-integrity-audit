@@ -31,7 +31,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 
-VERSION = "0.12.0"
+VERSION = "0.13.0"
 IOC = re.compile(r"SC_ADV_BEGIN|--sc-cli|--sc-succ|trace-inspector-pad|cipher-feeder|_sc_fpc|sc_cron_guard|sc_persist_manifest|sc_own_manifest|function ceya")
 PATTERN_NAMES = (".sc_", ".gr_", ".gk_", ".kk_", ".wp-object-cache")
 SCRIPT_EXTENSIONS = {".php", ".phtml", ".phar", ".inc", ".php5", ".php7", ".php8", ".pht", ".phps"}
@@ -312,7 +312,7 @@ def configuration_audit(target: Path, case: Path) -> list[dict]:
                               else "CONFIGURACAO_INVENTARIADA_SEM_INDICADOR")
             if (relative == "wp-content/plugins/akismet/.htaccess"
                     and info.st_size <= 1048576 and akismet_access_guard(content)):
-                classification = "LEGITIMO_VALIDADO"
+                classification = "CONFIGURACAO_LEGITIMA_VALIDADA"
                 indicators = []
             findings.append({
                 "indicators": indicators,
@@ -818,7 +818,7 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
         "", "## Risk overview", "",
         f"- Database risk: **{'HIGH' if summary['confirmed_family_residues'] or summary['active_database_markers'] else 'LOW — no selected database IOC' if audited else 'NOT DETERMINED'}**",
         f"- File risk: **{'REQUIRES REVIEW' if summary['file_indicators_requiring_review'] else 'LOW FOR SELECTED INDICATORS'}**",
-        f"- Core risk: **{'MEDIUM — REVIEW REQUIRED' if core_count else 'NO EXPLICIT MISMATCH DETECTED' if core.get('status') == 'COMPLETE' else 'NOT DETERMINED'}**",
+        f"- Core risk: **{'MEDIUM — REVIEW REQUIRED' if core_count else 'MEDIUM — outdated release; official checksums verified' if component_result and component_result['summary'].get('core_outdated') and component_result['coverage'].get('core') == 'EXECUTED' else 'NO EXPLICIT MISMATCH DETECTED' if component_result and component_result['coverage'].get('core') == 'EXECUTED' else 'NOT DETERMINED'}**",
         f"- External persistence risk: **{persistence_risk}**",
         "- No known indicators found does not prove absence of persistence.",
         "", "## Recommendation", "",
