@@ -188,3 +188,7 @@ WordPress Core version comparison also consults the official HTTPS version-check
 Officially listed plugins without a downloadable checksum manifest receive `PLUGIN_OFICIAL_SEM_CHECKSUM` when their installed version matches the official version. Missing manifests are not considered evidence of modification. The management report counts components flagged as premium/customized separately from unavailable API results.
 
 All component-version evidence and generated report labels are in English. Read-only component results are supplementary and require validation on a disposable full WordPress test installation prior to production acceptance.
+
+## 0.8.0 checksum hardening
+
+Component-version scanning now streams file hashes in bounded 1 MiB blocks. It does not execute WordPress code or download executable packages, and refuses symlinks while hashing. Version inventory remains pre-release until full disposable WordPress scenario testing and explicit provenance/coverage acceptance are complete.
