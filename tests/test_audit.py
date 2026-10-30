@@ -479,6 +479,37 @@ $table_prefix = 'wp_';
             self.assertEqual(doc["omitted_checks"], ["core", "database"])
             self.assertIn("## Omitted checks", (case / "report.md").read_text())
 
+    def test_core_config_host_summary_and_domain_case_id(self):
+        import json
+        import csv
+        with tempfile.TemporaryDirectory() as directory:
+            case = Path(directory) / "mbengenharia.com-20261030T220303Z-538f44"
+            case.mkdir()
+            audit.write_private(case / "core-integrity.json", json.dumps({
+                "status": "COMPLETE", "findings": [
+                    {"path": "readme.html", "classification": "CORE_AUSENTE_REQUER_REVISAO"},
+                    {"path": "wp-includes/version.php", "classification": "CORE_MODIFICADO_REQUER_REVISAO"}]}))
+            audit.write_private(case / "configuration-evidence.json", json.dumps([
+                {"path": ".htaccess", "classification": "CONFIGURACAO_REQUER_VALIDACAO", "sha256": "a" * 64}]))
+            audit.write_private(case / "host-persistence.json", json.dumps([
+                {"path": "/etc/apache2/conf.d/ordinary.conf", "classification": "INVENTARIADO_SEM_INDICADOR"},
+                {"path": "/etc/cron.d/suspect", "classification": "HOST_INDICATOR_REQUIRES_INVESTIGATION"}]))
+            audit.make_report(case, "audit", [], [], [], "fixture", "wp_")
+            doc = json.loads((case / "report.json").read_text())
+            self.assertEqual(doc["domain"], "mbengenharia.com")
+            self.assertEqual(doc["case_id"], "20261030T220303Z-538f44")
+            self.assertEqual(doc["configuration_review_count"], 1)
+            self.assertEqual(doc["core_discrepancies"], 2)
+            self.assertEqual(doc["host_persistence_indicators"], 1)
+            md = (case / "report.md").read_text()
+            self.assertIn("wp-includes/version.php", md)
+            self.assertIn("CORE_MODIFICADO_REQUER_REVISAO", md)
+            self.assertIn("| `.htaccess` |", md)
+            self.assertNotIn("ordinary.conf", md)
+            csv_rows = list(csv.reader((case / "report.csv").open()))
+            self.assertEqual(csv_rows[0][:2], ["domain", "case_id"])
+            self.assertEqual(csv_rows[1][:2], ["mbengenharia.com", "20261030T220303Z-538f44"])
+
     def test_secret_redaction(self):
         self.assertNotIn("example-secret", audit.redact("password=example-secret"))
         self.assertNotIn("192.168.1.20", audit.redact("192.168.1.20"))
