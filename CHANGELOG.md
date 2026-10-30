@@ -110,3 +110,8 @@ All project documentation and source commentary are in English. Versions follow 
 - Reject comparisons with incomplete database audits or mismatched database names; add synthetic regression tests.
 
 - Prevent comparison output directories from being created inside either source case; add regression test.
+
+### Configuration evidence inventory
+- Audit WordPress-tree `.htaccess`, `.user.ini`, `php.ini`, `web.config` and related files without executing or revealing their contents.
+- Write `configuration-evidence.json` with relative paths, byte sizes, permissions and hashes.
+- Add regression test to prevent config-content credential exposure.
