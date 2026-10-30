@@ -14,6 +14,10 @@ All project documentation and source commentary are in English. Versions follow 
 - Potentially destructive removal of entire serialized `active_plugins`/`cron` options is replaced by fail-closed manual remediation.
 - Unsafe inferred recursive uploads ownership changes are replaced by metadata-only auditing.
 - Clean source symlinks and special files are rejected before copying.
+- Quarantine and failed stage directories are moved outside the document root.
+- Post-recovery file/process/database IOC scanning blocks a clean completion status when indicators remain.
+- Password and salt rewriting refuses symlinked WordPress configuration and restricts file permissions.
+- Tests cover synthetic database backups, full-file scanning, symlink handling and salt rotation.
 - File scans read full PHP-like file content in bounded chunks, rather than checking only the first portion.
 
 ### Known limitations
