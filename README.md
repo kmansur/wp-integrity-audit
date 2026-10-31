@@ -230,3 +230,7 @@ The management `report.md` now contains an individual finding for each relevant 
 ## 0.16.0 forensic evidence and containment record
 
 Completed audits write `evidence-manifest.json`, containing SHA-256 hashes and byte sizes of ordinary private case evidence files, and `incident-containment-record.md`, an explicit operator-completion template. The tool never invents the outage timeline, containment authorization or an attacker's identity. A local hash manifest alone is not a tamper-proof or independently attested chain of custody; secure external retention and signed provenance remain necessary for legal/forensic-grade evidence.
+
+## 0.17.0 optional customer PDF
+
+Use `--pdf-report` to generate `management-report.pdf` from the customer-facing `report.md`. Optional dependency: `python3 -m pip install reportlab` in an isolated environment. PDF generation uses no network requests, does not ingest `technical-report.md`, escapes report content before paragraph rendering and restricts generated PDF permissions to owner-only. Without `reportlab`, the CLI fails with an explicit error instead of silently substituting another document. Do not publish the technical case directory.
