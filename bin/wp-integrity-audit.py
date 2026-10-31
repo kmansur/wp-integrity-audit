@@ -450,8 +450,6 @@ def host_persistence_inventory(case: Path, roots: list[Path]) -> list[dict]:
                                  "mode": oct(stat.S_IMODE(info.st_mode)),
                                  "sha256": sha256(file), "source": "host_metadata",
                                  "classification": ("HOST_INDICATOR_REQUIRES_INVESTIGATION" if indicator
-                                                    else "COMPONENTE_DE_SEGURANCA_CONHECIDO"
-                                                    if "bitninja" in str(file).lower()
                                                     else "INVENTARIADO_SEM_INDICADOR")})
             except OSError:
                 continue
