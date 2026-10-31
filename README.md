@@ -226,3 +226,7 @@ The component detail report includes manual review guidance for plugins absent f
 ## 0.15.0 customer-facing evidence narrative
 
 The management `report.md` now contains an individual finding for each relevant database indicator, file/configuration review and Core/plugin/theme component requiring action. Each finding explains its meaning, recorded state and available SHA-256 evidence without publishing database values, credentials or technical commands. The separate technical report remains restricted. The management report does **not** automatically certify an outage justification or identify an attacker: the service interruption decision must be supported by its own contemporaneous authorization and incident-response record.
+
+## 0.16.0 forensic evidence and containment record
+
+Completed audits write `evidence-manifest.json`, containing SHA-256 hashes and byte sizes of ordinary private case evidence files, and `incident-containment-record.md`, an explicit operator-completion template. The tool never invents the outage timeline, containment authorization or an attacker's identity. A local hash manifest alone is not a tamper-proof or independently attested chain of custody; secure external retention and signed provenance remain necessary for legal/forensic-grade evidence.
