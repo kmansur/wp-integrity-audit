@@ -238,3 +238,7 @@ Use `--pdf-report` to generate `management-report.pdf` from the customer-facing 
 ## 0.18.0 administrator metadata inventory
 
 A normal read-only audit additionally creates `administrator-inventory.json`, listing administrator role candidates as account IDs, SHA-256 pseudonyms and registration dates. Real login names are not exported. `UNAVAILABLE` is recorded if the SQL query cannot run; this is not mistaken for zero administrators. This is an inventory heuristic, not evidence that any user is malicious. Multisite roles and super administrators require further validation.
+
+## 0.19.0 evidence verification and restricted packaging
+
+Use `python3 bin/wp-integrity-audit.py --verify-case /path/to/case` to recompute file SHA-256 and detect missing/modified or unlisted post-capture files (0 for match; 40 for differences). Use `--bundle-evidence` during an audit to create an owner-only `evidence-bundle.tar.gz` plus `evidence-bundle.sha256`; the restricted archive includes internal technical details and **must not be given directly to a customer**. The management report and optional management PDF remain the appropriate customer deliverables. A hash manifest is not independent timestamping, authentication or a cryptographic signature.
