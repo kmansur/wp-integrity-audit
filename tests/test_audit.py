@@ -1030,6 +1030,59 @@ $table_prefix = 'wp_';
             self.assertEqual(result["coverage"], "UNAVAILABLE")
             self.assertIsNone(result["count"])
 
+    def test_case_manifest_verification_and_tampering(self):
+        with tempfile.TemporaryDirectory() as folder:
+            case = Path(folder)
+            file = case / "report.md"
+            file.write_text("Evidence at capture")
+            audit.create_evidence_manifest(case)
+            self.assertEqual(audit.verify_evidence_manifest(case)["status"], "MATCH")
+            file.write_text("Modified evidence")
+            result = audit.verify_evidence_manifest(case)
+            self.assertEqual(result["status"], "DIFFERENCES_FOUND")
+            self.assertEqual(result["differences"][0]["result"], "MODIFIED")
+
+    def test_private_evidence_bundle_contains_manifest(self):
+        import tarfile
+        with tempfile.TemporaryDirectory() as folder:
+            case = Path(folder)
+            (case / "report.md").write_text("Public summary")
+            (case / "technical-report.md").write_text("Internal notes")
+            audit.create_evidence_manifest(case)
+            archive = audit.bundle_case_evidence(case)
+            self.assertEqual(archive.stat().st_mode & 0o777, 0o600)
+            with tarfile.open(archive, "r:gz") as stream:
+                self.assertIn("evidence-manifest.json", stream.getnames())
+                self.assertIn("technical-report.md", stream.getnames())
+                self.assertNotIn("evidence-bundle.tar.gz", stream.getnames())
+            self.assertEqual(audit.verify_evidence_manifest(case)["status"], "MATCH")
+
+    def test_bundle_rejects_database_secret_file(self):
+        with tempfile.TemporaryDirectory() as folder:
+            case = Path(folder)
+            (case / "mysql-client.cnf").write_text("password=redacted")
+            audit.create_evidence_manifest(case)
+            with self.assertRaises(audit.AuditError):
+                audit.bundle_case_evidence(case)
+
+    def test_status_precedence_residue_remains_primary(self):
+        import json
+        with tempfile.TemporaryDirectory() as folder:
+            case = Path(folder) / "example-20261030T000000Z-abcdef"
+            case.mkdir()
+            (case / "component-version-evidence.json").write_text(json.dumps({
+                "coverage": {"local": "EXECUTED", "official": "EXECUTED", "core": "EXECUTED"},
+                "summary": {"core_outdated": 1},
+                "components": [{"state": "CORE_MODIFICADO_REQUER_REVISAO"}]
+            }))
+            db = [{"kind": "family_option", "name": "sc_test", "length": "1",
+                   "state": "RESIDUO_FAMILIA_REQUER_LIMPEZA"}]
+            audit.make_report(case, "audit", [], [], db)
+            report = json.loads((case / "report.json").read_text())
+            self.assertEqual(report["exit_code"], 10)
+            self.assertEqual(report["status"], "RESIDUOS_REQUEREM_LIMPEZA")
+            self.assertTrue(report["summary"]["critical_component_review"])
+
     def test_secret_redaction(self):
         self.assertNotIn("example-secret", audit.redact("password=example-secret"))
         self.assertNotIn("192.168.1.20", audit.redact("192.168.1.20"))
