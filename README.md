@@ -246,3 +246,5 @@ Use `python3 bin/wp-integrity-audit.py --verify-case /path/to/case` to recompute
 The existing `--compare OLD_CASE NEW_CASE` flow also compares Core/plugin/theme component state when both cases have component evidence. Management findings display a calibrated review-priority description; these labels indicate triage urgency, not independent proof of active malware or attribution.
 
 Evidence archive creation performs a sensitive-file preflight before writing, then atomically renames the private completed archive. A failed preflight does not intentionally leave a partial bundle.
+
+The host persistence inventory includes additional Debian/Ubuntu cron, login-profile, preload and sudoers configuration paths. It hashes metadata without printing secret file contents. A filename containing a known security product's name is not sufficient to confer a trusted classification.
