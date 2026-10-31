@@ -25,6 +25,9 @@ O arquivo de configuração e o arquivo separado com a senha SMTP devem permanec
 
 ## Relatórios em português
 
+A versão 0.21.10 também apresenta em português o registro de contenção do incidente. Esse registro não representa autorização de retirada do site do ar nem comprovação de indisponibilidade; exige preenchimento documental pelo responsável.
+
+
 Na versão 0.21.9, o teste opcional do PDF verifica também a extração dos acentos e a paginação quando o pacote `PyMuPDF` (`fitz`) estiver disponível. A verificação isolada do mecanismo de PDF não substitui a auditoria de integração nem a inspeção visual de um relatório real. A ferramenta permanece em pré-lançamento.
 
 
