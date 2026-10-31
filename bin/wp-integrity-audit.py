@@ -21,6 +21,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import component_versions
 import report_export
+import mail_delivery
 import re
 import secrets
 import shutil
@@ -32,7 +33,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 
-VERSION = "0.20.0"
+VERSION = "0.21.0"
 IOC = re.compile(r"SC_ADV_BEGIN|--sc-cli|--sc-succ|trace-inspector-pad|cipher-feeder|_sc_fpc|sc_cron_guard|sc_persist_manifest|sc_own_manifest|function ceya")
 PATTERN_NAMES = (".sc_", ".gr_", ".gk_", ".kk_", ".wp-object-cache")
 SCRIPT_EXTENSIONS = {".php", ".phtml", ".phar", ".inc", ".php5", ".php7", ".php8", ".pht", ".phps"}
@@ -1674,6 +1675,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--offline", action="store_true", help="Disable external WordPress.org consultations")
     parser.add_argument("--bundle-evidence", action="store_true", help="Create private forensic evidence tarball (sensitive)")
     parser.add_argument("--verify-case", type=Path, help="Verify a collected case manifest without scanning WordPress")
+    parser.add_argument("--email-to", help="Email the management PDF to this explicit recipient")
+    parser.add_argument("--smtp-config", type=Path, help="Private external SMTP .cfg path")
     parser.add_argument("--pdf-report", action="store_true", help="Export the management report as PDF (optional reportlab dependency)")
     parser.add_argument("--show-report", action="store_true", help="Print management report on a terminal")
     parser.add_argument("--no-show-report", action="store_true", help="Never print management report")
@@ -1700,6 +1703,10 @@ def parse_args() -> argparse.Namespace:
         if args.target is not None or args.mode != "audit" or args.skip_db or args.source or args.core_source or args.skip_core or args.skip_host_persistence or args.skip_files or args.skip_config or args.skip_processes or args.skip_elementor or args.skip_version_check or args.offline or args.official_compare:
             parser.error("--compare cannot be combined with a target or audit/recovery options")
         return args
+    if bool(args.email_to) != bool(args.smtp_config):
+        parser.error("--email-to and --smtp-config must be used together")
+    if args.email_to and (args.compare or args.verify_case or args.mode != "audit"):
+        parser.error("Email delivery requires a normal read-only audit")
     if args.compare_output:
         parser.error("--compare-output requires --compare")
     if args.target is None:
@@ -1788,8 +1795,10 @@ def main() -> int:
             component_versions.append_management_section(case)
             mark_incomplete_case(case, omitted)
             incident_containment_note(case, label)
-            if args.pdf_report:
+            if args.pdf_report or args.email_to:
                 report_export.export_management_pdf(case)
+            if args.email_to:
+                mail_delivery.send_management_report(case, args.email_to, args.smtp_config)
             create_evidence_manifest(case)
             if args.bundle_evidence:
                 bundle_case_evidence(case)
@@ -1820,8 +1829,10 @@ def main() -> int:
                     mark_incomplete_case(case, omitted)
                 if is_audit:
                     incident_containment_note(case, label)
-                    if args.pdf_report:
+                    if args.pdf_report or args.email_to:
                         report_export.export_management_pdf(case)
+                    if args.email_to:
+                        mail_delivery.send_management_report(case, args.email_to, args.smtp_config)
                     create_evidence_manifest(case)
                     if args.bundle_evidence:
                         bundle_case_evidence(case)
@@ -1911,6 +1922,6 @@ def main() -> int:
 if __name__ == "__main__":
     try:
         sys.exit(main())
-    except (AuditError, report_export.PDFExportError, OSError, subprocess.CalledProcessError, ValueError, EOFError) as error:
+    except (AuditError, report_export.PDFExportError, mail_delivery.MailDeliveryError, OSError, subprocess.CalledProcessError, ValueError, EOFError) as error:
         print(f"ERROR: {redact(error)}", file=sys.stderr)
         sys.exit(30)
