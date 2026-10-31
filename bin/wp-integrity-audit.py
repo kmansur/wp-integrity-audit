@@ -33,7 +33,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 
-VERSION = "0.21.4"
+VERSION = "0.21.5"
 IOC = re.compile(r"SC_ADV_BEGIN|--sc-cli|--sc-succ|trace-inspector-pad|cipher-feeder|_sc_fpc|sc_cron_guard|sc_persist_manifest|sc_own_manifest|function ceya")
 PATTERN_NAMES = (".sc_", ".gr_", ".gk_", ".kk_", ".wp-object-cache")
 SCRIPT_EXTENSIONS = {".php", ".phtml", ".phar", ".inc", ".php5", ".php7", ".php8", ".pht", ".phps"}
@@ -597,6 +597,22 @@ def supplementary_evidence(case: Path) -> tuple[dict, list, list]:
     return core, configs, host
 
 
+def traduzir_estado(valor: object) -> str:
+    """Traduz somente a apresentação, preservando códigos e contratos JSON."""
+    estados = {
+        "NOT DETERMINED": "NÃO DETERMINADO",
+        "REVIEW REQUIRED": "REVISÃO NECESSÁRIA",
+        "LOW — no known indicators found": "BAIXO — nenhum indicador conhecido encontrado",
+        "EXECUTED": "EXECUTADA",
+        "NOT EXECUTED": "NÃO EXECUTADA",
+        "COMPLETE": "CONCLUÍDA",
+        "INCOMPLETE": "INCOMPLETA",
+        "SKIPPED": "IGNORADA",
+        "UNAVAILABLE": "INDISPONÍVEL",
+    }
+    return estados.get(str(valor), str(valor))
+
+
 def customer_findings(files, database, configs, components):
     """Provide a redacted item-by-item explanation suitable for a customer."""
     lines = ["", "## Achados detalhados e evidências correspondentes", "",
@@ -607,24 +623,24 @@ def customer_findings(files, database, configs, components):
         if entry.get("state") in ("ABSENT", "NOT_FOUND") or entry.get("kind") in ("session_rows", "application_password_rows"):
             continue
         kind = entry.get("kind")
-        description = ("Historical incident reference; not proof of active code execution."
+        description = ("Referência histórica ao incidente, sem comprovação de execução ativa de código."
                        if kind == "historical_cache" else
-                       "Database residue matching an incident-related pattern; verify before remediation."
+                       "Resíduo no banco de dados compatível com um padrão do incidente; valide antes de qualquer correção."
                        if kind == "family_option" else
-                       "An incident-related database indicator needs investigation.")
-        items.append((entry.get("evidence_id", "DB-UNASSIGNED"), "Database", entry.get("name"),
+                       "Indicador relacionado ao incidente no banco de dados que exige investigação.")
+        items.append((entry.get("evidence_id", "DB-UNASSIGNED"), "Banco de dados", entry.get("name"),
                       entry.get("state"), description, entry.get("sha256")))
     for entry in files:
         if entry.get("classification") != "LEGITIMO_VALIDADO":
-            items.append((entry.get("evidence_id", "FILE-UNASSIGNED"), "Files",
+            items.append((entry.get("evidence_id", "FILE-UNASSIGNED"), "Arquivos",
                           sanitize_relative_path(entry.get("path", "")), entry.get("classification"),
-                          "Static file indicator requiring review; detection does not prove execution.",
+                          "Indicador estático em arquivo que exige revisão; a detecção não comprova execução.",
                           entry.get("sha256")))
     for entry in configs:
         if entry.get("classification") in ("CONFIGURACAO_REQUER_VALIDACAO", "CONFIGURACAO_PLUGIN_SEGURANCA_REQUER_VALIDACAO"):
-            items.append((entry.get("evidence_id", "CONFIG-UNASSIGNED"), "Configuration",
+            items.append((entry.get("evidence_id", "CONFIG-UNASSIGNED"), "Configuração",
                           sanitize_relative_path(entry.get("path", "")), entry.get("classification"),
-                          "Configuration directive requires confirmation of its business purpose and authorization.",
+                          "Diretiva de configuração cuja finalidade e autorização precisam ser confirmadas.",
                           entry.get("sha256")))
     for entry in (components or {}).get("components", []):
         state = entry.get("state")
@@ -633,34 +649,34 @@ def customer_findings(files, database, configs, components):
                      "CORE_MODIFICADO_REQUER_REVISAO", "CORE_AUSENTE_REQUER_REVISAO",
                      "PLUGIN_COM_ARQUIVOS_MODIFICADOS", "TEMA_COM_ARQUIVOS_MODIFICADOS",
                      "PLUGIN_OFICIAL_DESATUALIZADO", "TEMA_OFICIAL_DESATUALIZADO"):
-            explanation = ("Version update available; this is not itself evidence of compromise."
+            explanation = ("Atualização disponível; a versão desatualizada não comprova comprometimento."
                            if state.endswith("DESATUALIZADO") else
-                           "Official origin is unconfirmed. Verify vendor, license, package and hash; this is not malware proof."
+                           "Origem oficial não confirmada. Verifique fornecedor, licença, pacote e hash; isso não comprova malware."
                            if state in ("PLUGIN_ORIGEM_NAO_CONFIRMADA_REQUER_REVISAO", "TEMA_NAO_ENCONTRADO_NO_REPOSITORIO") else
-                           "Installed version could not be read; confirm the installed package manually."
+                           "Não foi possível identificar a versão instalada; verifique o pacote manualmente."
                            if state == "PLUGIN_VERSAO_NAO_IDENTIFICADA" else
-                           "An integrity difference requires comparison with a trusted release.")
-            items.append((entry.get("component_id", "COMPONENT-UNASSIGNED"), "Component",
+                           "Uma divergência de integridade exige comparação com uma versão confiável.")
+            items.append((entry.get("component_id", "COMPONENT-UNASSIGNED"), "Componente",
                           entry.get("slug"), state, explanation, entry.get("main_file_sha256")))
     for identifier, kind, subject, state, explanation, digest in items:
-        risk = ("HIGH PRIORITY - residual incident indicator" if state == "RESIDUO_FAMILIA_REQUER_LIMPEZA" else
-                "MEDIUM - executable or integrity finding requires validation" if kind in ("Files", "Configuration") or state in ("CORE_MODIFICADO_REQUER_REVISAO", "PLUGIN_COM_ARQUIVOS_MODIFICADOS") else
-                "MEDIUM - component hygiene or origin review" if kind == "Component" else
-                "CONTEXT DEPENDENT - historical or unconfirmed indicator")
+        risk = ("PRIORIDADE ALTA — indicador residual do incidente" if state == "RESIDUO_FAMILIA_REQUER_LIMPEZA" else
+                "MÉDIA — item executável ou divergência de integridade que exige validação" if kind in ("Arquivos", "Configuration") or state in ("CORE_MODIFICADO_REQUER_REVISAO", "PLUGIN_COM_ARQUIVOS_MODIFICADOS") else
+                "MÉDIA — origem ou manutenção do componente exige revisão" if kind == "Componente" else
+                "DEPENDENTE DO CONTEXTO — indicador histórico ou não confirmado")
         clean = lambda value: str(value or "não disponível").replace("\r", " ").replace("\n", " ")[:250]
         lines.extend(["### " + clean(identifier) + " - " + clean(kind), "",
                       "- Item: " + clean(subject),
-                      "- Classification: " + clean(state),
-                      "- Explanation: " + explanation,
-                      "- Review priority: " + risk + " (not proof of active compromise)",
-                      "- Evidence SHA-256: " + clean(digest),
-                      "- Verification: Review the referenced evidence with the responsible technical team.", ""])
+                      "- Classificação: " + clean(state),
+                      "- Explicação: " + explanation,
+                      "- Prioridade de revisão: " + risk + " (não comprova comprometimento ativo)",
+                      "- SHA-256 da evidência: " + clean(digest),
+                      "- Verificação: revise a evidência indicada com a equipe técnica responsável.", ""])
     if not items:
-        lines.extend(["No individual review findings were recorded by the selected checks.", ""])
+        lines.extend(["Nenhuma ocorrência individual que exija revisão foi registrada nas verificações selecionadas.", ""])
     lines.extend(["## Sobre a indisponibilidade do site", "",
-                  "This report records observed security indicators. It does not establish who caused the incident or independently verify the time and cause of any outage.",
-                  "Taking a website offline is a separate containment decision requiring documented justification, proportionality and authorization.",
-                  "Detailed infrastructure evidence remains in the restricted technical report.", ""])
+                  "Este relatório registra indicadores de segurança observados. Não identifica o responsável pelo incidente nem comprova, isoladamente, a data e a causa de eventual indisponibilidade.",
+                  "Retirar o site do ar é uma decisão de contenção independente, que exige justificativa, proporcionalidade e autorização documentadas.",
+                  "As evidências detalhadas da infraestrutura estão preservadas no relatório técnico de acesso restrito.", ""])
     return lines
 
 
@@ -777,8 +793,8 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
     host_known = sum(x.get("classification") == "COMPONENTE_DE_SEGURANCA_CONHECIDO" for x in host_records)
     host_unclassified = len(host_records) - host_indicators - host_review - host_known
     host_legitimate = host_known + host_unclassified
-    persistence_risk = ("NÃO DETERMINADO" if not (case / "host-persistence.json").is_file()
-                        else "REVISÃO NECESSÁRIA" if host_indicators or host_review
+    persistence_risk = ("NOT DETERMINED" if not (case / "host-persistence.json").is_file()
+                        else "REVIEW REQUIRED" if host_indicators or host_review
                         else "LOW — no known indicators found")
     summary["host_known_security_components"] = host_known
     summary["host_unclassified_inventory"] = host_unclassified
@@ -995,14 +1011,14 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
     lines.extend(["", "## Recomendação para reativação", "",
                   "**LIBERAÇÃO NÃO RECOMENDADA**",
                   "An audit alone does not authorize reopening. A qualified operator must validate remediation, "
-                  "evidence completeness, persistence checks and backups before approving release.", ""])
+                  "a integridade das evidências, as verificações de persistência e os backups antes de autorizar a liberação.", ""])
     lines.extend(["", "## Legenda das classificações", "",
-                  "- `RESIDUO_FAMILIA_REQUER_LIMPEZA`: family-specific database residue.",
-                  "- `HISTORICAL_REFERENCE`: historic cache reference, not proof of execution.",
-                  "- `LEGITIMO_VALIDADO`: recognized plugin guard pattern, not cryptographic verification.",
-                  "- `CONFIGURACAO_PLUGIN_SEGURANCA_REQUER_VALIDACAO`: security plugin configuration needs contextual analysis.",
-                  "- `PRESENT`: informational record exists.",
-                  "- `NOT_FOUND`: check ran with no matching records.",
+                  "- `RESIDUO_FAMILIA_REQUER_LIMPEZA`: resíduo de uma família de indicadores de incidente no banco de dados.",
+                  "- `HISTORICAL_REFERENCE`: referência histórica em cache, sem comprovação de execução.",
+                  "- `LEGITIMO_VALIDADO`: padrão reconhecido de proteção de plugin, sem validação criptográfica.",
+                  "- `CONFIGURACAO_PLUGIN_SEGURANCA_REQUER_VALIDACAO`: configuração de segurança que exige análise contextual.",
+                  "- `PRESENT`: registro informativo presente.",
+                  "- `NOT_FOUND`: verificação executada sem registros correspondentes.",
                   "", "## Limitações", "",
                   "A classificação de arquivos de proteção de plugins utiliza padrões conhecidos e não comprova a integridade dos pacotes.",
                   "A ausência de achados não comprova que o site esteja seguro. Revise as evidências antes de compartilhar os relatórios."])
@@ -1019,7 +1035,7 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
         f"- Indicadores ativos no banco de dados: **{summary['active_database_markers']}**",
         f"- Processos suspeitos: **{summary['suspicious_processes']}**",
         f"- Divergências do núcleo do WordPress que exigem revisão: **{core_count}**",
-        f"- Inventário de administradores: **{summary['administrator_inventory']['coverage']}** (quantidade: {summary['administrator_inventory']['count'] if summary['administrator_inventory']['count'] is not None else 'não determinada'})",
+        f"- Inventário de administradores: **{traduzir_estado(summary['administrator_inventory']['coverage'])}** (quantidade: {summary['administrator_inventory']['count'] if summary['administrator_inventory']['count'] is not None else 'não determinada'})",
         f"- Arquivos de configuração do WordPress que exigem revisão: **{config_count}**",
         f"- Indicadores de persistência externa: **{host_indicators}**",
         f"- Registros do servidor que exigem revisão: **{host_review}**",
@@ -1027,14 +1043,14 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
         f"- Risco do banco de dados: **{'ALTO' if summary['confirmed_family_residues'] or summary['active_database_markers'] else 'BAIXO — nenhum indicador pesquisado encontrado no banco de dados' if audited else 'NÃO DETERMINADO'}**",
         f"- Risco dos arquivos: **{'REVISÃO NECESSÁRIA' if summary['file_indicators_requiring_review'] else 'BAIXO PARA OS INDICADORES PESQUISADOS'}**",
         f"- Risco do núcleo do WordPress: **{'MÉDIO — REVISÃO NECESSÁRIA' if core_count else 'MÉDIO — versão desatualizada; somas de verificação oficiais validadas' if component_result and component_result['summary'].get('core_outdated') and component_result['coverage'].get('core') == 'EXECUTED' else 'NENHUMA DIVERGÊNCIA EXPLÍCITA IDENTIFICADA' if component_result and component_result['coverage'].get('core') == 'EXECUTED' else 'NÃO DETERMINADO'}**",
-        f"- Risco de persistência externa: **{persistence_risk}**",
+        f"- Risco de persistência externa: **{traduzir_estado(persistence_risk)}**",
         "- A ausência de indicadores conhecidos não comprova ausência de persistência.",
         "", "## Recomendação", "",
         "**REATIVAÇÃO DEPENDE DE REVISÃO TÉCNICA**" if exit_code else "**SEM INDICADORES EXPLÍCITOS; REATIVAÇÃO AINDA EXIGE APROVAÇÃO TÉCNICA**",
         "Resolva as pendências identificadas e valide a segurança do ambiente antes da reativação." if exit_code else "Não foram encontrados os indicadores pesquisados; isso não garante que o site esteja livre de comprometimento.",
         "", "## Abrangência da auditoria", "",
         f"- Auditoria do banco de dados: {'EXECUTADA' if audited else 'NÃO EXECUTADA'}",
-        f"- Verificação do núcleo: {summary['component_coverage'].get('core', core.get('status', 'NOT EXECUTED'))}",
+        f"- Verificação do núcleo: {traduzir_estado(summary['component_coverage'].get('core', core.get('status', 'NOT EXECUTED')))}",
         f"- Cópia SQL do banco de dados: {'REALIZADA' if (case / 'database-before.sql').is_file() else 'NÃO REALIZADA'}",
         f"- Cópia dos arquivos do site: {'REALIZADA' if (case / 'site-before.tar.gz').is_file() else 'NÃO REALIZADA'}",
         "", "As evidências detalhadas da infraestrutura estão preservadas no relatório técnico interno.", "",
