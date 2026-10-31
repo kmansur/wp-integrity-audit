@@ -675,6 +675,60 @@ def create_evidence_manifest(case: Path) -> dict:
     return result
 
 
+def verify_evidence_manifest(case: Path) -> dict:
+    """Check case contents against recorded SHA-256 without modifying case files."""
+    if case.is_symlink() or not case.is_dir():
+        raise AuditError("Case directory is missing or symlinked")
+    manifest = case / "evidence-manifest.json"
+    if manifest.is_symlink() or not manifest.is_file():
+        raise AuditError("Case evidence manifest is unavailable")
+    source = json.loads(manifest.read_text(encoding="utf-8"))
+    if source.get("algorithm") != "SHA-256" or not isinstance(source.get("files"), list):
+        raise AuditError("Unsupported evidence manifest")
+    differences = []
+    expected_files = set()
+    for entry in source["files"]:
+        relative = entry.get("file")
+        if not isinstance(relative, str) or not relative or Path(relative).is_absolute() or ".." in Path(relative).parts:
+            raise AuditError("Unsafe evidence manifest path")
+        if relative in expected_files:
+            raise AuditError("Duplicate evidence manifest path")
+        expected_files.add(relative)
+        path = case / relative
+        if path.is_symlink() or not path.is_file():
+            differences.append({"file": relative, "result": "MISSING_OR_LINKED"})
+        elif path.stat().st_size != entry.get("size_bytes") or sha256(path) != entry.get("sha256"):
+            differences.append({"file": relative, "result": "MODIFIED"})
+    excluded = {"evidence-manifest.json", "evidence-bundle.tar.gz", "evidence-bundle.sha256"}
+    current = {path.relative_to(case).as_posix() for path in case.rglob("*")
+               if path.is_file() and not path.is_symlink() and path.relative_to(case).as_posix() not in excluded}
+    for extra in sorted(current - expected_files):
+        differences.append({"file": extra, "result": "UNLISTED_AFTER_CAPTURE"})
+    return {"status": "MATCH" if not differences else "DIFFERENCES_FOUND",
+            "checked": len(expected_files), "differences": differences,
+            "limitations": "A matching local manifest does not authenticate the collector or independently prove the time of collection."}
+
+
+def bundle_case_evidence(case: Path) -> Path:
+    """Package restricted case evidence only on explicit operator request."""
+    archive = case / "evidence-bundle.tar.gz"
+    if archive.exists() or archive.is_symlink():
+        raise AuditError("Refusing to overwrite an existing evidence bundle")
+    if not (case / "evidence-manifest.json").is_file():
+        raise AuditError("Evidence manifest must exist before packaging")
+    with tarfile.open(archive, "w:gz") as output:
+        for path in sorted(case.rglob("*")):
+            if path.is_symlink() or not path.is_file() or path == archive:
+                continue
+            if path.name == "mysql-client.cnf":
+                raise AuditError("Refusing to package a database credential file")
+            output.add(path, arcname=path.relative_to(case).as_posix(), recursive=False)
+    archive.chmod(0o600)
+    digest_path = case / "evidence-bundle.sha256"
+    write_private(digest_path, sha256(archive) + "  evidence-bundle.tar.gz\n")
+    return archive
+
+
 def incident_containment_note(case: Path, domain: str) -> None:
     """Do not fabricate an incident timeline or outage authorization."""
     content = ("# Incident containment record (operator completion required)\n\n"
@@ -1575,6 +1629,8 @@ def parse_args() -> argparse.Namespace:
     # Mutating operations always require separate explicit mode and confirmation.
     parser.add_argument("--skip-version-check", action="store_true", help="Disable Core, plugin and theme version checks")
     parser.add_argument("--offline", action="store_true", help="Disable external WordPress.org consultations")
+    parser.add_argument("--bundle-evidence", action="store_true", help="Create private forensic evidence tarball (sensitive)")
+    parser.add_argument("--verify-case", type=Path, help="Verify a collected case manifest without scanning WordPress")
     parser.add_argument("--pdf-report", action="store_true", help="Export the management report as PDF (optional reportlab dependency)")
     parser.add_argument("--show-report", action="store_true", help="Print management report on a terminal")
     parser.add_argument("--no-show-report", action="store_true", help="Never print management report")
@@ -1593,6 +1649,10 @@ def parse_args() -> argparse.Namespace:
                         help="Private output directory for comparison findings")
     parser.add_argument("--version", action="version", version=VERSION)
     args = parser.parse_args()
+    if args.verify_case:
+        if args.target is not None or args.compare or args.mode != "audit" or args.bundle_evidence or args.pdf_report:
+            parser.error("--verify-case must be used alone without a target or report options")
+        return args
     if args.compare:
         if args.target is not None or args.mode != "audit" or args.skip_db or args.source or args.core_source or args.skip_core or args.skip_host_persistence or args.skip_files or args.skip_config or args.skip_processes or args.skip_elementor or args.skip_version_check or args.offline or args.official_compare:
             parser.error("--compare cannot be combined with a target or audit/recovery options")
@@ -1633,6 +1693,10 @@ def main() -> int:
     # Protect backup and report files from their first byte of creation.
     os.umask(0o077)
     args = parse_args()
+    if args.verify_case:
+        verdict = verify_evidence_manifest(args.verify_case)
+        print(json.dumps(verdict, indent=2))
+        return 0 if verdict["status"] == "MATCH" else 40
     if args.compare:
         output = args.compare_output or (Path.cwd() / "wp-audit-comparison")
         compare_cases(args.compare[0], args.compare[1], output)
@@ -1682,6 +1746,8 @@ def main() -> int:
             if args.pdf_report:
                 report_export.export_management_pdf(case)
             create_evidence_manifest(case)
+            if args.bundle_evidence:
+                bundle_case_evidence(case)
             print("Audit complete; database NOT EXECUTED")
             present_management_report(case, show=args.show_report, no_show=args.no_show_report)
             return 40
@@ -1712,6 +1778,8 @@ def main() -> int:
                     if args.pdf_report:
                         report_export.export_management_pdf(case)
                     create_evidence_manifest(case)
+                    if args.bundle_evidence:
+                        bundle_case_evidence(case)
                 with (case / "report.json").open(encoding="utf-8") as stream:
                     outcome = json.load(stream)
                 print("Audit complete: status=" + outcome["status"] + "; exit=" + str(outcome["exit_code"]))
