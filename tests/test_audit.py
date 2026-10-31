@@ -1011,8 +1011,8 @@ $table_prefix = 'wp_';
             case = Path(folder)
             audit.incident_containment_note(case, "example.test")
             content = (case / "incident-containment-record.md").read_text()
-            self.assertIn("NOT VERIFIED BY THIS AUDIT", content)
-            self.assertIn("NOT DOCUMENTED", content)
+            self.assertIn("NÃO VERIFICADO NESTA AUDITORIA", content)
+            self.assertIn("NÃO DOCUMENTAD", content)
             self.assertIn("example.test", content)
 
     def test_pdf_export_only_reads_management_report(self):
