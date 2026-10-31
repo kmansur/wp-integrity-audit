@@ -157,3 +157,7 @@ The CLI prints the management-report path after audits. A TTY displays `report.m
 ## Customer-facing incident evidence (0.15.0)
 
 Review the management report before giving it to the customer. Each case item has an evidence identifier and a plain-English interpretation. Cross-reference the private evidence files for underlying material, and do not copy raw SQL values, credentials, or infrastructure details into the customer copy. Clearly distinguish forensic observations, historical residues and unverified component provenance from confirmed compromise. If website isolation was performed, attach the separately maintained containment decision, timestamp, decision owner, scope and justification; the audit alone cannot prove these facts.
+
+## Case evidence manifest and containment documentation
+
+Keep the generated case outside the WordPress document root, retain restricted permissions and copy the manifest and evidence to independent immutable storage under documented custody. The manifest excludes symlinked files and itself and provides per-file SHA-256 checksums. Record the operator, timestamp, legal authorization, scope and business impact in a separately approved containment record. Never substitute an automatically generated report for an actual outage decision or claim that hashes prove who made changes.
