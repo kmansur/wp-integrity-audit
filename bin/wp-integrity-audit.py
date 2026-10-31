@@ -20,6 +20,7 @@ from pathlib import Path
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import component_versions
+import report_export
 import re
 import secrets
 import shutil
@@ -31,7 +32,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 
-VERSION = "0.16.0"
+VERSION = "0.17.0"
 IOC = re.compile(r"SC_ADV_BEGIN|--sc-cli|--sc-succ|trace-inspector-pad|cipher-feeder|_sc_fpc|sc_cron_guard|sc_persist_manifest|sc_own_manifest|function ceya")
 PATTERN_NAMES = (".sc_", ".gr_", ".gk_", ".kk_", ".wp-object-cache")
 SCRIPT_EXTENSIONS = {".php", ".phtml", ".phar", ".inc", ".php5", ".php7", ".php8", ".pht", ".phps"}
@@ -1536,6 +1537,7 @@ def parse_args() -> argparse.Namespace:
     # Mutating operations always require separate explicit mode and confirmation.
     parser.add_argument("--skip-version-check", action="store_true", help="Disable Core, plugin and theme version checks")
     parser.add_argument("--offline", action="store_true", help="Disable external WordPress.org consultations")
+    parser.add_argument("--pdf-report", action="store_true", help="Export the management report as PDF (optional reportlab dependency)")
     parser.add_argument("--show-report", action="store_true", help="Print management report on a terminal")
     parser.add_argument("--no-show-report", action="store_true", help="Never print management report")
     parser.add_argument("--official-compare", action="store_true", help="Explicitly enable official comparison")
@@ -1639,6 +1641,8 @@ def main() -> int:
             component_versions.append_management_section(case)
             mark_incomplete_case(case, omitted)
             incident_containment_note(case, label)
+            if args.pdf_report:
+                report_export.export_management_pdf(case)
             create_evidence_manifest(case)
             print("Audit complete; database NOT EXECUTED")
             present_management_report(case, show=args.show_report, no_show=args.no_show_report)
@@ -1666,6 +1670,8 @@ def main() -> int:
                     mark_incomplete_case(case, omitted)
                 if is_audit:
                     incident_containment_note(case, label)
+                    if args.pdf_report:
+                        report_export.export_management_pdf(case)
                     create_evidence_manifest(case)
                 with (case / "report.json").open(encoding="utf-8") as stream:
                     outcome = json.load(stream)
