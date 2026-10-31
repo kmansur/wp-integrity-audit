@@ -22,9 +22,28 @@ def export_management_pdf(case: Path) -> Path:
         from reportlab.lib.enums import TA_LEFT
         from reportlab.lib.colors import HexColor
         from xml.sax.saxutils import escape
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.ttfonts import TTFont
     except ImportError as error:
         raise PDFExportError("A exportação para PDF exige a dependência opcional: pip install reportlab") from error
+    # Preferir fontes Unicode normalmente disponíveis em Debian/Ubuntu.
+    fonte = "Helvetica"
+    alternativas = (
+        Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
+        Path("/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf"),
+        Path("/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"),
+    )
+    for arquivo_fonte in alternativas:
+        if arquivo_fonte.is_file():
+            try:
+                pdfmetrics.registerFont(TTFont("FonteAuditoriaUnicode", str(arquivo_fonte)))
+                fonte = "FonteAuditoriaUnicode"
+                break
+            except (OSError, ValueError):
+                continue
     styles = getSampleStyleSheet()
+    for nome in ("Normal", "BodyText", "Title", "Heading2", "Heading3"):
+        styles[nome].fontName = fonte
     styles.add(ParagraphStyle(name="FindingTitle", parent=styles["Heading3"],
                               textColor=HexColor("#26364D"), spaceBefore=11, spaceAfter=5))
     styles.add(ParagraphStyle(name="FindingText", parent=styles["BodyText"],
@@ -55,7 +74,7 @@ def export_management_pdf(case: Path) -> Path:
                             title="Auditoria de Integridade WordPress - Relatório Gerencial")
     def footer(canvas, document):
         canvas.saveState()
-        canvas.setFont("Helvetica", 8)
+        canvas.setFont(fonte, 8)
         canvas.drawRightString(A4[0] - 43, 31, f"Página {document.page}")
         canvas.restoreState()
     try:
