@@ -1,4 +1,35 @@
-# WordPress Integrity Audit — Python branch
+# Auditoria de Integridade WordPress — branch Python
+
+Ferramenta para auditoria de integridade e investigação de comprometimento em sites WordPress, destinada a servidores Debian e Ubuntu.
+
+> **Estado de segurança:** versão de pré-lançamento. Os procedimentos de recuperação ainda não foram validados integralmente em cenários reais de WordPress/MySQL. Não utilize os modos de alteração em produção sem ensaios independentes de recuperação.
+
+## Uso rápido
+
+A auditoria padrão armazena as evidências em `/var/lib/wp-integrity-audit/cases/`. O parâmetro `--case-root` só é necessário para utilizar outro diretório.
+
+```bash
+python3 bin/wp-integrity-audit.py /var/www/exemplo/public_html --domain-label exemplo.com
+python3 bin/wp-integrity-audit.py /var/www/exemplo/public_html --domain-label exemplo.com --case-root /backup/auditorias
+```
+
+## Envio do relatório gerencial por e-mail
+
+O envio exige a opção `--email-to` e utiliza, por padrão, o arquivo privado `/etc/wp-integrity-audit/config.cfg`. Para escolher outro arquivo, utilize `--config`. A opção antiga `--smtp-config` continua aceita.
+
+```bash
+python3 bin/wp-integrity-audit.py /var/www/exemplo/public_html --domain-label exemplo.com --email-to cliente@exemplo.com
+```
+
+O arquivo de configuração e o arquivo separado com a senha SMTP devem permanecer fora do site, com permissões restritas (`0600`). O envio utiliza TLS validado. O relatório técnico e o conjunto completo de evidências **não** devem ser encaminhados ao cliente sem revisão e autorização.
+
+## Idioma e compatibilidade
+
+Os textos destinados ao operador e ao cliente devem ser apresentados em português do Brasil (`pt-BR`). Nomes de parâmetros, estruturas JSON, nomes de arquivos e chaves da configuração permanecem estáveis quando sua tradução quebraria a compatibilidade. Consulte o histórico de alterações em `CHANGELOG.md`.
+
+---
+
+## Documentação técnica histórica (tradução em andamento)
 
 Python 3 implementation of the WordPress filesystem/database incident audit and recovery utility for Debian and Ubuntu.
 
