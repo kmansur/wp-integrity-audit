@@ -4,6 +4,15 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 
 ## [Não publicado]
 
+## [0.21.4] - 2026-10-31
+
+### Correções
+- Corrigidas quatro asserções da suíte de testes que ainda esperavam títulos antigos em inglês após a tradução.
+- Corrigidos rótulos mistos em português/inglês no relatório gerencial e no relatório técnico.
+- Traduzidos valores de apresentação para risco e realização de verificações, sem modificar códigos internos e campos estruturados.
+- Mantidos os testes de regressão como critério para validar a mudança no ambiente Debian/Ubuntu; execução remota ainda pendente.
+
+
 ## [0.21.3] - 2026-10-31
 
 ### Relatórios em português
