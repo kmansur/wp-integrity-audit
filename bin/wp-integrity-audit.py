@@ -33,7 +33,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 
-VERSION = "0.21.5"
+VERSION = "0.21.6"
 IOC = re.compile(r"SC_ADV_BEGIN|--sc-cli|--sc-succ|trace-inspector-pad|cipher-feeder|_sc_fpc|sc_cron_guard|sc_persist_manifest|sc_own_manifest|function ceya")
 PATTERN_NAMES = (".sc_", ".gr_", ".gk_", ".kk_", ".wp-object-cache")
 SCRIPT_EXTENSIONS = {".php", ".phtml", ".phar", ".inc", ".php5", ".php7", ".php8", ".pht", ".phps"}
@@ -660,7 +660,7 @@ def customer_findings(files, database, configs, components):
                           entry.get("slug"), state, explanation, entry.get("main_file_sha256")))
     for identifier, kind, subject, state, explanation, digest in items:
         risk = ("PRIORIDADE ALTA — indicador residual do incidente" if state == "RESIDUO_FAMILIA_REQUER_LIMPEZA" else
-                "MÉDIA — item executável ou divergência de integridade que exige validação" if kind in ("Arquivos", "Configuration") or state in ("CORE_MODIFICADO_REQUER_REVISAO", "PLUGIN_COM_ARQUIVOS_MODIFICADOS") else
+                "MÉDIA — item executável ou divergência de integridade que exige validação" if kind in ("Arquivos", "Configuração") or state in ("CORE_MODIFICADO_REQUER_REVISAO", "PLUGIN_COM_ARQUIVOS_MODIFICADOS") else
                 "MÉDIA — origem ou manutenção do componente exige revisão" if kind == "Componente" else
                 "DEPENDENTE DO CONTEXTO — indicador histórico ou não confirmado")
         clean = lambda value: str(value or "não disponível").replace("\r", " ").replace("\n", " ")[:250]
@@ -983,7 +983,7 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
             f"- Referências históricas: **{positive('historical_cache')}**.",
             f"- Registros informativos: **{sum(int(item['length']) for item in database if item['kind'] in ('session_rows', 'application_password_rows'))}**.",
             f"- Indicadores ativos no banco de dados: **{positive('marker_option') + positive('cron_marker') + positive('active_plugins_marker')}**.",
-            f"- Informational session records: **{sum(int(item['length']) for item in database if item['kind'] == 'session_rows')}**.",
+            f"- Registros informativos de sessões: **{sum(int(item['length']) for item in database if item['kind'] == 'session_rows')}**.",
         ])
     lines.append(f"- Arquivos que exigem investigação de indicadores: **{len(critical)}**.")
     lines.append(f"- Processos compatíveis com indicadores: **{len(processes)}**.")
@@ -997,7 +997,7 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
         lines.append(f"- Resíduos em opções e transientes: **{family}**.")
         lines.append(f"- Administradores com nomes suspeitos: **{total('suspicious_users')}**.")
         lines.append(f"- Sessões armazenadas do WordPress: **{total('session_rows')}**.")
-        lines.append(f"- Referências históricas no cache de atualização de plugins: **{total('historical_cache')}**; this is not evidence of active execution.")
+        lines.append(f"- Referências históricas no cache de atualização de plugins: **{total('historical_cache')}**; isso não comprova execução ativa.")
         for kind, name in (("cron_marker", "cron"), ("active_plugins_marker", "active_plugins")):
             lines.append(f"- Indicadores conhecidos em `{name}`: **{total(kind)}**.")
         if family or total("marker_option") or total("cron_marker") or total("active_plugins_marker"):
