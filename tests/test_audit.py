@@ -1110,6 +1110,20 @@ $table_prefix = 'wp_';
         self.assertIn("HIGH PRIORITY", document)
         self.assertIn("not proof of active compromise", document)
 
+    def test_pdf_export_when_optional_dependency_is_installed(self):
+        import importlib.util
+        import report_export
+        if importlib.util.find_spec("reportlab") is None:
+            self.skipTest("Optional reportlab not installed")
+        with tempfile.TemporaryDirectory() as folder:
+            case = Path(folder)
+            (case / "report.md").write_text(
+                "# Customer Report\n\n## Findings\n\n- DB-001: Review is required\n")
+            (case / "technical-report.md").write_text("PRIVATE-DO-NOT-EXPORT")
+            pdf = report_export.export_management_pdf(case)
+            self.assertTrue(pdf.read_bytes().startswith(b"%PDF-"))
+            self.assertEqual(pdf.stat().st_mode & 0o777, 0o600)
+
     def test_secret_redaction(self):
         self.assertNotIn("example-secret", audit.redact("password=example-secret"))
         self.assertNotIn("192.168.1.20", audit.redact("192.168.1.20"))
