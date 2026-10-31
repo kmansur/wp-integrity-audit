@@ -23,6 +23,10 @@ python3 bin/wp-integrity-audit.py /var/www/exemplo/public_html --domain-label ex
 
 O arquivo de configuração e o arquivo separado com a senha SMTP devem permanecer fora do site, com permissões restritas (`0600`). O envio utiliza TLS validado. O relatório técnico e o conjunto completo de evidências **não** devem ser encaminhados ao cliente sem revisão e autorização.
 
+## Relatórios em português
+
+A versão 0.21.3 traduz os títulos, rótulos e principais explicações de `report.md` e `technical-report.md`, além do assunto e corpo do e-mail e da paginação do PDF. Códigos de classificação, valores de estado e identificadores de evidência permanecem inalterados para preservar integrações e permitir correlação técnica. Ainda é necessário revisar o restante das mensagens dinâmicas e executar testes automatizados e inspeção visual de PDFs reais.
+
 ## Idioma e compatibilidade
 
 Os textos destinados ao operador e ao cliente devem ser apresentados em português do Brasil (`pt-BR`). Nomes de parâmetros, estruturas JSON, nomes de arquivos e chaves da configuração permanecem estáveis quando sua tradução quebraria a compatibilidade. Consulte o histórico de alterações em `CHANGELOG.md`.
