@@ -999,6 +999,17 @@ $table_prefix = 'wp_';
             self.assertIn("NOT DOCUMENTED", content)
             self.assertIn("example.test", content)
 
+    def test_pdf_export_only_reads_management_report(self):
+        import report_export
+        with tempfile.TemporaryDirectory() as folder:
+            case = Path(folder)
+            (case / "technical-report.md").write_text("PRIVATE-SERVER-DETAILS")
+            (case / "report.md").write_text("# Management report\n\nPublic observation\n")
+            with unittest.mock.patch.dict("sys.modules", {"reportlab": None}):
+                with self.assertRaises(report_export.PDFExportError):
+                    report_export.export_management_pdf(case)
+            self.assertFalse((case / "management-report.pdf").exists())
+
     def test_secret_redaction(self):
         self.assertNotIn("example-secret", audit.redact("password=example-secret"))
         self.assertNotIn("192.168.1.20", audit.redact("192.168.1.20"))
