@@ -25,7 +25,7 @@ O arquivo de configuração e o arquivo separado com a senha SMTP devem permanec
 
 ## Relatórios em português
 
-A versão 0.21.3 traduz os títulos, rótulos e principais explicações de `report.md` e `technical-report.md`, além do assunto e corpo do e-mail e da paginação do PDF. Códigos de classificação, valores de estado e identificadores de evidência permanecem inalterados para preservar integrações e permitir correlação técnica. Ainda é necessário revisar o restante das mensagens dinâmicas e executar testes automatizados e inspeção visual de PDFs reais.
+A versão 0.21.4 corrige rótulos mistos e asserções dos testes após a tradução. A versão 0.21.3 traduz os títulos, rótulos e principais explicações de `report.md` e `technical-report.md`, além do assunto e corpo do e-mail e da paginação do PDF. Códigos de classificação, valores de estado e identificadores de evidência permanecem inalterados para preservar integrações e permitir correlação técnica. Ainda é necessário revisar o restante das mensagens dinâmicas e executar testes automatizados e inspeção visual de PDFs reais.
 
 ## Idioma e compatibilidade
 
