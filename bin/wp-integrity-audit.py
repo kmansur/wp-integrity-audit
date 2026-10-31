@@ -428,7 +428,8 @@ def host_persistence_inventory(case: Path, roots: list[Path]) -> list[dict]:
     """Bounded Linux persistence metadata collection, without reading secrets."""
     findings = []
     allowed = ("/etc/cron", "/etc/crontab", "/etc/systemd/system", "/etc/php",
-               "/etc/apache2", "/etc/profile", "/etc/bash.bashrc")
+               "/etc/apache2", "/etc/profile", "/etc/bash.bashrc",
+               "/etc/rc.local", "/etc/ld.so.preload", "/etc/sudoers.d", "/var/spool/cron")
     for root in roots:
         root = Path(root)
         if not any(str(root) == prefix or str(root).startswith(prefix + ".") or
@@ -1770,7 +1771,9 @@ def main() -> int:
         if is_audit and not args.skip_host_persistence:
             if sys.platform != "linux":
                 raise AuditError("Host persistence inventory is supported only on Linux")
-            host_persistence_inventory(case, [Path(p) for p in ("/etc/crontab", "/etc/cron.d", "/etc/cron.daily", "/etc/cron.hourly", "/etc/systemd/system", "/etc/php", "/etc/apache2")])
+            host_persistence_inventory(case, [Path(p) for p in ("/etc/crontab", "/etc/cron.d", "/etc/cron.daily", "/etc/cron.hourly", "/etc/systemd/system", "/etc/php", "/etc/apache2",
+                          "/etc/profile.d", "/etc/rc.local", "/etc/ld.so.preload",
+                          "/etc/sudoers.d", "/var/spool/cron")])
         if not (is_audit and args.skip_elementor):
             elementor_asset_audit(target, case)
         processes = [] if is_audit and args.skip_processes else process_audit(case)
