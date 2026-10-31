@@ -956,6 +956,23 @@ $table_prefix = 'wp_';
             self.assertEqual(record["status"], "REVISAO_NECESSARIA")
             self.assertIn("Core verification: EXECUTED", (case / "report.md").read_text())
 
+    def test_customer_report_individual_evidence_is_redacted(self):
+        findings = audit.customer_findings(
+            [{"evidence_id": "FILE-001", "path": "wp-content/uploads/example.php",
+              "classification": "PHP_UPLOAD_REQUER_VALIDACAO", "sha256": "a" * 64}],
+            [{"evidence_id": "DB-001", "kind": "family_option", "name": "sc_test",
+              "state": "RESIDUO_FAMILIA_REQUER_LIMPEZA", "sha256": "b" * 64,
+              "safe_excerpt": "do-not-show-secret"}],
+            [{"evidence_id": "CONFIG-001", "path": ".htaccess",
+              "classification": "CONFIGURACAO_REQUER_VALIDACAO"}],
+            {"components": [{"component_id": "CORE-001", "slug": "wordpress",
+                             "state": "CORE_DESATUALIZADO"}]})
+        text = "\\n".join(findings)
+        for identifier in ("FILE-001", "DB-001", "CONFIG-001", "CORE-001"):
+            self.assertIn(identifier, text)
+        self.assertNotIn("do-not-show-secret", text)
+        self.assertIn("service interruption", text.lower())
+
     def test_secret_redaction(self):
         self.assertNotIn("example-secret", audit.redact("password=example-secret"))
         self.assertNotIn("192.168.1.20", audit.redact("192.168.1.20"))
