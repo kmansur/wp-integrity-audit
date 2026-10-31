@@ -1025,7 +1025,7 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
         f"- Registros do servidor que exigem revisão: **{host_review}**",
         "", "## Visão geral dos riscos", "",
         f"- Risco do banco de dados: **{'ALTO' if summary['confirmed_family_residues'] or summary['active_database_markers'] else 'BAIXO — nenhum indicador pesquisado encontrado no banco de dados' if audited else 'NÃO DETERMINADO'}**",
-        f"- Risco dos arquivos: **{'REQUIRES REVIEW' if summary['file_indicators_requiring_review'] else 'BAIXO PARA OS INDICADORES PESQUISADOS'}**",
+        f"- Risco dos arquivos: **{'REVISÃO NECESSÁRIA' if summary['file_indicators_requiring_review'] else 'BAIXO PARA OS INDICADORES PESQUISADOS'}**",
         f"- Risco do núcleo do WordPress: **{'MÉDIO — REVISÃO NECESSÁRIA' if core_count else 'MÉDIO — versão desatualizada; somas de verificação oficiais validadas' if component_result and component_result['summary'].get('core_outdated') and component_result['coverage'].get('core') == 'EXECUTED' else 'NENHUMA DIVERGÊNCIA EXPLÍCITA IDENTIFICADA' if component_result and component_result['coverage'].get('core') == 'EXECUTED' else 'NÃO DETERMINADO'}**",
         f"- Risco de persistência externa: **{persistence_risk}**",
         "- A ausência de indicadores conhecidos não comprova ausência de persistência.",
