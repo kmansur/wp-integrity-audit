@@ -32,7 +32,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 
-VERSION = "0.17.0"
+VERSION = "0.18.0"
 IOC = re.compile(r"SC_ADV_BEGIN|--sc-cli|--sc-succ|trace-inspector-pad|cipher-feeder|_sc_fpc|sc_cron_guard|sc_persist_manifest|sc_own_manifest|function ceya")
 PATTERN_NAMES = (".sc_", ".gr_", ".gk_", ".kk_", ".wp-object-cache")
 SCRIPT_EXTENSIONS = {".php", ".phtml", ".phar", ".inc", ".php5", ".php7", ".php8", ".pht", ".phps"}
@@ -999,6 +999,33 @@ def component_db_metadata(option_file: str, dbname: str, prefix: str):
     return active, values.get("template"), values.get("stylesheet")
 
 
+def admin_account_inventory(option_file: str, dbname: str, prefix: str, case: Path) -> dict:
+    """Inventory administrator role candidates without exporting account names."""
+    users, meta = sql_identifier(prefix + "users"), sql_identifier(prefix + "usermeta")
+    key = prefix + "capabilities"
+    # SQL string is derived solely from the validated table prefix.
+    sql = (f"SELECT u.ID, SHA2(u.user_login,256), u.user_registered "
+           f"FROM {users} u JOIN {meta} m ON m.user_id=u.ID "
+           f"WHERE m.meta_key='{key}' AND m.meta_value LIKE '%administrator%' "
+           f"ORDER BY u.ID LIMIT 1000;")
+    try:
+        rows = query_db(option_file, dbname, sql)
+        if any(len(row) != 3 or not row[0].isdigit() or
+               not re.fullmatch(r"[A-Fa-f0-9]{64}", row[1]) for row in rows):
+            raise AuditError("Unexpected administrator query output")
+        result = {"coverage": "EXECUTED", "count": len(rows),
+                  "truncated": len(rows) == 1000,
+                  "limitations": "Serialized role substring match; multisite super administrators are not covered. Presence is not evidence of compromise.",
+                  "accounts": [{"id": int(row[0]), "login_sha256": row[1],
+                                "registered": row[2][:25]} for row in rows]}
+    except (AuditError, OSError, subprocess.CalledProcessError):
+        result = {"coverage": "UNAVAILABLE", "count": None, "accounts": [],
+                  "limitations": "Account-role inventory query unavailable; no absence claim can be made."}
+    write_private(case / "administrator-inventory.json",
+                  json.dumps(result, indent=2, ensure_ascii=False))
+    return result
+
+
 def sql_identifier(value: str) -> str:
     if not re.fullmatch(r"[A-Za-z0-9_]+", value):
         raise AuditError("Invalid SQL identifier")
@@ -1656,6 +1683,7 @@ def main() -> int:
             if args.mode in ("audit", "audit-db", "audit-db-post"):
                 database = database_audit(cnf, dbname, prefix, case, post=args.mode == "audit-db-post")
                 if is_audit:
+                    admin_account_inventory(cnf, dbname, prefix, case)
                     if args.skip_version_check:
                         component_versions.write_skipped(case)
                     else:
