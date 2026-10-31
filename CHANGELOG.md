@@ -379,3 +379,5 @@ All project documentation and source commentary are in English. Versions follow 
 - Extend existing case-to-case comparisons with Core/plugin/theme version, source-state and main-file hash changes when both cases contain component evidence.
 - Include a calibrated review-priority label for each customer-facing finding; such labels do not assert active compromise.
 - Add regression tests for historical plugin-version changes and review-priority wording.
+
+- Create restricted evidence bundles via a temporary private file and atomic rename, rejecting credentials before creating any archive.
