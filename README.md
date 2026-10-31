@@ -25,7 +25,7 @@ O arquivo de configuração e o arquivo separado com a senha SMTP devem permanec
 
 ## Relatórios em português
 
-Na versão 0.21.6, foram corrigidas a prioridade dos achados de configuração e descrições do parecer técnico. Novos testes verificam essa apresentação e o mapeamento de estados. A aprovação para entrega ao cliente ainda depende dos testes em Debian/Ubuntu e da revisão visual de um PDF de auditoria real.
+Na versão 0.21.7, três expectativas da suíte de testes foram alinhadas com a apresentação em português, sem modificar a lógica de auditoria. Na versão 0.21.6, foram corrigidas a prioridade dos achados de configuração e descrições do parecer técnico. Novos testes verificam essa apresentação e o mapeamento de estados. A aprovação para entrega ao cliente ainda depende dos testes em Debian/Ubuntu e da revisão visual de um PDF de auditoria real.
 
 
 A versão 0.21.5 separa textos de apresentação dos valores estruturados (JSON) e traduz as evidências individuais. A versão 0.21.4 corrige rótulos mistos e asserções dos testes após a tradução. A versão 0.21.3 traduz os títulos, rótulos e principais explicações de `report.md` e `technical-report.md`, além do assunto e corpo do e-mail e da paginação do PDF. Códigos de classificação, valores de estado e identificadores de evidência permanecem inalterados para preservar integrações e permitir correlação técnica. Ainda é necessário revisar o restante das mensagens dinâmicas e executar testes automatizados e inspeção visual de PDFs reais.
