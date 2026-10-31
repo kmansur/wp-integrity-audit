@@ -1134,10 +1134,27 @@ $table_prefix = 'wp_';
         with tempfile.TemporaryDirectory() as folder:
             case = Path(folder)
             (case / "report.md").write_text(
-                "# Customer Report\n\n## Findings\n\n- DB-001: Review is required\n")
+                "# Relatório gerencial — auditoria de integridade\n\n## Evidências\n\n- DB-001: revisão necessária — configuração, código e ações\n")
             (case / "technical-report.md").write_text("PRIVATE-DO-NOT-EXPORT")
             pdf = report_export.export_management_pdf(case)
             self.assertTrue(pdf.read_bytes().startswith(b"%PDF-"))
+            self.assertEqual(pdf.stat().st_mode & 0o777, 0o600)
+
+    def test_pdf_portuguese_accents_and_pagination(self):
+        import importlib.util
+        import report_export
+        if importlib.util.find_spec("reportlab") is None:
+            self.skipTest("Dependência opcional reportlab não instalada")
+        with tempfile.TemporaryDirectory() as folder:
+            case = Path(folder)
+            linhas = ["# Relatório técnico-gerencial — revisão de segurança",
+                      "## Evidências e conclusão"]
+            linhas += ["- Item %03d: alteração, proteção, execução e verificação de integridade." % i
+                       for i in range(250)]
+            (case / "report.md").write_text("\n".join(linhas) + "\n", encoding="utf-8")
+            pdf = report_export.export_management_pdf(case)
+            self.assertTrue(pdf.read_bytes().startswith(b"%PDF-"))
+            self.assertGreater(pdf.stat().st_size, 1000)
             self.assertEqual(pdf.stat().st_mode & 0o777, 0o600)
 
     def test_pdf_export_error_is_operational_error(self):
