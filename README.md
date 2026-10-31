@@ -250,3 +250,7 @@ Evidence archive creation performs a sensitive-file preflight before writing, th
 The host persistence inventory includes additional Debian/Ubuntu cron, login-profile, preload and sudoers configuration paths. It hashes metadata without printing secret file contents. A filename containing a known security product's name is not sufficient to confer a trusted classification.
 
 The test suite also includes a conditional PDF smoke test that renders a sample management report when `reportlab` is installed. An isolated environment with ReportLab is still required for pre-release PDF visual validation.
+
+## 0.20.0 safe PDF publication
+
+Management PDF generation now renders to an owner-private temporary file within the evidence case. Only a completed file with a valid `%PDF-` signature is atomically published as `management-report.pdf`; a rendering failure removes the temporary file and returns exit 30. The original `report.md` remains available. Optional ReportLab installation and visual review of the final PDF are still required.
