@@ -33,7 +33,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 
-VERSION = "0.21.1"
+VERSION = "0.21.2"
 IOC = re.compile(r"SC_ADV_BEGIN|--sc-cli|--sc-succ|trace-inspector-pad|cipher-feeder|_sc_fpc|sc_cron_guard|sc_persist_manifest|sc_own_manifest|function ceya")
 PATTERN_NAMES = (".sc_", ".gr_", ".gk_", ".kk_", ".wp-object-cache")
 SCRIPT_EXTENSIONS = {".php", ".phtml", ".phar", ".inc", ".php5", ".php7", ".php8", ".pht", ".phps"}
@@ -1656,7 +1656,7 @@ def mark_incomplete_case(case: Path, skipped: list[str]) -> None:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="WordPress Integrity Audit (Python)")
+    parser = argparse.ArgumentParser(description="Auditoria de Integridade WordPress (Python)")
     modes = parser.add_mutually_exclusive_group()
     for opt in ("audit", "audit-db", "audit-db-post", "apply-files", "apply-db", "recover"):
         modes.add_argument("--" + opt, dest="mode", action="store_const", const=opt)
@@ -1669,33 +1669,33 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--replace-plugins-themes", action="store_true")
     parser.add_argument("--official-sync", action="store_true")
     parser.add_argument("--case-root", type=Path, default=Path("/var/lib/wp-integrity-audit/cases"),
-                        help="Evidence root (default: /var/lib/wp-integrity-audit/cases)")
+                        help="Diretório das evidências (padrão: /var/lib/wp-integrity-audit/cases)")
     # A normal audit enables every available passive probe.
     # Mutating operations always require separate explicit mode and confirmation.
-    parser.add_argument("--skip-version-check", action="store_true", help="Disable Core, plugin and theme version checks")
-    parser.add_argument("--offline", action="store_true", help="Disable external WordPress.org consultations")
-    parser.add_argument("--bundle-evidence", action="store_true", help="Create private forensic evidence tarball (sensitive)")
-    parser.add_argument("--verify-case", type=Path, help="Verify a collected case manifest without scanning WordPress")
-    parser.add_argument("--email-to", help="Email the management PDF to this explicit recipient")
+    parser.add_argument("--skip-version-check", action="store_true", help="Desativa a verificação de versões do núcleo, dos plugins e dos temas")
+    parser.add_argument("--offline", action="store_true", help="Desativa consultas externas ao WordPress.org")
+    parser.add_argument("--bundle-evidence", action="store_true", help="Cria arquivo TAR privado com evidências forenses (dados sensíveis)")
+    parser.add_argument("--verify-case", type=Path, help="Verifica o manifesto de um caso existente sem analisar o WordPress")
+    parser.add_argument("--email-to", help="Envia o PDF gerencial ao destinatário informado")
     parser.add_argument("--config", "--smtp-config", dest="smtp_config", type=Path,
                         default=Path("/etc/wp-integrity-audit/config.cfg"),
-                        help="Private SMTP configuration (default: /etc/wp-integrity-audit/config.cfg)")
-    parser.add_argument("--pdf-report", action="store_true", help="Export the management report as PDF (optional reportlab dependency)")
-    parser.add_argument("--show-report", action="store_true", help="Print management report on a terminal")
-    parser.add_argument("--no-show-report", action="store_true", help="Never print management report")
+                        help="Configuração SMTP privada (padrão: /etc/wp-integrity-audit/config.cfg)")
+    parser.add_argument("--pdf-report", action="store_true", help="Exporta o relatório gerencial em PDF (requer reportlab)")
+    parser.add_argument("--show-report", action="store_true", help="Exibe o relatório gerencial no terminal")
+    parser.add_argument("--no-show-report", action="store_true", help="Não exibe o relatório gerencial no terminal")
     parser.add_argument("--official-compare", action="store_true", help="Explicitly enable official comparison")
     parser.add_argument("--skip-core", action="store_true", help="Skip official WordPress Core checksum comparison")
     parser.add_argument("--skip-host-persistence", action="store_true", help="Skip Linux persistence metadata inventory")
     parser.add_argument("--skip-db", "--files-only", dest="skip_db", action="store_true",
-                        help="Skip database checks; produces an incomplete audit")
+                        help="Ignora a verificação do banco de dados; a auditoria ficará incompleta")
     parser.add_argument("--skip-files", action="store_true", help="Skip WordPress file scanning")
     parser.add_argument("--skip-config", action="store_true", help="Skip configuration metadata scanning")
     parser.add_argument("--skip-processes", action="store_true", help="Skip process indicator scanning")
     parser.add_argument("--skip-elementor", action="store_true", help="Skip Elementor asset checks")
     parser.add_argument("--compare", nargs=2, metavar=("OLD_CASE", "NEW_CASE"), type=Path,
-                        help="Compare two existing case directories without scanning a live site")
+                        help="Compara dois diretórios de casos existentes sem analisar um site em produção")
     parser.add_argument("--compare-output", type=Path,
-                        help="Private output directory for comparison findings")
+                        help="Diretório privado para resultados da comparação")
     parser.add_argument("--version", action="version", version=VERSION)
     args = parser.parse_args()
     if args.verify_case:
@@ -1803,7 +1803,7 @@ def main() -> int:
             create_evidence_manifest(case)
             if args.bundle_evidence:
                 bundle_case_evidence(case)
-            print("Audit complete; database NOT EXECUTED")
+            print("Auditoria concluída; banco de dados NÃO ANALISADO")
             present_management_report(case, show=args.show_report, no_show=args.no_show_report)
             return 40
         config, prefix = parse_wordpress(target / "wp-config.php")
@@ -1839,7 +1839,7 @@ def main() -> int:
                         bundle_case_evidence(case)
                 with (case / "report.json").open(encoding="utf-8") as stream:
                     outcome = json.load(stream)
-                print("Audit complete: status=" + outcome["status"] + "; exit=" + str(outcome["exit_code"]))
+                print("Auditoria concluída: status=" + outcome["status"] + "; código de saída=" + str(outcome["exit_code"]))
                 present_management_report(case, show=args.show_report, no_show=args.no_show_report)
                 return outcome["exit_code"]
             if os.geteuid() != 0:
@@ -1917,12 +1917,12 @@ def main() -> int:
             finally:
                 if stage is not None:
                     shutil.rmtree(stage, ignore_errors=True)
-            print("Operation complete. Review findings and validate site before reopening.")
+            print("Operação concluída. Revise os achados e valide o site antes de reativá-lo.")
             return 0
 
 if __name__ == "__main__":
     try:
         sys.exit(main())
     except (AuditError, report_export.PDFExportError, mail_delivery.MailDeliveryError, OSError, subprocess.CalledProcessError, ValueError, EOFError) as error:
-        print(f"ERROR: {redact(error)}", file=sys.stderr)
+        print(f"ERRO: {redact(error)}", file=sys.stderr)
         sys.exit(30)
