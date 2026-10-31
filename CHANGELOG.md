@@ -4,6 +4,17 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 
 ## [Não publicado]
 
+## [0.21.7] - 2026-10-31
+
+### Testes
+- Corrigidas três expectativas antigas da suíte de testes para validar os textos em português: divergências do núcleo, prioridade alta e verificação executada.
+- Mantidas as verificações estruturadas existentes em `report.json` e o contrato dos códigos internos.
+- Nenhuma alteração nas regras de detecção, classificação ou nos códigos de saída.
+
+### Validação pendente
+- Reexecutar a suíte de testes no Debian/Ubuntu; integração MySQL e geração real de PDF dependem dos ambientes opcionais.
+
+
 ## [0.21.6] - 2026-10-31
 
 ### Correções
