@@ -362,3 +362,16 @@ All project documentation and source commentary are in English. Versions follow 
 
 ### Limitations
 - The role test is a serialized-value substring heuristic and does not validate authorization, prove compromise or cover multisite super administrators. The results are kept in restricted JSON evidence, not the customer-facing report.
+
+## [0.19.0] - 2026-10-30
+
+### Added
+- `--verify-case CASE`: read-only SHA-256 verification of evidence listed in `evidence-manifest.json`, identifying missing, modified and post-capture unlisted files.
+- `--bundle-evidence`: explicitly package private case evidence into `evidence-bundle.tar.gz` with an accompanying SHA-256 sidecar. The bundle contains sensitive technical material and must not be sent directly to a customer.
+- Regression tests for manifest tampering, bundle permissions, credential-file exclusion and status precedence.
+
+### Fixed
+- Preserve confirmed-residue status (exit 10) when Core or component integrity reviews coexist; record concurrent integrity concerns without suppressing the primary incident finding.
+
+### Limitations
+- The bundle and manifest are unsigned; independent immutable storage and approved custody logs are necessary for legal-grade chain of custody.
