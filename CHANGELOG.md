@@ -375,3 +375,7 @@ All project documentation and source commentary are in English. Versions follow 
 
 ### Limitations
 - The bundle and manifest are unsigned; independent immutable storage and approved custody logs are necessary for legal-grade chain of custody.
+
+- Extend existing case-to-case comparisons with Core/plugin/theme version, source-state and main-file hash changes when both cases contain component evidence.
+- Include a calibrated review-priority label for each customer-facing finding; such labels do not assert active compromise.
+- Add regression tests for historical plugin-version changes and review-priority wording.
