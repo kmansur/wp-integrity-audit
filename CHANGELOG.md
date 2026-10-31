@@ -341,3 +341,14 @@ All project documentation and source commentary are in English. Versions follow 
 ### Security
 - Read-only WordPress inspection remains the default; mutating modes stay disabled.
 - The manifest records hashes of evidence files at the time it is generated and does not, on its own, establish an authenticated chain of custody.
+
+## [0.17.0] - 2026-10-30
+
+### Added
+- Optional `--pdf-report` export of the customer-facing `report.md` to `management-report.pdf` in the private case directory.
+- Page-numbered local PDF rendering with escaped report content and private file permissions.
+- PDF export depends on optional `reportlab`; no network calls or automatic installation are performed.
+- Regression test that missing optional dependencies produce a controlled failure without touching technical-report content.
+
+### Limitations
+- PDF rendering requires separate document-visual QA for long, real incident reports; the Markdown remains the authoritative editable management report.
