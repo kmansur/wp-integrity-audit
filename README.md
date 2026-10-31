@@ -242,3 +242,5 @@ A normal read-only audit additionally creates `administrator-inventory.json`, li
 ## 0.19.0 evidence verification and restricted packaging
 
 Use `python3 bin/wp-integrity-audit.py --verify-case /path/to/case` to recompute file SHA-256 and detect missing/modified or unlisted post-capture files (0 for match; 40 for differences). Use `--bundle-evidence` during an audit to create an owner-only `evidence-bundle.tar.gz` plus `evidence-bundle.sha256`; the restricted archive includes internal technical details and **must not be given directly to a customer**. The management report and optional management PDF remain the appropriate customer deliverables. A hash manifest is not independent timestamping, authentication or a cryptographic signature.
+
+The existing `--compare OLD_CASE NEW_CASE` flow also compares Core/plugin/theme component state when both cases have component evidence. Management findings display a calibrated review-priority description; these labels indicate triage urgency, not independent proof of active malware or attribution.
