@@ -1124,6 +1124,16 @@ $table_prefix = 'wp_';
             self.assertTrue(pdf.read_bytes().startswith(b"%PDF-"))
             self.assertEqual(pdf.stat().st_mode & 0o777, 0o600)
 
+    def test_pdf_export_error_is_operational_error(self):
+        import report_export
+        self.assertTrue(issubclass(report_export.PDFExportError, RuntimeError))
+        with tempfile.TemporaryDirectory() as folder:
+            case = Path(folder)
+            with self.assertRaises(report_export.PDFExportError):
+                report_export.export_management_pdf(case)
+            self.assertFalse((case / "management-report.pdf").exists())
+            self.assertEqual(list(case.glob(".management-report-*")), [])
+
     def test_secret_redaction(self):
         self.assertNotIn("example-secret", audit.redact("password=example-secret"))
         self.assertNotIn("192.168.1.20", audit.redact("192.168.1.20"))
