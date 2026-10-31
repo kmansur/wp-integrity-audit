@@ -514,7 +514,7 @@ $table_prefix = 'wp_';
             self.assertIn("Relatório Gerencial", client_report)
             self.assertNotIn("/etc/apache2", client_report)
             self.assertNotIn("wp-includes/version.php", client_report)
-            self.assertIn("Core discrepancies", client_report)
+            self.assertIn("Divergências do núcleo do WordPress que exigem revisão", client_report)
             csv_rows = list(csv.reader((case / "report.csv").open()))
             self.assertEqual(csv_rows[0][:2], ["domain", "case_id"])
             self.assertEqual(csv_rows[1][:2], ["mbengenharia.com", "20261030T220303Z-538f44"])
@@ -954,7 +954,7 @@ $table_prefix = 'wp_';
             record = json.loads((case / "report.json").read_text())
             self.assertEqual(record["exit_code"], 40)
             self.assertEqual(record["status"], "REVISAO_NECESSARIA")
-            self.assertIn("Verificação do núcleo: EXECUTED", (case / "report.md").read_text())
+            self.assertIn("Verificação do núcleo: EXECUTADA", (case / "report.md").read_text())
 
     def test_customer_report_individual_evidence_is_redacted(self):
         findings = audit.customer_findings(
@@ -1123,8 +1123,8 @@ $table_prefix = 'wp_';
              "name": "sc_test", "state": "RESIDUO_FAMILIA_REQUER_LIMPEZA"}
         ], [], {})
         document = "\n".join(details)
-        self.assertIn("HIGH PRIORITY", document)
-        self.assertIn("not proof of active compromise", document)
+        self.assertIn("PRIORIDADE ALTA", document)
+        self.assertIn("não comprova comprometimento ativo", document)
 
     def test_pdf_export_when_optional_dependency_is_installed(self):
         import importlib.util
