@@ -1010,7 +1010,7 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
                       "Analise conjuntamente os indicadores identificados e o momento da coleta.", ""])
     lines.extend(["", "## Recomendação para reativação", "",
                   "**LIBERAÇÃO NÃO RECOMENDADA**",
-                  "An audit alone does not authorize reopening. A qualified operator must validate remediation, "
+                  "A auditoria não autoriza, por si só, a reativação. O responsável técnico deve validar a recuperação, "
                   "a integridade das evidências, as verificações de persistência e os backups antes de autorizar a liberação.", ""])
     lines.extend(["", "## Legenda das classificações", "",
                   "- `RESIDUO_FAMILIA_REQUER_LIMPEZA`: resíduo de uma família de indicadores de incidente no banco de dados.",
