@@ -165,3 +165,7 @@ Keep the generated case outside the WordPress document root, retain restricted p
 ## Customer PDF delivery
 
 Enable `--pdf-report` only when the local optional `reportlab` dependency is installed. Review the generated `management-report.pdf` visually before distribution, especially long evidence IDs and paths. The report is based on `report.md`, which is separate from the restricted technical report. Preserve the case SHA-256 manifest and never email the full evidence directory to an unauthenticated recipient.
+
+## Administrator inventory
+
+Review `administrator-inventory.json` in the restricted case folder. Correlate account IDs and registration metadata with approved account-management records. Login names are hashed; note that unsalted hashes of human-readable names can be guessable and must remain private. The inventory does not imply that a privileged user is malicious and does not cover all WordPress multisite privilege mechanisms.
