@@ -1,6 +1,8 @@
 """Optional, local PDF export of the public management report (no network)."""
 from __future__ import annotations
 from pathlib import Path
+import os
+import tempfile
 
 
 class PDFExportError(RuntimeError):
@@ -45,7 +47,10 @@ def export_management_pdf(case: Path) -> Path:
         # Render Markdown as plain text to avoid feeding attacker-controlled HTML to PDF parser.
         rendered = escape(re.sub(r"[*\x60]", "", line))
         elements.append(Paragraph(rendered, style))
-    doc = SimpleDocTemplate(str(output), pagesize=A4, rightMargin=43, leftMargin=43,
+    temporary = None
+    with tempfile.NamedTemporaryFile(prefix=".management-report-", suffix=".pdf.tmp", dir=case, delete=False) as handle:
+        temporary = Path(handle.name)
+    doc = SimpleDocTemplate(str(temporary), pagesize=A4, rightMargin=43, leftMargin=43,
                             topMargin=55, bottomMargin=50,
                             title="WordPress Integrity Audit - Management Report")
     def footer(canvas, document):
@@ -53,6 +58,14 @@ def export_management_pdf(case: Path) -> Path:
         canvas.setFont("Helvetica", 8)
         canvas.drawRightString(A4[0] - 43, 31, f"Page {document.page}")
         canvas.restoreState()
-    doc.build(elements, onFirstPage=footer, onLaterPages=footer)
-    output.chmod(0o600)
-    return output
+    try:
+        doc.build(elements, onFirstPage=footer, onLaterPages=footer)
+        if temporary.stat().st_size < 5 or not temporary.read_bytes()[:5] == b"%PDF-":
+            raise PDFExportError("PDF renderer did not produce a valid PDF header")
+        temporary.chmod(0o600)
+        os.replace(temporary, output)
+        return output
+    except Exception as error:
+        raise PDFExportError("PDF rendering failed; no completed PDF was published") from error
+    finally:
+        temporary.unlink(missing_ok=True)
