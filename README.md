@@ -222,3 +222,7 @@ After normal audit completion, `report.md` is printed on an interactive standard
 Akismet static-asset allowlists are checked for executable file extensions, without rejecting harmless filename substrings such as `refresh`.
 
 The component detail report includes manual review guidance for plugins absent from WordPress.org and for unreadable local plugin versions. It explicitly states that a repository miss is not evidence of malware and recommends verifying vendor origin, license, package and hash with the site owner.
+
+## 0.15.0 customer-facing evidence narrative
+
+The management `report.md` now contains an individual finding for each relevant database indicator, file/configuration review and Core/plugin/theme component requiring action. Each finding explains its meaning, recorded state and available SHA-256 evidence without publishing database values, credentials or technical commands. The separate technical report remains restricted. The management report does **not** automatically certify an outage justification or identify an attacker: the service interruption decision must be supported by its own contemporaneous authorization and incident-response record.
