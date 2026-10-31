@@ -1566,6 +1566,31 @@ def compare_cases(old_case: Path, new_case: Path, output: Path) -> dict:
                               if before[k] != after[k]),
             "unchanged_count": sum(before[k] == after[k] for k in before.keys() & after.keys()),
         }
+    # Compare version/provenance evidence when both historical cases include it.
+    if all((case / "component-version-evidence.json").is_file() and
+           not (case / "component-version-evidence.json").is_symlink()
+           for case in (old_case, new_case)):
+        def component_keys(case: Path) -> dict:
+            document = load(case, "component-version-evidence.json")
+            if not isinstance(document, dict) or not isinstance(document.get("components"), list):
+                raise AuditError("Invalid historical component evidence")
+            index = {}
+            for component in document["components"]:
+                kind, slug = component.get("type"), component.get("slug")
+                if not isinstance(kind, str) or not isinstance(slug, str) or not kind or not slug:
+                    raise AuditError("Invalid historical component identity")
+                index[kind + ":" + slug] = (component.get("local_version"), component.get("state"),
+                                             component.get("main_file_sha256"))
+            return index
+        previous, current = component_keys(old_case), component_keys(new_case)
+        outcomes["components"] = {
+            "removed": sorted(previous.keys() - current.keys()),
+            "added": sorted(current.keys() - previous.keys()),
+            "changed": sorted(key for key in previous.keys() & current.keys()
+                              if previous[key] != current[key]),
+            "unchanged_count": sum(previous[key] == current[key]
+                                   for key in previous.keys() & current.keys()),
+        }
     report = {
         "schema_version": 1,
         "generated_at_utc": dt.datetime.now(dt.timezone.utc).isoformat(),
