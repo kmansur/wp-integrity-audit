@@ -33,7 +33,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 
-VERSION = "0.21.2"
+VERSION = "0.21.3"
 IOC = re.compile(r"SC_ADV_BEGIN|--sc-cli|--sc-succ|trace-inspector-pad|cipher-feeder|_sc_fpc|sc_cron_guard|sc_persist_manifest|sc_own_manifest|function ceya")
 PATTERN_NAMES = (".sc_", ".gr_", ".gk_", ".kk_", ".wp-object-cache")
 SCRIPT_EXTENSIONS = {".php", ".phtml", ".phar", ".inc", ".php5", ".php7", ".php8", ".pht", ".phps"}
@@ -877,35 +877,35 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
                       for i, _ in enumerate(processes, 1)],
     }, indent=2, ensure_ascii=False))
     lines = [
-        "# WordPress Integrity Audit", "",
-        "## Executive summary", "",
-        f"- Final status: **{status}**",
-        f"- Detailed status: **{status_detail}**",
-        f"- Exit code: **{exit_code}**",
-        f"- Confirmed family residues: **{summary['confirmed_family_residues']}**",
-        f"- Historical references: **{summary['historical_references']}**",
-        f"- Informational records: **{summary['informational_records']}**",
-        f"- Active database markers: **{summary['active_database_markers']}**",
-        f"- Confirmed compromised files: **{summary['confirmed_compromised_files']}**",
-        f"- Validated legitimate file patterns: **{summary['validated_legitimate_files']}**",
-        f"- Security configurations requiring validation: **{summary['security_configuration_review']}**",
-        f"- Suspicious processes: **{summary['suspicious_processes']}**",
-        f"- Core discrepancies: **{core_count}**",
-        f"- Configuration files requiring review: **{config_count}**",
-        f"- External persistence indicators: **{host_indicators}**",
-        f"- Host inventory entries: **{len(host_records)}** (known security: {host_known}; unclassified: {host_unclassified}; suspicious: {host_indicators}; review: {host_review})",
-        *[f"- Optional probe issue: {issue}" for issue in optional_issues],
-        "- Release recommendation: **LIBERAÇÃO NÃO RECOMENDADA**",
-        "", "## Audit metadata", "",
-        f"- Version: `{VERSION}`", f"- Tool SHA-256: `{sha256(Path(__file__))}`", f"- Mode: `{mode}`",
-        f"- Timestamp (UTC): {dt.datetime.now(dt.timezone.utc).isoformat()}",
-        f"- File findings: {len(findings)}", f"- Process findings: {len(processes)}",
-        f"- Database audit: **{'EXECUTED' if audited else 'NOT EXECUTED'}**",
-        f"- Database evaluation: {'COMPLETE TARGETED CHECKS' if audited else 'NOT EVALUATED'}",
-        f"- Database dump: {'PERFORMED' if (case / 'database-before.sql').is_file() else 'NOT PERFORMED'}",
-        f"- File snapshot: {'PERFORMED' if (case / 'site-before.tar.gz').is_file() else 'NOT PERFORMED'}",
-        "", "## Filesystem evidence", "",
-        "| Relative path | Classification | SHA-256 |",
+        "# Auditoria de Integridade WordPress", "",
+        "## Resumo executivo", "",
+        f"- Situação final: **{status}**",
+        f"- Situação detalhada: **{status_detail}**",
+        f"- Código de saída: **{exit_code}**",
+        f"- Resíduos da família investigada: **{summary['confirmed_family_residues']}**",
+        f"- Referências históricas: **{summary['historical_references']}**",
+        f"- Registros informativos: **{summary['informational_records']}**",
+        f"- Indicadores ativos no banco de dados: **{summary['active_database_markers']}**",
+        f"- Arquivos confirmados como comprometidos: **{summary['confirmed_compromised_files']}**",
+        f"- Padrões de arquivos legítimos validados: **{summary['validated_legitimate_files']}**",
+        f"- Configurações de segurança pendentes de validação: **{summary['security_configuration_review']}**",
+        f"- Processos suspeitos: **{summary['suspicious_processes']}**",
+        f"- Divergências no núcleo do WordPress: **{core_count}**",
+        f"- Arquivos de configuração pendentes de análise: **{config_count}**",
+        f"- Indicadores de persistência externa: **{host_indicators}**",
+        f"- Registros do inventário do servidor: **{len(host_records)}** (segurança conhecida: {host_known}; não classificados: {host_unclassified}; suspeitos: {host_indicators}; revisão: {host_review})",
+        *[f"- Problema em verificação opcional: {issue}" for issue in optional_issues],
+        "- Recomendação para reativação: **LIBERAÇÃO NÃO RECOMENDADA**",
+        "", "## Dados da auditoria", "",
+        f"- Versão: `{VERSION}`", f"- SHA-256 da ferramenta: `{sha256(Path(__file__))}`", f"- Modo: `{mode}`",
+        f"- Data e hora (UTC): {dt.datetime.now(dt.timezone.utc).isoformat()}",
+        f"- Ocorrências em arquivos: {len(findings)}", f"- Ocorrências em processos: {len(processes)}",
+        f"- Auditoria do banco de dados: **{'EXECUTED' if audited else 'NOT EXECUTED'}**",
+        f"- Avaliação do banco de dados: {'COMPLETE TARGETED CHECKS' if audited else 'NOT EVALUATED'}",
+        f"- Cópia SQL do banco de dados: {'PERFORMED' if (case / 'database-before.sql').is_file() else 'NOT PERFORMED'}",
+        f"- Cópia dos arquivos do site: {'PERFORMED' if (case / 'site-before.tar.gz').is_file() else 'NOT PERFORMED'}",
+        "", "## Evidências do sistema de arquivos", "",
+        "| Caminho relativo | Classificação | SHA-256 |",
         "|---|---|---|",
     ]
     for finding in findings:
@@ -913,131 +913,131 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
         path = sanitize_relative_path(finding["path"])
         lines.append(f"| `{path}` | {finding['classification']} | {finding['sha256']} |")
     if audited:
-        lines.extend(["", "## Database evidence", "",
-                      f"- Database: `{safe_option_name(db_name or 'UNKNOWN')}`",
-                      f"- Options table: `{(db_prefix or '')}options`",
-                      f"- User metadata table: `{(db_prefix or '')}usermeta`", "",
-                      "| Kind | Name | Count/size | State |",
+        lines.extend(["", "## Evidências do banco de dados", "",
+                      f"- Banco de dados: `{safe_option_name(db_name or 'UNKNOWN')}`",
+                      f"- Tabela de opções: `{(db_prefix or '')}options`",
+                      f"- Tabela de metadados dos usuários: `{(db_prefix or '')}usermeta`", "",
+                      "| Tipo | Nome | Quantidade/tamanho | Situação |",
                       "|---|---|---|---|"])
         for item in database:
             lines.append(f"| {item['kind']} | {item.get('name', '(not supplied)')} | {item['length']} | {item.get('state','')} |")
-        lines.extend(["", "### Evidence details", ""])
+        lines.extend(["", "### Detalhes das evidências", ""])
         for item in database:
             if not item.get("sha256"):
                 continue
             lines.extend([
                 f"#### `{item['name']}`", "",
                 f"- SHA-256: `{item['sha256']}`",
-                f"- Value length: {item['value_length_bytes']} bytes",
-                f"- Classification: `{item['value_classification']}`",
-                f"- Safe evidence: `{item['safe_excerpt']}`",
-                f"- Interpreted value: `{item['safe_excerpt'] if item.get('value_classification') == 'ESCALAR_TEXTO_NUMERO_NAO_CODIFICADO' else '[NOT_EXPOSED]'}`",
-                f"- Decoded excerpt: `{item['decoded_excerpt']}`",
-                *([f"- Collection time (UTC): `{item['collected_at_utc']}`",
-                   f"- Known cron marker matches: {len(item['indicator_matches'])}"]
+                f"- Tamanho do valor: {item['value_length_bytes']} bytes",
+                f"- Classificação: `{item['value_classification']}`",
+                f"- Evidência sem dados sigilosos: `{item['safe_excerpt']}`",
+                f"- Valor interpretado: `{item['safe_excerpt'] if item.get('value_classification') == 'ESCALAR_TEXTO_NUMERO_NAO_CODIFICADO' else '[NOT_EXPOSED]'}`",
+                f"- Trecho decodificado: `{item['decoded_excerpt']}`",
+                *([f"- Coleta (UTC): `{item['collected_at_utc']}`",
+                   f"- Indicadores conhecidos no cron: {len(item['indicator_matches'])}"]
                   if item.get("kind") == "cron_metadata" else []), "",
             ])
-    lines.extend(["", "## WordPress Core integrity", "",
+    lines.extend(["", "## Integridade do núcleo do WordPress", "",
                   f"- Status: `{summary['component_coverage'].get('core', core.get('status', 'NOT EXECUTED'))}`",
-                  f"- Discrepancies: **{core_count}**", ""])
+                  f"- Divergências: **{core_count}**", ""])
     for item in core.get("findings", []):
         lines.append(f"- `{sanitize_relative_path(item.get('path', ''))}`: "
                      f"`{item.get('classification', 'REVIEW')}`")
     if any(item.get("path") == "wp-includes/version.php" for item in core.get("findings", [])):
-        lines.append("- Priority review: `wp-includes/version.php` differs from the reference; this alone does not prove malware.")
-    lines.extend(["", "## WordPress configuration inventory", "",
-                  f"- Configuration files requiring review: **{config_count}**", "",
-                  "| Relative path | Classification | SHA-256 |", "|---|---|---|"])
+        lines.append("- Priority revisão: `wp-includes/version.php` difere da referência; isso isoladamente não comprova a presença de malware.")
+    lines.extend(["", "## Inventário de configurações do WordPress", "",
+                  f"- Arquivos de configuração pendentes de análise: **{config_count}**", "",
+                  "| Caminho relativo | Classificação | SHA-256 |", "|---|---|---|"])
     for item in configurations:
         lines.append(f"| `{sanitize_relative_path(item.get('path', ''))}` | "
                      f"{item.get('classification', 'REVIEW')} | `{item.get('sha256', '')}` |")
-    lines.extend(["", "## External persistence summary", "",
-                  f"- Suspicious indicators: **{host_indicators}**",
-                  f"- Legitimate/inventory items: **{host_legitimate}**",
-                  f"- Items requiring review: **{host_review}**",
-                  "- Detailed host paths remain in the internal host-persistence.json.", ""])
-    lines.extend(["", "## Technical opinion", ""])
+    lines.extend(["", "## Resumo da persistência externa", "",
+                  f"- Indicadores suspeitos: **{host_indicators}**",
+                  f"- Itens legítimos ou de inventário: **{host_legitimate}**",
+                  f"- Items requiring revisão: **{host_review}**",
+                  "- Os caminhos completos do servidor permanecem no arquivo técnico interno host-persistence.json.", ""])
+    lines.extend(["", "## Parecer técnico", ""])
     critical = [x for x in findings if x["classification"] == "IOC_REQUER_VALIDACAO"]
     if audited:
         def positive(kind: str) -> int:
             return sum(item.get("state") not in ("NOT_FOUND", "ABSENT")
                        for item in database if item["kind"] == kind)
         lines.extend([
-            f"- Confirmed family residues: **{positive('family_option')}**.",
-            f"- Historical references: **{positive('historical_cache')}**.",
-            f"- Informational records: **{sum(int(item['length']) for item in database if item['kind'] in ('session_rows', 'application_password_rows'))}**.",
-            f"- Active database markers: **{positive('marker_option') + positive('cron_marker') + positive('active_plugins_marker')}**.",
+            f"- Resíduos da família investigada: **{positive('family_option')}**.",
+            f"- Referências históricas: **{positive('historical_cache')}**.",
+            f"- Registros informativos: **{sum(int(item['length']) for item in database if item['kind'] in ('session_rows', 'application_password_rows'))}**.",
+            f"- Indicadores ativos no banco de dados: **{positive('marker_option') + positive('cron_marker') + positive('active_plugins_marker')}**.",
             f"- Informational session records: **{sum(int(item['length']) for item in database if item['kind'] == 'session_rows')}**.",
         ])
-    lines.append(f"- Files requiring IOC investigation: **{len(critical)}**.")
-    lines.append(f"- Matching process indicators: **{len(processes)}**.")
+    lines.append(f"- Arquivos que exigem investigação de indicadores: **{len(critical)}**.")
+    lines.append(f"- Processos compatíveis com indicadores: **{len(processes)}**.")
     if not audited:
-        lines.append("- **Database was not audited. No conclusion about database persistence, cron, sessions or administrators is supported.**")
+        lines.append("- **O banco de dados não foi auditado. Não é possível concluir sobre persistência, cron, sessões ou administradores.**")
     else:
         def total(kind: str) -> int:
             return sum(int(x["length"]) if kind in ("session_rows", "application_password_rows") else (x.get("state") != "NOT_FOUND")
                        for x in database if x["kind"] == kind)
         family = total("family_option")
-        lines.append(f"- Family-specific option/transient residues: **{family}**.")
-        lines.append(f"- Matching suspicious administrator naming pattern: **{total('suspicious_users')}**.")
-        lines.append(f"- Stored WordPress session records: **{total('session_rows')}**.")
-        lines.append(f"- Historical plugin update-cache references: **{total('historical_cache')}**; this is not evidence of active execution.")
+        lines.append(f"- Resíduos em opções e transientes: **{family}**.")
+        lines.append(f"- Administradores com nomes suspeitos: **{total('suspicious_users')}**.")
+        lines.append(f"- Sessões armazenadas do WordPress: **{total('session_rows')}**.")
+        lines.append(f"- Referências históricas no cache de atualização de plugins: **{total('historical_cache')}**; this is not evidence of active execution.")
         for kind, name in (("cron_marker", "cron"), ("active_plugins_marker", "active_plugins")):
-            lines.append(f"- Known indicators in `{name}`: **{total(kind)}**.")
+            lines.append(f"- Indicadores conhecidos em `{name}`: **{total(kind)}**.")
         if family or total("marker_option") or total("cron_marker") or total("active_plugins_marker"):
-            lines.append("- **Known compromise-related database markers remain; do not declare this installation clean.**")
+            lines.append("- **Persistem indicadores de comprometimento no banco de dados; não declare esta instalação segura.**")
         else:
-            lines.append("- No selected database IOC was observed; this is not a clean-site certification.")
+            lines.append("- Nenhum dos indicadores pesquisados foi encontrado no banco de dados; isso não certifica a integridade do site.")
     if audited:
-        lines.extend(["", "### Dynamic WordPress cron option", "",
-                      "WordPress modifies cron automatically; changes in hash or size alone do not indicate compromise.",
-                      "Examine indicator matches and collection time together.", ""])
-    lines.extend(["", "## Release recommendation", "",
+        lines.extend(["", "### Agendamento dinâmico do WordPress (cron)", "",
+                      "O WordPress modifica o agendamento cron automaticamente. Alterações isoladas no hash ou tamanho não comprovam comprometimento.",
+                      "Analise conjuntamente os indicadores identificados e o momento da coleta.", ""])
+    lines.extend(["", "## Recomendação para reativação", "",
                   "**LIBERAÇÃO NÃO RECOMENDADA**",
                   "An audit alone does not authorize reopening. A qualified operator must validate remediation, "
                   "evidence completeness, persistence checks and backups before approving release.", ""])
-    lines.extend(["", "## Classification legend", "",
+    lines.extend(["", "## Legenda das classificações", "",
                   "- `RESIDUO_FAMILIA_REQUER_LIMPEZA`: family-specific database residue.",
                   "- `HISTORICAL_REFERENCE`: historic cache reference, not proof of execution.",
                   "- `LEGITIMO_VALIDADO`: recognized plugin guard pattern, not cryptographic verification.",
                   "- `CONFIGURACAO_PLUGIN_SEGURANCA_REQUER_VALIDACAO`: security plugin configuration needs contextual analysis.",
                   "- `PRESENT`: informational record exists.",
                   "- `NOT_FOUND`: check ran with no matching records.",
-                  "", "## Limitations", "",
+                  "", "## Limitações", "",
                   "Classification of plugin guard files is signature-based, not proof of package integrity.",
                   "No findings never establish that a site is clean. Review evidence before distributing reports."])
     write_private(case / "technical-report.md", "\n".join(lines) + "\n")
     management = [
-        "# WordPress Integrity Audit — Management Summary", "",
-        f"- Domain: `{domain}`",
-        f"- Case ID: `{case_id}`",
-        f"- Final status: **{status}**",
-        f"- Exit code: **{exit_code}**",
-        f"- Confirmed family residues: **{summary['confirmed_family_residues']}**",
-        f"- Historical references: **{summary['historical_references']}**",
-        f"- Informational records: **{summary['informational_records']}**",
-        f"- Active database markers: **{summary['active_database_markers']}**",
-        f"- Suspicious processes: **{summary['suspicious_processes']}**",
-        f"- WordPress Core discrepancies requiring review: **{core_count}**",
-        f"- Administrator role inventory: **{summary['administrator_inventory']['coverage']}** (count: {summary['administrator_inventory']['count'] if summary['administrator_inventory']['count'] is not None else 'not determined'})",
-        f"- WordPress configuration files requiring review: **{config_count}**",
-        f"- External persistence indicators: **{host_indicators}**",
-        f"- Host inventory records requiring review: **{host_review}**",
-        "", "## Risk overview", "",
-        f"- Database risk: **{'HIGH' if summary['confirmed_family_residues'] or summary['active_database_markers'] else 'LOW — no selected database IOC' if audited else 'NOT DETERMINED'}**",
-        f"- File risk: **{'REQUIRES REVIEW' if summary['file_indicators_requiring_review'] else 'LOW FOR SELECTED INDICATORS'}**",
-        f"- Core risk: **{'MEDIUM — REVIEW REQUIRED' if core_count else 'MEDIUM — outdated release; official checksums verified' if component_result and component_result['summary'].get('core_outdated') and component_result['coverage'].get('core') == 'EXECUTED' else 'NO EXPLICIT MISMATCH DETECTED' if component_result and component_result['coverage'].get('core') == 'EXECUTED' else 'NOT DETERMINED'}**",
-        f"- External persistence risk: **{persistence_risk}**",
-        "- No known indicators found does not prove absence of persistence.",
-        "", "## Recommendation", "",
-        "**RELEASE REQUIRES REVIEW**" if exit_code else "**NO EXPLICIT MARKERS; RELEASE STILL REQUIRES OPERATOR APPROVAL**",
-        "Resolve all review findings and validate deployment readiness before release." if exit_code else "No selected indicators were found; this is not a guarantee of a clean site.",
-        "", "## Coverage", "",
-        f"- Database audit: {'EXECUTED' if audited else 'NOT EXECUTED'}",
-        f"- Core verification: {summary['component_coverage'].get('core', core.get('status', 'NOT EXECUTED'))}",
-        f"- Database dump: {'PERFORMED' if (case / 'database-before.sql').is_file() else 'NOT PERFORMED'}",
-        f"- File snapshot: {'PERFORMED' if (case / 'site-before.tar.gz').is_file() else 'NOT PERFORMED'}",
-        "", "Detailed infrastructure evidence is retained in the internal technical report.", "",
+        "# Auditoria de Integridade WordPress — Relatório Gerencial", "",
+        f"- Domínio: `{domain}`",
+        f"- Identificação do caso: `{case_id}`",
+        f"- Situação final: **{status}**",
+        f"- Código de saída: **{exit_code}**",
+        f"- Resíduos da família investigada: **{summary['confirmed_family_residues']}**",
+        f"- Referências históricas: **{summary['historical_references']}**",
+        f"- Registros informativos: **{summary['informational_records']}**",
+        f"- Indicadores ativos no banco de dados: **{summary['active_database_markers']}**",
+        f"- Processos suspeitos: **{summary['suspicious_processes']}**",
+        f"- WordPress Core discrepancies requiring revisão: **{core_count}**",
+        f"- Inventário de administradores: **{summary['administrator_inventory']['coverage']}** (count: {summary['administrator_inventory']['count'] if summary['administrator_inventory']['count'] is not None else 'not determined'})",
+        f"- WordPress configuration files requiring revisão: **{config_count}**",
+        f"- Indicadores de persistência externa: **{host_indicators}**",
+        f"- Host inventory records requiring revisão: **{host_review}**",
+        "", "## Visão geral dos riscos", "",
+        f"- Risco do banco de dados: **{'HIGH' if summary['confirmed_family_residues'] or summary['active_database_markers'] else 'LOW — no selected database IOC' if audited else 'NOT DETERMINED'}**",
+        f"- Risco dos arquivos: **{'REQUIRES REVIEW' if summary['file_indicators_requiring_review'] else 'LOW FOR SELECTED INDICATORS'}**",
+        f"- Risco do núcleo do WordPress: **{'MEDIUM — REVIEW REQUIRED' if core_count else 'MEDIUM — outdated release; official checksums verified' if component_result and component_result['summary'].get('core_outdated') and component_result['coverage'].get('core') == 'EXECUTED' else 'NO EXPLICIT MISMATCH DETECTED' if component_result and component_result['coverage'].get('core') == 'EXECUTED' else 'NOT DETERMINED'}**",
+        f"- Risco de persistência externa: **{persistence_risk}**",
+        "- A ausência de indicadores conhecidos não comprova ausência de persistência.",
+        "", "## Recomendação", "",
+        "**REATIVAÇÃO DEPENDE DE REVISÃO TÉCNICA**" if exit_code else "**SEM INDICADORES EXPLÍCITOS; REATIVAÇÃO AINDA EXIGE APROVAÇÃO TÉCNICA**",
+        "Resolva as pendências identificadas e valide a segurança do ambiente antes da reativação." if exit_code else "Não foram encontrados os indicadores pesquisados; isso não garante que o site esteja livre de comprometimento.",
+        "", "## Abrangência da auditoria", "",
+        f"- Auditoria do banco de dados: {'EXECUTED' if audited else 'NOT EXECUTED'}",
+        f"- Verificação do núcleo: {summary['component_coverage'].get('core', core.get('status', 'NOT EXECUTED'))}",
+        f"- Cópia SQL do banco de dados: {'PERFORMED' if (case / 'database-before.sql').is_file() else 'NOT PERFORMED'}",
+        f"- Cópia dos arquivos do site: {'PERFORMED' if (case / 'site-before.tar.gz').is_file() else 'NOT PERFORMED'}",
+        "", "As evidências detalhadas da infraestrutura estão preservadas no relatório técnico interno.", "",
     ]
     management.extend(customer_findings(findings, database, configurations, component_result))
     write_private(case / "report.md", "\n".join(management) + "\n")
