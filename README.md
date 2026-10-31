@@ -25,6 +25,9 @@ O arquivo de configuração e o arquivo separado com a senha SMTP devem permanec
 
 ## Relatórios em português
 
+Na versão 0.21.8, a geração do PDF prioriza fontes TrueType Unicode disponíveis no Debian/Ubuntu para representar corretamente os acentos. O teste opcional também gera um documento em português com várias páginas, mas não substitui a inspeção visual por um responsável técnico. Para habilitar o teste, instale ReportLab em um ambiente virtual isolado.
+
+
 Na versão 0.21.7, três expectativas da suíte de testes foram alinhadas com a apresentação em português, sem modificar a lógica de auditoria. Na versão 0.21.6, foram corrigidas a prioridade dos achados de configuração e descrições do parecer técnico. Novos testes verificam essa apresentação e o mapeamento de estados. A aprovação para entrega ao cliente ainda depende dos testes em Debian/Ubuntu e da revisão visual de um PDF de auditoria real.
 
 
