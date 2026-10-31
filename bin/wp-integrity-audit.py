@@ -715,22 +715,32 @@ def verify_evidence_manifest(case: Path) -> dict:
 
 
 def bundle_case_evidence(case: Path) -> Path:
-    """Package restricted case evidence only on explicit operator request."""
+    """Package restricted evidence atomically after a sensitive-file preflight."""
     archive = case / "evidence-bundle.tar.gz"
-    if archive.exists() or archive.is_symlink():
-        raise AuditError("Refusing to overwrite an existing evidence bundle")
-    if not (case / "evidence-manifest.json").is_file():
-        raise AuditError("Evidence manifest must exist before packaging")
-    with tarfile.open(archive, "w:gz") as output:
-        for path in sorted(case.rglob("*")):
-            if path.is_symlink() or not path.is_file() or path == archive:
-                continue
-            if path.name == "mysql-client.cnf":
-                raise AuditError("Refusing to package a database credential file")
-            output.add(path, arcname=path.relative_to(case).as_posix(), recursive=False)
-    archive.chmod(0o600)
     digest_path = case / "evidence-bundle.sha256"
-    write_private(digest_path, sha256(archive) + "  evidence-bundle.tar.gz\n")
+    if archive.exists() or archive.is_symlink() or digest_path.exists() or digest_path.is_symlink():
+        raise AuditError("Refusing to overwrite an existing evidence bundle")
+    manifest = case / "evidence-manifest.json"
+    if manifest.is_symlink() or not manifest.is_file():
+        raise AuditError("Evidence manifest must exist before packaging")
+    paths = [path for path in sorted(case.rglob("*"))
+             if path.is_file() and not path.is_symlink() and path not in (archive, digest_path)]
+    if any(path.name == "mysql-client.cnf" for path in paths):
+        raise AuditError("Refusing to package a database credential file")
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(prefix=".evidence-bundle-", suffix=".tmp",
+                                         dir=case, delete=False) as stream:
+            temporary = Path(stream.name)
+        with tarfile.open(temporary, "w:gz") as output:
+            for path in paths:
+                output.add(path, arcname=path.relative_to(case).as_posix(), recursive=False)
+        temporary.chmod(0o600)
+        os.replace(temporary, archive)
+        write_private(digest_path, sha256(archive) + "  evidence-bundle.tar.gz\n")
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
     return archive
 
 
