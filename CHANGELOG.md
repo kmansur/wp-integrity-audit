@@ -384,3 +384,5 @@ All project documentation and source commentary are in English. Versions follow 
 
 - Expand passive Debian/Ubuntu persistence inventory to include `/etc/profile.d`, `/etc/rc.local`, `/etc/ld.so.preload`, `/etc/sudoers.d` and `/var/spool/cron`.
 - Eliminate automatic trusted-security-component classification based only on a `bitninja` substring in a filesystem path.
+
+- Add a conditional real PDF smoke test that verifies PDF magic bytes and owner-only permissions when the optional ReportLab dependency is present.
