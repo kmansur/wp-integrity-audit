@@ -397,3 +397,15 @@ All project documentation and source commentary are in English. Versions follow 
 
 ### Operational limits
 - PDF export remains optional and must be visually checked with real long incident reports before customer delivery.
+
+## [0.21.0] - 2026-10-31
+
+### Added
+- Explicit `--email-to` and `--smtp-config` CLI switches to send only the customer management PDF after a read-only audit.
+- External INI SMTP configuration with validated TLS (`starttls` or `ssl`) and a separate owner-only password file; credential values never belong in the repository.
+- Non-secret sample `config/smtp.example.cfg`.
+- Sender and recipient validation, safe email attachments, fail-closed TLS and controlled mail-delivery error handling.
+- Regression tests for permissive SMTP file permissions and email header injection.
+
+### Security
+- Sending is always opt-in. SMTP errors return 30 and do not convert unresolved audit findings into success. An accepted SMTP submission does not guarantee mailbox delivery.
