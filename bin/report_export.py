@@ -1,4 +1,4 @@
-"""Optional, local PDF export of the public management report (no network)."""
+"""Exportação local opcional do relatório gerencial em PDF, sem acesso à rede."""
 from __future__ import annotations
 from pathlib import Path
 import os
@@ -6,15 +6,15 @@ import tempfile
 
 
 class PDFExportError(RuntimeError):
-    """PDF export was requested but cannot be completed securely."""
+    """A exportação do PDF não pôde ser concluída com segurança."""
 
 
 def export_management_pdf(case: Path) -> Path:
-    """Export only report.md; never include private technical evidence or secrets."""
+    """Exportar apenas report.md, sem evidências técnicas sigilosas ou credenciais."""
     source = case / "report.md"
     output = case / "management-report.pdf"
     if source.is_symlink() or not source.is_file() or output.is_symlink():
-        raise PDFExportError("Missing or unsafe management report source/destination")
+        raise PDFExportError("Origem ou destino do relatório gerencial ausente ou inseguro")
     try:
         from reportlab.lib.pagesizes import A4
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -23,7 +23,7 @@ def export_management_pdf(case: Path) -> Path:
         from reportlab.lib.colors import HexColor
         from xml.sax.saxutils import escape
     except ImportError as error:
-        raise PDFExportError("PDF export requires optional dependency: pip install reportlab") from error
+        raise PDFExportError("A exportação para PDF exige a dependência opcional: pip install reportlab") from error
     styles = getSampleStyleSheet()
     styles.add(ParagraphStyle(name="FindingTitle", parent=styles["Heading3"],
                               textColor=HexColor("#26364D"), spaceBefore=11, spaceAfter=5))
@@ -52,22 +52,22 @@ def export_management_pdf(case: Path) -> Path:
         temporary = Path(handle.name)
     doc = SimpleDocTemplate(str(temporary), pagesize=A4, rightMargin=43, leftMargin=43,
                             topMargin=55, bottomMargin=50,
-                            title="WordPress Integrity Audit - Management Report")
+                            title="Auditoria de Integridade WordPress - Relatório Gerencial")
     def footer(canvas, document):
         canvas.saveState()
         canvas.setFont("Helvetica", 8)
-        canvas.drawRightString(A4[0] - 43, 31, f"Page {document.page}")
+        canvas.drawRightString(A4[0] - 43, 31, f"Página {document.page}")
         canvas.restoreState()
     try:
         doc.build(elements, onFirstPage=footer, onLaterPages=footer)
         with temporary.open("rb") as rendered:
             header = rendered.read(5)
         if header != b"%PDF-":
-            raise PDFExportError("PDF renderer did not produce a valid PDF header")
+            raise PDFExportError("A geração não produziu um cabeçalho PDF válido")
         temporary.chmod(0o600)
         os.replace(temporary, output)
         return output
     except Exception as error:
-        raise PDFExportError("PDF rendering failed; no completed PDF was published") from error
+        raise PDFExportError("Falha ao gerar PDF; nenhum documento incompleto foi publicado") from error
     finally:
         temporary.unlink(missing_ok=True)
