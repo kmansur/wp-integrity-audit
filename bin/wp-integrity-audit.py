@@ -33,7 +33,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 
-VERSION = "0.21.9"
+VERSION = "0.21.10"
 IOC = re.compile(r"SC_ADV_BEGIN|--sc-cli|--sc-succ|trace-inspector-pad|cipher-feeder|_sc_fpc|sc_cron_guard|sc_persist_manifest|sc_own_manifest|function ceya")
 PATTERN_NAMES = (".sc_", ".gr_", ".gk_", ".kk_", ".wp-object-cache")
 SCRIPT_EXTENSIONS = {".php", ".phtml", ".phar", ".inc", ".php5", ".php7", ".php8", ".pht", ".phps"}
@@ -762,16 +762,16 @@ def bundle_case_evidence(case: Path) -> Path:
 
 def incident_containment_note(case: Path, domain: str) -> None:
     """Do not fabricate an incident timeline or outage authorization."""
-    content = ("# Incident containment record (operator completion required)\n\n"
-               f"- Domain: {domain}\n"
-               "- Website taken offline: NOT VERIFIED BY THIS AUDIT\n"
-               "- Outage start and end time: NOT DOCUMENTED\n"
-               "- Containment decision maker: NOT DOCUMENTED\n"
-               "- Decision authorization: NOT DOCUMENTED\n"
-               "- Operational impact and scope: NOT DOCUMENTED\n"
-               "- Evidence supporting containment: Refer to individually listed findings in report.md\n"
-               "- Criteria for reinstatement: REQUIRE OWNER APPROVAL\n\n"
-               "Do not use this template to imply that the auditor confirmed an outage or approved an interruption.\n")
+    content = ("# Registro de contenção do incidente (preenchimento pelo responsável)\\n\\n"
+               f"- Domínio: {domain}\\n"
+               "- Site retirado do ar: NÃO VERIFICADO NESTA AUDITORIA\\n"
+               "- Início e término da indisponibilidade: NÃO DOCUMENTADOS\\n"
+               "- Responsável pela decisão de contenção: NÃO DOCUMENTADO\\n"
+               "- Autorização da decisão: NÃO DOCUMENTADA\\n"
+               "- Impacto e abrangência operacional: NÃO DOCUMENTADOS\\n"
+               "- Evidências que justificam a contenção: consultar os achados individuais em report.md\\n"
+               "- Critérios para reativação: EXIGEM APROVAÇÃO DO RESPONSÁVEL\\n\\n"
+               "Este modelo não comprova indisponibilidade nem autorização para interromper o serviço.\\n")
     write_private(case / "incident-containment-record.md", content)
 
 
