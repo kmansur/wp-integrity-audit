@@ -169,3 +169,7 @@ Enable `--pdf-report` only when the local optional `reportlab` dependency is ins
 ## Administrator inventory
 
 Review `administrator-inventory.json` in the restricted case folder. Correlate account IDs and registration metadata with approved account-management records. Login names are hashed; note that unsalted hashes of human-readable names can be guessable and must remain private. The inventory does not imply that a privileged user is malicious and does not cover all WordPress multisite privilege mechanisms.
+
+## Verify and preserve a case
+
+After capture, verify integrity with `--verify-case CASE_DIRECTORY`. It does not modify the source case, and it returns 40 if the evidence differs from the recorded manifest. Optionally produce a restricted bundle during the audit using `--bundle-evidence`, then transfer it to independently secured storage with a documented custody process. Compare its sidecar SHA-256 after transfer. Do not publish the bundle: it contains technical evidence that may disclose infrastructure context. The main findings' exit codes preserve known-residue precedence even when other reviews coexist.
