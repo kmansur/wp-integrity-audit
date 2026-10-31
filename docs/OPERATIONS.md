@@ -185,3 +185,7 @@ The auditor now inventories `/etc/profile.d`, `/etc/rc.local`, `/etc/ld.so.prelo
 ## Handling PDF export failures
 
 When `--pdf-report` fails (missing ReportLab or a renderer error), the CLI uses execution error code 30 and does not intentionally leave a partially published PDF. Inspect the restricted case `report.md` and its evidence before retrying. Do not treat a successful CLI run as visual validation of multipage layout; inspect output with an appropriate PDF viewer prior to external distribution.
+
+## Explicit SMTP delivery (0.21.0)
+
+Copy `config/smtp.example.cfg` to `/etc/wp-integrity-audit/smtp.cfg` and configure hostname, verified TLS mode, sender, username and an absolute password_file. Restrict both files to 0600 and secure the directory. Use `--email-to recipient@example.com --smtp-config /etc/wp-integrity-audit/smtp.cfg` during a normal read-only audit. This sends only `management-report.pdf`; it never attaches `technical-report.md` or the private case bundle. The receiver must be authorized before executing. A failed SMTP operation produces exit 30; always inspect `report.json` separately to determine the actual audit findings. Avoid configuring plaintext SMTP or putting authentication secrets into the .cfg itself.
