@@ -1700,7 +1700,7 @@ def parse_args() -> argparse.Namespace:
             parser.error("--verify-case must be used alone without a target or report options")
         return args
     if args.compare:
-        if args.target is not None or args.mode != "audit" or args.skip_db or args.source or args.core_source or args.skip_core or args.skip_host_persistence or args.skip_files or args.skip_config or args.skip_processes or args.skip_elementor or args.skip_version_check or args.offline or args.official_compare:
+        if args.target is not None or args.email_to or args.smtp_config or args.mode != "audit" or args.skip_db or args.source or args.core_source or args.skip_core or args.skip_host_persistence or args.skip_files or args.skip_config or args.skip_processes or args.skip_elementor or args.skip_version_check or args.offline or args.official_compare:
             parser.error("--compare cannot be combined with a target or audit/recovery options")
         return args
     if bool(args.email_to) != bool(args.smtp_config):
