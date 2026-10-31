@@ -4,6 +4,15 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 
 ## [Não publicado]
 
+## [0.21.5] - 2026-10-31
+
+### Correções de internacionalização
+- Restaurado o contrato de valores de `persistence_risk` no JSON; a tradução é aplicada apenas na apresentação do relatório.
+- Traduzidas descrições e prioridades dos achados individuais e justificativas de indisponibilidade.
+- Corrigidas asserções de teste ainda dependentes de textos antigos em inglês.
+- Mantidas as classificações técnicas e os valores estruturados; testes de regressão aguardam nova execução no Linux.
+
+
 ## [0.21.4] - 2026-10-31
 
 ### Correções
