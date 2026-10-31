@@ -1010,6 +1010,26 @@ $table_prefix = 'wp_';
                     report_export.export_management_pdf(case)
             self.assertFalse((case / "management-report.pdf").exists())
 
+    def test_administrator_inventory_hash_only(self):
+        import json
+        with tempfile.TemporaryDirectory() as folder:
+            case = Path(folder)
+            with unittest.mock.patch.object(audit, "query_db", return_value=[
+                ["7", "a" * 64, "2026-10-01 10:00:00"]]):
+                result = audit.admin_account_inventory("cnf", "wordpress", "wp_", case)
+            self.assertEqual(result["count"], 1)
+            saved = json.loads((case / "administrator-inventory.json").read_text())
+            self.assertEqual(saved["coverage"], "EXECUTED")
+            self.assertEqual(saved["accounts"][0]["login_sha256"], "a" * 64)
+            self.assertNotIn("admin@example", (case / "administrator-inventory.json").read_text())
+
+    def test_administrator_inventory_reports_unavailable_not_zero(self):
+        with tempfile.TemporaryDirectory() as folder:
+            with unittest.mock.patch.object(audit, "query_db", side_effect=audit.AuditError("denied")):
+                result = audit.admin_account_inventory("cnf", "wordpress", "wp_", Path(folder))
+            self.assertEqual(result["coverage"], "UNAVAILABLE")
+            self.assertIsNone(result["count"])
+
     def test_secret_redaction(self):
         self.assertNotIn("example-secret", audit.redact("password=example-secret"))
         self.assertNotIn("192.168.1.20", audit.redact("192.168.1.20"))
