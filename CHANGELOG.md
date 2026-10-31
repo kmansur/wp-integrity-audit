@@ -4,6 +4,14 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 
 ## [Não publicado]
 
+## [0.21.8] - 2026-10-31
+
+### PDF e testes
+- O gerador PDF prioriza DejaVu Sans ou Liberation Sans em Debian/Ubuntu, preservando uma alternativa quando as fontes não estão instaladas.
+- Novo teste opcional com acentuação e múltiplas páginas, sem incluir evidências técnicas privadas.
+- A inspeção visual com arquivo real e os testes em Linux ainda são necessários; não classificar esta versão como estável.
+
+
 ## [0.21.7] - 2026-10-31
 
 ### Testes
