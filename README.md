@@ -25,6 +25,9 @@ O arquivo de configuração e o arquivo separado com a senha SMTP devem permanec
 
 ## Relatórios em português
 
+Na versão 0.21.9, o teste opcional do PDF verifica também a extração dos acentos e a paginação quando o pacote `PyMuPDF` (`fitz`) estiver disponível. A verificação isolada do mecanismo de PDF não substitui a auditoria de integração nem a inspeção visual de um relatório real. A ferramenta permanece em pré-lançamento.
+
+
 Na versão 0.21.8, a geração do PDF prioriza fontes TrueType Unicode disponíveis no Debian/Ubuntu para representar corretamente os acentos. O teste opcional também gera um documento em português com várias páginas, mas não substitui a inspeção visual por um responsável técnico. Para habilitar o teste, instale ReportLab em um ambiente virtual isolado.
 
 
