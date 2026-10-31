@@ -33,7 +33,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 
-VERSION = "0.21.0"
+VERSION = "0.21.1"
 IOC = re.compile(r"SC_ADV_BEGIN|--sc-cli|--sc-succ|trace-inspector-pad|cipher-feeder|_sc_fpc|sc_cron_guard|sc_persist_manifest|sc_own_manifest|function ceya")
 PATTERN_NAMES = (".sc_", ".gr_", ".gk_", ".kk_", ".wp-object-cache")
 SCRIPT_EXTENSIONS = {".php", ".phtml", ".phar", ".inc", ".php5", ".php7", ".php8", ".pht", ".phps"}
@@ -1668,7 +1668,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--db-host")
     parser.add_argument("--replace-plugins-themes", action="store_true")
     parser.add_argument("--official-sync", action="store_true")
-    parser.add_argument("--case-root", type=Path, default=Path("/var/lib/wp-integrity-audit/cases"))
+    parser.add_argument("--case-root", type=Path, default=Path("/var/lib/wp-integrity-audit/cases"),
+                        help="Evidence root (default: /var/lib/wp-integrity-audit/cases)")
     # A normal audit enables every available passive probe.
     # Mutating operations always require separate explicit mode and confirmation.
     parser.add_argument("--skip-version-check", action="store_true", help="Disable Core, plugin and theme version checks")
@@ -1676,7 +1677,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--bundle-evidence", action="store_true", help="Create private forensic evidence tarball (sensitive)")
     parser.add_argument("--verify-case", type=Path, help="Verify a collected case manifest without scanning WordPress")
     parser.add_argument("--email-to", help="Email the management PDF to this explicit recipient")
-    parser.add_argument("--smtp-config", type=Path, help="Private external SMTP .cfg path")
+    parser.add_argument("--config", "--smtp-config", dest="smtp_config", type=Path,
+                        default=Path("/etc/wp-integrity-audit/config.cfg"),
+                        help="Private SMTP configuration (default: /etc/wp-integrity-audit/config.cfg)")
     parser.add_argument("--pdf-report", action="store_true", help="Export the management report as PDF (optional reportlab dependency)")
     parser.add_argument("--show-report", action="store_true", help="Print management report on a terminal")
     parser.add_argument("--no-show-report", action="store_true", help="Never print management report")
@@ -1700,11 +1703,9 @@ def parse_args() -> argparse.Namespace:
             parser.error("--verify-case must be used alone without a target or report options")
         return args
     if args.compare:
-        if args.target is not None or args.email_to or args.smtp_config or args.mode != "audit" or args.skip_db or args.source or args.core_source or args.skip_core or args.skip_host_persistence or args.skip_files or args.skip_config or args.skip_processes or args.skip_elementor or args.skip_version_check or args.offline or args.official_compare:
+        if args.target is not None or args.email_to or args.mode != "audit" or args.skip_db or args.source or args.core_source or args.skip_core or args.skip_host_persistence or args.skip_files or args.skip_config or args.skip_processes or args.skip_elementor or args.skip_version_check or args.offline or args.official_compare:
             parser.error("--compare cannot be combined with a target or audit/recovery options")
         return args
-    if bool(args.email_to) != bool(args.smtp_config):
-        parser.error("--email-to and --smtp-config must be used together")
     if args.email_to and (args.compare or args.verify_case or args.mode != "audit"):
         parser.error("Email delivery requires a normal read-only audit")
     if args.compare_output:
