@@ -973,6 +973,32 @@ $table_prefix = 'wp_';
         self.assertNotIn("do-not-show-secret", text)
         self.assertIn("service interruption", text.lower())
 
+    def test_evidence_manifest_rejects_symlinks_and_has_valid_hashes(self):
+        import json
+        import hashlib
+        with tempfile.TemporaryDirectory() as folder:
+            case = Path(folder) / "case"
+            case.mkdir()
+            (case / "report.md").write_text("Customer report")
+            (case / "technical-report.md").write_text("Private details")
+            (case / "link").symlink_to(case / "report.md")
+            manifest = audit.create_evidence_manifest(case)
+            names = [record["file"] for record in manifest["files"]]
+            self.assertEqual(names, ["report.md", "technical-report.md"])
+            self.assertEqual(manifest["files"][0]["sha256"],
+                             hashlib.sha256(b"Customer report").hexdigest())
+            saved = json.loads((case / "evidence-manifest.json").read_text())
+            self.assertEqual(saved["algorithm"], "SHA-256")
+
+    def test_containment_note_does_not_invent_outage(self):
+        with tempfile.TemporaryDirectory() as folder:
+            case = Path(folder)
+            audit.incident_containment_note(case, "example.test")
+            content = (case / "incident-containment-record.md").read_text()
+            self.assertIn("NOT VERIFIED BY THIS AUDIT", content)
+            self.assertIn("NOT DOCUMENTED", content)
+            self.assertIn("example.test", content)
+
     def test_secret_redaction(self):
         self.assertNotIn("example-secret", audit.redact("password=example-secret"))
         self.assertNotIn("192.168.1.20", audit.redact("192.168.1.20"))
