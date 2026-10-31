@@ -173,3 +173,7 @@ Review `administrator-inventory.json` in the restricted case folder. Correlate a
 ## Verify and preserve a case
 
 After capture, verify integrity with `--verify-case CASE_DIRECTORY`. It does not modify the source case, and it returns 40 if the evidence differs from the recorded manifest. Optionally produce a restricted bundle during the audit using `--bundle-evidence`, then transfer it to independently secured storage with a documented custody process. Compare its sidecar SHA-256 after transfer. Do not publish the bundle: it contains technical evidence that may disclose infrastructure context. The main findings' exit codes preserve known-residue precedence even when other reviews coexist.
+
+## Cross-case component history and review priorities
+
+Compare two complete audit cases using `--compare OLD_CASE NEW_CASE` and inspect `comparison.json`/`comparison.md` for added, removed and changed component-version states, where both cases include component metadata. Customer-facing review priorities communicate triage urgency, not an independently validated severity score or confirmation of malicious execution.
