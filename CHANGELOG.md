@@ -4,6 +4,14 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 
 ## [Não publicado]
 
+## [0.21.3] - 2026-10-31
+
+### Relatórios em português
+- Tradução de 91 fragmentos de interface do gerador de relatórios: cabeçalhos, rótulos, legendas e orientações ao cliente e à equipe técnica.
+- Preservação dos códigos de classificação, chaves estruturadas, nomes de evidências e estados internos para evitar quebra de integrações.
+- A tradução ainda não é integral; continuam pendentes mensagens dinâmicas, revisão completa da documentação histórica, testes automatizados e inspeção visual de PDFs com acentuação.
+
+
 ## [0.21.2] - 2026-10-31
 
 ### Internacionalização (pt-BR)
