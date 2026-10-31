@@ -409,3 +409,5 @@ All project documentation and source commentary are in English. Versions follow 
 
 ### Security
 - Sending is always opt-in. SMTP errors return 30 and do not convert unresolved audit findings into success. An accepted SMTP submission does not guarantee mailbox delivery.
+
+- Reject mail delivery options when running historical case comparison; email can only be triggered during an explicit audit.
