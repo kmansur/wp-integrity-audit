@@ -381,3 +381,6 @@ All project documentation and source commentary are in English. Versions follow 
 - Add regression tests for historical plugin-version changes and review-priority wording.
 
 - Create restricted evidence bundles via a temporary private file and atomic rename, rejecting credentials before creating any archive.
+
+- Expand passive Debian/Ubuntu persistence inventory to include `/etc/profile.d`, `/etc/rc.local`, `/etc/ld.so.preload`, `/etc/sudoers.d` and `/var/spool/cron`.
+- Eliminate automatic trusted-security-component classification based only on a `bitninja` substring in a filesystem path.
