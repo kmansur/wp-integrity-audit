@@ -1134,6 +1134,21 @@ $table_prefix = 'wp_';
             self.assertFalse((case / "management-report.pdf").exists())
             self.assertEqual(list(case.glob(".management-report-*")), [])
 
+    def test_mail_delivery_requires_private_config(self):
+        import mail_delivery
+        with tempfile.TemporaryDirectory() as folder:
+            case = Path(folder)
+            config = case / "smtp.cfg"
+            config.write_text("[smtp]\nhost = smtp.example.com\nport = 587\nsecurity = starttls\n")
+            config.chmod(0o644)
+            with self.assertRaises(mail_delivery.MailDeliveryError):
+                mail_delivery.send_management_report(case, "recipient@example.com", config)
+
+    def test_mail_delivery_rejects_header_injection(self):
+        import mail_delivery
+        with self.assertRaises(mail_delivery.MailDeliveryError):
+            mail_delivery._address("recipient@example.com\nBcc: attacker@example.com")
+
     def test_secret_redaction(self):
         self.assertNotIn("example-secret", audit.redact("password=example-secret"))
         self.assertNotIn("192.168.1.20", audit.redact("192.168.1.20"))
