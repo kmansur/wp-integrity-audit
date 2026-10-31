@@ -234,3 +234,7 @@ Completed audits write `evidence-manifest.json`, containing SHA-256 hashes and b
 ## 0.17.0 optional customer PDF
 
 Use `--pdf-report` to generate `management-report.pdf` from the customer-facing `report.md`. Optional dependency: `python3 -m pip install reportlab` in an isolated environment. PDF generation uses no network requests, does not ingest `technical-report.md`, escapes report content before paragraph rendering and restricts generated PDF permissions to owner-only. Without `reportlab`, the CLI fails with an explicit error instead of silently substituting another document. Do not publish the technical case directory.
+
+## 0.18.0 administrator metadata inventory
+
+A normal read-only audit additionally creates `administrator-inventory.json`, listing administrator role candidates as account IDs, SHA-256 pseudonyms and registration dates. Real login names are not exported. `UNAVAILABLE` is recorded if the SQL query cannot run; this is not mistaken for zero administrators. This is an inventory heuristic, not evidence that any user is malicious. Multisite roles and super administrators require further validation.
