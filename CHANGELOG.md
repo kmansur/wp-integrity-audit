@@ -319,3 +319,14 @@ All project documentation and source commentary are in English. Versions follow 
 - Fix overly broad Akismet static-asset extension screening: `refresh` filenames were incorrectly rejected because they contain the suffix `sh`. Only executable file extensions are disallowed.
 
 - Include explicit non-malware provenance-review guidance for plugins missing from WordPress.org and missing-version guidance for locally unreadable plugin headers in component Markdown and CSV evidence.
+
+## [0.15.0] - 2026-10-30
+
+### Added
+- Itemized, customer-facing management-report evidence with individual case IDs, findings, classifications, human-readable meaning and SHA-256 references.
+- Separate documented technical observations from an independently authorized containment decision and avoid claiming incident attribution or exact outage cause.
+- Redact raw database payloads, credentials and internal command details from the client-facing section.
+- Regression test for evidence IDs and prevention of raw SQL value disclosure.
+
+### Limitations
+- Reports show what current read-only probes observed; they cannot independently prove who initiated an outage or that malware executed.
