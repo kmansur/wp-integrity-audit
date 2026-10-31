@@ -248,3 +248,5 @@ The existing `--compare OLD_CASE NEW_CASE` flow also compares Core/plugin/theme 
 Evidence archive creation performs a sensitive-file preflight before writing, then atomically renames the private completed archive. A failed preflight does not intentionally leave a partial bundle.
 
 The host persistence inventory includes additional Debian/Ubuntu cron, login-profile, preload and sudoers configuration paths. It hashes metadata without printing secret file contents. A filename containing a known security product's name is not sufficient to confer a trusted classification.
+
+The test suite also includes a conditional PDF smoke test that renders a sample management report when `reportlab` is installed. An isolated environment with ReportLab is still required for pre-release PDF visual validation.
