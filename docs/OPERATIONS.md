@@ -161,3 +161,7 @@ Review the management report before giving it to the customer. Each case item ha
 ## Case evidence manifest and containment documentation
 
 Keep the generated case outside the WordPress document root, retain restricted permissions and copy the manifest and evidence to independent immutable storage under documented custody. The manifest excludes symlinked files and itself and provides per-file SHA-256 checksums. Record the operator, timestamp, legal authorization, scope and business impact in a separately approved containment record. Never substitute an automatically generated report for an actual outage decision or claim that hashes prove who made changes.
+
+## Customer PDF delivery
+
+Enable `--pdf-report` only when the local optional `reportlab` dependency is installed. Review the generated `management-report.pdf` visually before distribution, especially long evidence IDs and paths. The report is based on `report.md`, which is separate from the restricted technical report. Preserve the case SHA-256 manifest and never email the full evidence directory to an unauthenticated recipient.
