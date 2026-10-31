@@ -4,6 +4,16 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 
 ## [Não publicado]
 
+## [0.21.10] - 2026-10-31
+
+### Registro de incidente
+- Traduzido o modelo `incident-containment-record.md` gerado para o operador, preservando a ressalva de que a auditoria não comprova a suspensão do serviço.
+- Adaptado o teste de regressão da documentação de contenção para o português.
+
+### Pendências de homologação
+- Reexecutar testes no Linux e validar cenários MySQL/PDF. Não classificar como versão estável sem as validações.
+
+
 ## [0.21.9] - 2026-10-31
 
 ### Validação de documentos PDF
