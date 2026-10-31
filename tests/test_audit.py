@@ -1083,6 +1083,33 @@ $table_prefix = 'wp_';
             self.assertEqual(report["status"], "RESIDUOS_REQUEREM_LIMPEZA")
             self.assertTrue(report["summary"]["critical_component_review"])
 
+    def test_historical_case_component_changes(self):
+        import json
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            before, after = root / "before", root / "after"
+            before.mkdir()
+            after.mkdir()
+            for case, version in ((before, "1.0"), (after, "1.1")):
+                (case / "report.json").write_text(json.dumps({
+                    "database": "wordpress", "database_audited": True, "status": "REVISAO_NECESSARIA"}))
+                (case / "file-evidence.json").write_text("[]")
+                (case / "database-evidence.json").write_text("[]")
+                (case / "component-version-evidence.json").write_text(json.dumps({
+                    "components": [{"type": "plugin", "slug": "akismet", "local_version": version,
+                                    "state": "PLUGIN_OFICIAL_ATUAL", "main_file_sha256": "a" * 64}]}))
+            comparison = audit.compare_cases(before, after, root / "out")
+            self.assertEqual(comparison["diff"]["components"]["changed"], ["plugin:akismet"])
+
+    def test_customer_review_priorities_do_not_claim_compromise(self):
+        details = audit.customer_findings([], [
+            {"evidence_id": "DB-001", "kind": "family_option",
+             "name": "sc_test", "state": "RESIDUO_FAMILIA_REQUER_LIMPEZA"}
+        ], [], {})
+        document = "\n".join(details)
+        self.assertIn("HIGH PRIORITY", document)
+        self.assertIn("not proof of active compromise", document)
+
     def test_secret_redaction(self):
         self.assertNotIn("example-secret", audit.redact("password=example-secret"))
         self.assertNotIn("192.168.1.20", audit.redact("192.168.1.20"))
