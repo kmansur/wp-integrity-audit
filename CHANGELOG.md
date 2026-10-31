@@ -1,8 +1,23 @@
-# Changelog
+# Histórico de alterações
 
-All project documentation and source commentary are in English. Versions follow Semantic Versioning.
+O projeto utiliza versionamento semântico. As mensagens e a documentação destinadas ao operador e ao cliente devem ser produzidas em português do Brasil.
 
-## [Unreleased]
+## [Não publicado]
+
+## [0.21.2] - 2026-10-31
+
+### Internacionalização (pt-BR)
+- Tradução do assunto e do corpo dos e-mails enviados ao cliente.
+- Tradução do título, da paginação e das mensagens de falha da exportação PDF.
+- Tradução das mensagens de validação e falha de entrega SMTP.
+- Tradução das opções de ajuda mais utilizadas e das principais mensagens de conclusão da auditoria.
+- Tradução da política de segurança e dos comentários do arquivo de exemplo SMTP.
+- Inclusão de instruções operacionais em português no início do README.
+- Preservação de parâmetros de linha de comando, chaves SMTP e identificadores internos para evitar incompatibilidades.
+
+### Pendente
+- Revisão integral das demais mensagens do programa, conteúdo de relatórios e documentação histórica ainda em inglês, com testes de regressão e validação visual do PDF.
+
 
 ## [0.21.1] - 2026-10-31
 
