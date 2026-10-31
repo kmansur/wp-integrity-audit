@@ -177,3 +177,7 @@ After capture, verify integrity with `--verify-case CASE_DIRECTORY`. It does not
 ## Cross-case component history and review priorities
 
 Compare two complete audit cases using `--compare OLD_CASE NEW_CASE` and inspect `comparison.json`/`comparison.md` for added, removed and changed component-version states, where both cases include component metadata. Customer-facing review priorities communicate triage urgency, not an independently validated severity score or confirmation of malicious execution.
+
+## Expanded passive host persistence checks
+
+The auditor now inventories `/etc/profile.d`, `/etc/rc.local`, `/etc/ld.so.preload`, `/etc/sudoers.d` and `/var/spool/cron` alongside existing cron, systemd, PHP and Apache configuration directories. Results remain metadata/IOC-based; absence of indicators does not prove an uncompromised host. Do not infer security trust from filenames alone.
