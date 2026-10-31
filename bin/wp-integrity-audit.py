@@ -31,7 +31,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 
-VERSION = "0.15.0"
+VERSION = "0.16.0"
 IOC = re.compile(r"SC_ADV_BEGIN|--sc-cli|--sc-succ|trace-inspector-pad|cipher-feeder|_sc_fpc|sc_cron_guard|sc_persist_manifest|sc_own_manifest|function ceya")
 PATTERN_NAMES = (".sc_", ".gr_", ".gk_", ".kk_", ".wp-object-cache")
 SCRIPT_EXTENSIONS = {".php", ".phtml", ".phar", ".inc", ".php5", ".php7", ".php8", ".pht", ".phps"}
@@ -656,6 +656,37 @@ def customer_findings(files, database, configs, components):
                   "Taking a website offline is a separate containment decision requiring documented justification, proportionality and authorization.",
                   "Detailed infrastructure evidence remains in the restricted technical report.", ""])
     return lines
+
+
+def create_evidence_manifest(case: Path) -> dict:
+    """Hash regular private case files without following symlinks."""
+    records = []
+    for path in sorted(case.rglob("*")):
+        if path.is_symlink() or not path.is_file() or path.name == "evidence-manifest.json":
+            continue
+        records.append({"file": path.relative_to(case).as_posix(), "sha256": sha256(path),
+                        "size_bytes": path.stat().st_size})
+    result = {"schema_version": 1, "algorithm": "SHA-256",
+              "generated_utc": dt.datetime.now(dt.timezone.utc).isoformat(),
+              "scope": "case evidence files at time of manifest creation",
+              "files": records, "limitations": "Local hashes establish integrity after capture, not the truth of their contents or who handled them."}
+    write_private(case / "evidence-manifest.json", json.dumps(result, indent=2))
+    return result
+
+
+def incident_containment_note(case: Path, domain: str) -> None:
+    """Do not fabricate an incident timeline or outage authorization."""
+    content = ("# Incident containment record (operator completion required)\n\n"
+               f"- Domain: {domain}\n"
+               "- Website taken offline: NOT VERIFIED BY THIS AUDIT\n"
+               "- Outage start and end time: NOT DOCUMENTED\n"
+               "- Containment decision maker: NOT DOCUMENTED\n"
+               "- Decision authorization: NOT DOCUMENTED\n"
+               "- Operational impact and scope: NOT DOCUMENTED\n"
+               "- Evidence supporting containment: Refer to individually listed findings in report.md\n"
+               "- Criteria for reinstatement: REQUIRE OWNER APPROVAL\n\n"
+               "Do not use this template to imply that the auditor confirmed an outage or approved an interruption.\n")
+    write_private(case / "incident-containment-record.md", content)
 
 
 def make_report(case: Path, mode: str, findings: list[dict], processes: list[str],
@@ -1607,6 +1638,8 @@ def main() -> int:
             make_report(case, args.mode, files, processes)
             component_versions.append_management_section(case)
             mark_incomplete_case(case, omitted)
+            incident_containment_note(case, label)
+            create_evidence_manifest(case)
             print("Audit complete; database NOT EXECUTED")
             present_management_report(case, show=args.show_report, no_show=args.no_show_report)
             return 40
@@ -1631,6 +1664,9 @@ def main() -> int:
                     component_versions.append_management_section(case)
                 if omitted:
                     mark_incomplete_case(case, omitted)
+                if is_audit:
+                    incident_containment_note(case, label)
+                    create_evidence_manifest(case)
                 with (case / "report.json").open(encoding="utf-8") as stream:
                     outcome = json.load(stream)
                 print("Audit complete: status=" + outcome["status"] + "; exit=" + str(outcome["exit_code"]))
