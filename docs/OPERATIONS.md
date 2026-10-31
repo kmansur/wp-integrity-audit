@@ -181,3 +181,7 @@ Compare two complete audit cases using `--compare OLD_CASE NEW_CASE` and inspect
 ## Expanded passive host persistence checks
 
 The auditor now inventories `/etc/profile.d`, `/etc/rc.local`, `/etc/ld.so.preload`, `/etc/sudoers.d` and `/var/spool/cron` alongside existing cron, systemd, PHP and Apache configuration directories. Results remain metadata/IOC-based; absence of indicators does not prove an uncompromised host. Do not infer security trust from filenames alone.
+
+## Handling PDF export failures
+
+When `--pdf-report` fails (missing ReportLab or a renderer error), the CLI uses execution error code 30 and does not intentionally leave a partially published PDF. Inspect the restricted case `report.md` and its evidence before retrying. Do not treat a successful CLI run as visual validation of multipage layout; inspect output with an appropriate PDF viewer prior to external distribution.
