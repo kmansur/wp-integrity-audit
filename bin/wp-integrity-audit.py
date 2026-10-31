@@ -33,7 +33,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 
-VERSION = "0.21.3"
+VERSION = "0.21.4"
 IOC = re.compile(r"SC_ADV_BEGIN|--sc-cli|--sc-succ|trace-inspector-pad|cipher-feeder|_sc_fpc|sc_cron_guard|sc_persist_manifest|sc_own_manifest|function ceya")
 PATTERN_NAMES = (".sc_", ".gr_", ".gk_", ".kk_", ".wp-object-cache")
 SCRIPT_EXTENSIONS = {".php", ".phtml", ".phar", ".inc", ".php5", ".php7", ".php8", ".pht", ".phps"}
@@ -599,9 +599,9 @@ def supplementary_evidence(case: Path) -> tuple[dict, list, list]:
 
 def customer_findings(files, database, configs, components):
     """Provide a redacted item-by-item explanation suitable for a customer."""
-    lines = ["", "## Detailed findings and supporting evidence", "",
-             "These findings describe observations, not proof of who caused an intrusion.",
-             "Database values, credentials, raw configuration content and internal commands are excluded.", ""]
+    lines = ["", "## Achados detalhados e evidências correspondentes", "",
+             "Os achados registram observações técnicas, sem atribuir autoria ao incidente.",
+             "Valores privados do banco de dados, credenciais, conteúdo integral de configurações e comandos internos foram omitidos.", ""]
     items = []
     for entry in database or []:
         if entry.get("state") in ("ABSENT", "NOT_FOUND") or entry.get("kind") in ("session_rows", "application_password_rows"):
@@ -647,7 +647,7 @@ def customer_findings(files, database, configs, components):
                 "MEDIUM - executable or integrity finding requires validation" if kind in ("Files", "Configuration") or state in ("CORE_MODIFICADO_REQUER_REVISAO", "PLUGIN_COM_ARQUIVOS_MODIFICADOS") else
                 "MEDIUM - component hygiene or origin review" if kind == "Component" else
                 "CONTEXT DEPENDENT - historical or unconfirmed indicator")
-        clean = lambda value: str(value or "not available").replace("\r", " ").replace("\n", " ")[:250]
+        clean = lambda value: str(value or "não disponível").replace("\r", " ").replace("\n", " ")[:250]
         lines.extend(["### " + clean(identifier) + " - " + clean(kind), "",
                       "- Item: " + clean(subject),
                       "- Classification: " + clean(state),
@@ -657,7 +657,7 @@ def customer_findings(files, database, configs, components):
                       "- Verification: Review the referenced evidence with the responsible technical team.", ""])
     if not items:
         lines.extend(["No individual review findings were recorded by the selected checks.", ""])
-    lines.extend(["## About the service interruption", "",
+    lines.extend(["## Sobre a indisponibilidade do site", "",
                   "This report records observed security indicators. It does not establish who caused the incident or independently verify the time and cause of any outage.",
                   "Taking a website offline is a separate containment decision requiring documented justification, proportionality and authorization.",
                   "Detailed infrastructure evidence remains in the restricted technical report.", ""])
@@ -777,8 +777,8 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
     host_known = sum(x.get("classification") == "COMPONENTE_DE_SEGURANCA_CONHECIDO" for x in host_records)
     host_unclassified = len(host_records) - host_indicators - host_review - host_known
     host_legitimate = host_known + host_unclassified
-    persistence_risk = ("NOT DETERMINED" if not (case / "host-persistence.json").is_file()
-                        else "REVIEW REQUIRED" if host_indicators or host_review
+    persistence_risk = ("NÃO DETERMINADO" if not (case / "host-persistence.json").is_file()
+                        else "REVISÃO NECESSÁRIA" if host_indicators or host_review
                         else "LOW — no known indicators found")
     summary["host_known_security_components"] = host_known
     summary["host_unclassified_inventory"] = host_unclassified
@@ -900,10 +900,10 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
         f"- Versão: `{VERSION}`", f"- SHA-256 da ferramenta: `{sha256(Path(__file__))}`", f"- Modo: `{mode}`",
         f"- Data e hora (UTC): {dt.datetime.now(dt.timezone.utc).isoformat()}",
         f"- Ocorrências em arquivos: {len(findings)}", f"- Ocorrências em processos: {len(processes)}",
-        f"- Auditoria do banco de dados: **{'EXECUTED' if audited else 'NOT EXECUTED'}**",
-        f"- Avaliação do banco de dados: {'COMPLETE TARGETED CHECKS' if audited else 'NOT EVALUATED'}",
-        f"- Cópia SQL do banco de dados: {'PERFORMED' if (case / 'database-before.sql').is_file() else 'NOT PERFORMED'}",
-        f"- Cópia dos arquivos do site: {'PERFORMED' if (case / 'site-before.tar.gz').is_file() else 'NOT PERFORMED'}",
+        f"- Auditoria do banco de dados: **{'EXECUTADA' if audited else 'NÃO EXECUTADA'}**",
+        f"- Avaliação do banco de dados: {'VERIFICAÇÕES DIRECIONADAS CONCLUÍDAS' if audited else 'NÃO AVALIADO'}",
+        f"- Cópia SQL do banco de dados: {'REALIZADA' if (case / 'database-before.sql').is_file() else 'NÃO REALIZADA'}",
+        f"- Cópia dos arquivos do site: {'REALIZADA' if (case / 'site-before.tar.gz').is_file() else 'NÃO REALIZADA'}",
         "", "## Evidências do sistema de arquivos", "",
         "| Caminho relativo | Classificação | SHA-256 |",
         "|---|---|---|",
@@ -954,7 +954,7 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
     lines.extend(["", "## Resumo da persistência externa", "",
                   f"- Indicadores suspeitos: **{host_indicators}**",
                   f"- Itens legítimos ou de inventário: **{host_legitimate}**",
-                  f"- Items requiring revisão: **{host_review}**",
+                  f"- Itens que exigem revisão: **{host_review}**",
                   "- Os caminhos completos do servidor permanecem no arquivo técnico interno host-persistence.json.", ""])
     lines.extend(["", "## Parecer técnico", ""])
     critical = [x for x in findings if x["classification"] == "IOC_REQUER_VALIDACAO"]
@@ -1004,8 +1004,8 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
                   "- `PRESENT`: informational record exists.",
                   "- `NOT_FOUND`: check ran with no matching records.",
                   "", "## Limitações", "",
-                  "Classification of plugin guard files is signature-based, not proof of package integrity.",
-                  "No findings never establish that a site is clean. Review evidence before distributing reports."])
+                  "A classificação de arquivos de proteção de plugins utiliza padrões conhecidos e não comprova a integridade dos pacotes.",
+                  "A ausência de achados não comprova que o site esteja seguro. Revise as evidências antes de compartilhar os relatórios."])
     write_private(case / "technical-report.md", "\n".join(lines) + "\n")
     management = [
         "# Auditoria de Integridade WordPress — Relatório Gerencial", "",
@@ -1018,25 +1018,25 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
         f"- Registros informativos: **{summary['informational_records']}**",
         f"- Indicadores ativos no banco de dados: **{summary['active_database_markers']}**",
         f"- Processos suspeitos: **{summary['suspicious_processes']}**",
-        f"- WordPress Core discrepancies requiring revisão: **{core_count}**",
-        f"- Inventário de administradores: **{summary['administrator_inventory']['coverage']}** (count: {summary['administrator_inventory']['count'] if summary['administrator_inventory']['count'] is not None else 'not determined'})",
-        f"- WordPress configuration files requiring revisão: **{config_count}**",
+        f"- Divergências do núcleo do WordPress que exigem revisão: **{core_count}**",
+        f"- Inventário de administradores: **{summary['administrator_inventory']['coverage']}** (quantidade: {summary['administrator_inventory']['count'] if summary['administrator_inventory']['count'] is not None else 'não determinada'})",
+        f"- Arquivos de configuração do WordPress que exigem revisão: **{config_count}**",
         f"- Indicadores de persistência externa: **{host_indicators}**",
-        f"- Host inventory records requiring revisão: **{host_review}**",
+        f"- Registros do servidor que exigem revisão: **{host_review}**",
         "", "## Visão geral dos riscos", "",
-        f"- Risco do banco de dados: **{'HIGH' if summary['confirmed_family_residues'] or summary['active_database_markers'] else 'LOW — no selected database IOC' if audited else 'NOT DETERMINED'}**",
-        f"- Risco dos arquivos: **{'REQUIRES REVIEW' if summary['file_indicators_requiring_review'] else 'LOW FOR SELECTED INDICATORS'}**",
-        f"- Risco do núcleo do WordPress: **{'MEDIUM — REVIEW REQUIRED' if core_count else 'MEDIUM — outdated release; official checksums verified' if component_result and component_result['summary'].get('core_outdated') and component_result['coverage'].get('core') == 'EXECUTED' else 'NO EXPLICIT MISMATCH DETECTED' if component_result and component_result['coverage'].get('core') == 'EXECUTED' else 'NOT DETERMINED'}**",
+        f"- Risco do banco de dados: **{'ALTO' if summary['confirmed_family_residues'] or summary['active_database_markers'] else 'BAIXO — nenhum indicador pesquisado encontrado no banco de dados' if audited else 'NÃO DETERMINADO'}**",
+        f"- Risco dos arquivos: **{'REQUIRES REVIEW' if summary['file_indicators_requiring_review'] else 'BAIXO PARA OS INDICADORES PESQUISADOS'}**",
+        f"- Risco do núcleo do WordPress: **{'MÉDIO — REVISÃO NECESSÁRIA' if core_count else 'MÉDIO — versão desatualizada; somas de verificação oficiais validadas' if component_result and component_result['summary'].get('core_outdated') and component_result['coverage'].get('core') == 'EXECUTED' else 'NENHUMA DIVERGÊNCIA EXPLÍCITA IDENTIFICADA' if component_result and component_result['coverage'].get('core') == 'EXECUTED' else 'NÃO DETERMINADO'}**",
         f"- Risco de persistência externa: **{persistence_risk}**",
         "- A ausência de indicadores conhecidos não comprova ausência de persistência.",
         "", "## Recomendação", "",
         "**REATIVAÇÃO DEPENDE DE REVISÃO TÉCNICA**" if exit_code else "**SEM INDICADORES EXPLÍCITOS; REATIVAÇÃO AINDA EXIGE APROVAÇÃO TÉCNICA**",
         "Resolva as pendências identificadas e valide a segurança do ambiente antes da reativação." if exit_code else "Não foram encontrados os indicadores pesquisados; isso não garante que o site esteja livre de comprometimento.",
         "", "## Abrangência da auditoria", "",
-        f"- Auditoria do banco de dados: {'EXECUTED' if audited else 'NOT EXECUTED'}",
+        f"- Auditoria do banco de dados: {'EXECUTADA' if audited else 'NÃO EXECUTADA'}",
         f"- Verificação do núcleo: {summary['component_coverage'].get('core', core.get('status', 'NOT EXECUTED'))}",
-        f"- Cópia SQL do banco de dados: {'PERFORMED' if (case / 'database-before.sql').is_file() else 'NOT PERFORMED'}",
-        f"- Cópia dos arquivos do site: {'PERFORMED' if (case / 'site-before.tar.gz').is_file() else 'NOT PERFORMED'}",
+        f"- Cópia SQL do banco de dados: {'REALIZADA' if (case / 'database-before.sql').is_file() else 'NÃO REALIZADA'}",
+        f"- Cópia dos arquivos do site: {'REALIZADA' if (case / 'site-before.tar.gz').is_file() else 'NÃO REALIZADA'}",
         "", "As evidências detalhadas da infraestrutura estão preservadas no relatório técnico interno.", "",
     ]
     management.extend(customer_findings(findings, database, configurations, component_result))
