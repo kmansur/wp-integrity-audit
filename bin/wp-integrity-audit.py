@@ -32,7 +32,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 
-VERSION = "0.18.0"
+VERSION = "0.19.0"
 IOC = re.compile(r"SC_ADV_BEGIN|--sc-cli|--sc-succ|trace-inspector-pad|cipher-feeder|_sc_fpc|sc_cron_guard|sc_persist_manifest|sc_own_manifest|function ceya")
 PATTERN_NAMES = (".sc_", ".gr_", ".gk_", ".kk_", ".wp-object-cache")
 SCRIPT_EXTENSIONS = {".php", ".phtml", ".phar", ".inc", ".php5", ".php7", ".php8", ".pht", ".phps"}
@@ -743,12 +743,23 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
     outdated_core = bool(component_result and component_result["summary"].get("core_outdated"))
     summary["component_review_required"] = component_review
     summary["core_outdated"] = outdated_core
-    review_pending = bool(config_count or component_review or outdated_core)
+    review_pending = bool(config_count or component_review or outdated_core or critical_component_review)
     summary["review_pending"] = review_pending
-    if review_pending and exit_code == 0:
-        status, exit_code, status_detail = "REVISAO_NECESSARIA", 40, "NON_MALWARE_REVIEW_FINDINGS"
-    if critical_component_review and exit_code == 0:
-        status, exit_code, status_detail = "AUDITORIA_INCOMPLETA", 40, "CORE_OR_COMPONENT_INTEGRITY_REQUIRES_REVIEW"
+    # Precedence: independent compromise > known residues > active/heuristic review
+    # > file-integrity review > ordinary version/provenance review > clean.
+    # An existing residue or active-indicator status must not be silently erased.
+    if critical_component_review:
+        if exit_code == 0:
+            status, exit_code = "AUDITORIA_INCOMPLETA", 40
+        status_detail = "CORE_OR_COMPONENT_INTEGRITY_REQUIRES_REVIEW"
+    elif review_pending and exit_code == 0:
+        status, exit_code = "REVISAO_NECESSARIA", 40
+        status_detail = "NON_MALWARE_REVIEW_FINDINGS"
+    summary["status_priority"] = ("known_residues" if exit_code == 10 else
+                                  "confirmed_compromise" if exit_code == 20 else
+                                  "integrity_review" if critical_component_review else
+                                  "review_pending" if review_pending else
+                                  "other")
     write_private(case / "report.json", json.dumps({
         "schema_version": 1, "tool_version": VERSION,
         "tool_sha256": sha256(Path(__file__)), "mode": mode,
