@@ -4,6 +4,17 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 
 ## [Não publicado]
 
+## [0.21.6] - 2026-10-31
+
+### Correções
+- Corrigida a classificação de prioridade de arquivos de configuração no relatório para o cliente (comparação com o rótulo português `Configuração`).
+- Traduzidos trechos restantes do parecer técnico relativos às sessões e referências históricas.
+- Adicionados dois testes de regressão para proteger a apresentação em português e manter os códigos estruturados de persistência estáveis.
+
+### Validação pendente
+- Executar a suíte de testes no ambiente Linux e conferir o PDF gerado com casos reais, inclusive acentuação, quebras de linha e paginação.
+
+
 ## [0.21.5] - 2026-10-31
 
 ### Correções de internacionalização
