@@ -31,7 +31,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 
-VERSION = "0.14.0"
+VERSION = "0.15.0"
 IOC = re.compile(r"SC_ADV_BEGIN|--sc-cli|--sc-succ|trace-inspector-pad|cipher-feeder|_sc_fpc|sc_cron_guard|sc_persist_manifest|sc_own_manifest|function ceya")
 PATTERN_NAMES = (".sc_", ".gr_", ".gk_", ".kk_", ".wp-object-cache")
 SCRIPT_EXTENSIONS = {".php", ".phtml", ".phar", ".inc", ".php5", ".php7", ".php8", ".pht", ".phps"}
@@ -596,6 +596,68 @@ def supplementary_evidence(case: Path) -> tuple[dict, list, list]:
     return core, configs, host
 
 
+def customer_findings(files, database, configs, components):
+    """Provide a redacted item-by-item explanation suitable for a customer."""
+    lines = ["", "## Detailed findings and supporting evidence", "",
+             "These findings describe observations, not proof of who caused an intrusion.",
+             "Database values, credentials, raw configuration content and internal commands are excluded.", ""]
+    items = []
+    for entry in database or []:
+        if entry.get("state") in ("ABSENT", "NOT_FOUND") or entry.get("kind") in ("session_rows", "application_password_rows"):
+            continue
+        kind = entry.get("kind")
+        description = ("Historical incident reference; not proof of active code execution."
+                       if kind == "historical_cache" else
+                       "Database residue matching an incident-related pattern; verify before remediation."
+                       if kind == "family_option" else
+                       "An incident-related database indicator needs investigation.")
+        items.append((entry.get("evidence_id", "DB-UNASSIGNED"), "Database", entry.get("name"),
+                      entry.get("state"), description, entry.get("sha256")))
+    for entry in files:
+        if entry.get("classification") != "LEGITIMO_VALIDADO":
+            items.append((entry.get("evidence_id", "FILE-UNASSIGNED"), "Files",
+                          sanitize_relative_path(entry.get("path", "")), entry.get("classification"),
+                          "Static file indicator requiring review; detection does not prove execution.",
+                          entry.get("sha256")))
+    for entry in configs:
+        if entry.get("classification") in ("CONFIGURACAO_REQUER_VALIDACAO", "CONFIGURACAO_PLUGIN_SEGURANCA_REQUER_VALIDACAO"):
+            items.append((entry.get("evidence_id", "CONFIG-UNASSIGNED"), "Configuration",
+                          sanitize_relative_path(entry.get("path", "")), entry.get("classification"),
+                          "Configuration directive requires confirmation of its business purpose and authorization.",
+                          entry.get("sha256")))
+    for entry in (components or {}).get("components", []):
+        state = entry.get("state")
+        if state in ("CORE_DESATUALIZADO", "PLUGIN_ORIGEM_NAO_CONFIRMADA_REQUER_REVISAO",
+                     "PLUGIN_VERSAO_NAO_IDENTIFICADA", "TEMA_NAO_ENCONTRADO_NO_REPOSITORIO",
+                     "CORE_MODIFICADO_REQUER_REVISAO", "CORE_AUSENTE_REQUER_REVISAO",
+                     "PLUGIN_COM_ARQUIVOS_MODIFICADOS", "TEMA_COM_ARQUIVOS_MODIFICADOS",
+                     "PLUGIN_OFICIAL_DESATUALIZADO", "TEMA_OFICIAL_DESATUALIZADO"):
+            explanation = ("Version update available; this is not itself evidence of compromise."
+                           if state.endswith("DESATUALIZADO") else
+                           "Official origin is unconfirmed. Verify vendor, license, package and hash; this is not malware proof."
+                           if state in ("PLUGIN_ORIGEM_NAO_CONFIRMADA_REQUER_REVISAO", "TEMA_NAO_ENCONTRADO_NO_REPOSITORIO") else
+                           "Installed version could not be read; confirm the installed package manually."
+                           if state == "PLUGIN_VERSAO_NAO_IDENTIFICADA" else
+                           "An integrity difference requires comparison with a trusted release.")
+            items.append((entry.get("component_id", "COMPONENT-UNASSIGNED"), "Component",
+                          entry.get("slug"), state, explanation, entry.get("main_file_sha256")))
+    for identifier, kind, subject, state, explanation, digest in items:
+        clean = lambda value: str(value or "not available").replace("\r", " ").replace("\n", " ")[:250]
+        lines.extend(["### " + clean(identifier) + " - " + clean(kind), "",
+                      "- Item: " + clean(subject),
+                      "- Classification: " + clean(state),
+                      "- Explanation: " + explanation,
+                      "- Evidence SHA-256: " + clean(digest),
+                      "- Verification: Review the referenced evidence with the responsible technical team.", ""])
+    if not items:
+        lines.extend(["No individual review findings were recorded by the selected checks.", ""])
+    lines.extend(["## About the service interruption", "",
+                  "This report records observed security indicators. It does not establish who caused the incident or independently verify the time and cause of any outage.",
+                  "Taking a website offline is a separate containment decision requiring documented justification, proportionality and authorization.",
+                  "Detailed infrastructure evidence remains in the restricted technical report.", ""])
+    return lines
+
+
 def make_report(case: Path, mode: str, findings: list[dict], processes: list[str],
                 database: list[dict] | None = None, db_name: str | None = None, db_prefix: str | None = None) -> None:
     """Generate a precise coverage statement and evidence-based technical opinion."""
@@ -861,6 +923,7 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
         f"- File snapshot: {'PERFORMED' if (case / 'site-before.tar.gz').is_file() else 'NOT PERFORMED'}",
         "", "Detailed infrastructure evidence is retained in the internal technical report.", "",
     ]
+    management.extend(customer_findings(findings, database, configurations, component_result))
     write_private(case / "report.md", "\n".join(management) + "\n")
 
 
