@@ -352,3 +352,13 @@ All project documentation and source commentary are in English. Versions follow 
 
 ### Limitations
 - PDF rendering requires separate document-visual QA for long, real incident reports; the Markdown remains the authoritative editable management report.
+
+## [0.18.0] - 2026-10-30
+
+### Added
+- Read-only administrator role-candidate inventory using role metadata from WordPress users/usermeta, pseudonymized SHA-256 login names and registration metadata.
+- Explicit `UNAVAILABLE` account-coverage state rather than false zero counts when the database query fails.
+- Regression tests for account pseudonymization and unavailable coverage.
+
+### Limitations
+- The role test is a serialized-value substring heuristic and does not validate authorization, prove compromise or cover multisite super administrators. The results are kept in restricted JSON evidence, not the customer-facing report.
