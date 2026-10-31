@@ -4,6 +4,15 @@ All project documentation and source commentary are in English. Versions follow 
 
 ## [Unreleased]
 
+## [0.21.1] - 2026-10-31
+
+### Changed
+- Document the existing default evidence directory `/var/lib/wp-integrity-audit/cases` and retain optional `--case-root` overrides.
+- Resolve SMTP configuration from `/etc/wp-integrity-audit/config.cfg` when `--email-to` is supplied, without requiring an additional configuration argument.
+- Add `--config` as the preferred override and retain `--smtp-config` as a backward-compatible alias.
+- Keep SMTP delivery strictly opt-in and preserve existing private-file permissions and verified TLS requirements.
+
+
 ### Audit report improvements
 - Correct historical-cache excerpt handling after failed MySQL CI regression.
 - Show interpreted values for two strictly allowlisted numeric transient options.
