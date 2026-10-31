@@ -60,7 +60,9 @@ def export_management_pdf(case: Path) -> Path:
         canvas.restoreState()
     try:
         doc.build(elements, onFirstPage=footer, onLaterPages=footer)
-        if temporary.stat().st_size < 5 or not temporary.read_bytes()[:5] == b"%PDF-":
+        with temporary.open("rb") as rendered:
+            header = rendered.read(5)
+        if header != b"%PDF-":
             raise PDFExportError("PDF renderer did not produce a valid PDF header")
         temporary.chmod(0o600)
         os.replace(temporary, output)
