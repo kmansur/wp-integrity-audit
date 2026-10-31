@@ -254,3 +254,7 @@ The test suite also includes a conditional PDF smoke test that renders a sample 
 ## 0.20.0 safe PDF publication
 
 Management PDF generation now renders to an owner-private temporary file within the evidence case. Only a completed file with a valid `%PDF-` signature is atomically published as `management-report.pdf`; a rendering failure removes the temporary file and returns exit 30. The original `report.md` remains available. Optional ReportLab installation and visual review of the final PDF are still required.
+
+## 0.21.0 optional SMTP delivery
+
+To email the customer-only management PDF, run an ordinary audit with `--email-to recipient@example.com --smtp-config /etc/wp-integrity-audit/smtp.cfg`. The PDF is generated automatically even without `--pdf-report`. See `config/smtp.example.cfg` for TLS settings; copy it outside the repository and WordPress document root, then use `chmod 600` on both the configuration and the separate SMTP password file. Only STARTTLS or implicit TLS with certificate verification is supported; credentials are never passed on command lines or written into report files. No message is sent without `--email-to`. Successful submission only confirms acceptance by the configured SMTP server, not delivery or reading. Errors return exit 30. Never send the private evidence bundle or technical report to the customer.
