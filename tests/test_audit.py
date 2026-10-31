@@ -264,9 +264,9 @@ $table_prefix = 'wp_';
             report = (case / "technical-report.md").read_text()
             self.assertIn(path, report)
             self.assertIn("NOT EXECUTED", report)
-            self.assertIn("NOT EVALUATED", report)
+            self.assertIn("NÃO AVALIADO", report)
             self.assertIn("Cópia SQL do banco de dados: NÃO REALIZADA", report)
-            self.assertIn("File snapshot: NOT PERFORMED", report)
+            self.assertIn("Cópia dos arquivos do site: NÃO REALIZADA", report)
             self.assertNotIn("Database audit coverage:", report)
             self.assertIn("LIBERAÇÃO NÃO RECOMENDADA", report)
             self.assertNotIn("[LONG_VALUE_REDACTED]", report)
@@ -579,7 +579,7 @@ $table_prefix = 'wp_';
             result = json.loads((case / "report.json").read_text())
             self.assertEqual(result["configuration_review_count"], 1)
             self.assertEqual(result["summary"]["security_configuration_review"], 1)
-            self.assertIn("LOW — no selected database IOC", (case / "report.md").read_text())
+            self.assertIn("BAIXO — nenhum indicador pesquisado encontrado no banco de dados", (case / "report.md").read_text())
 
     def test_metform_guarded_header_candidate(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -971,7 +971,7 @@ $table_prefix = 'wp_';
         for identifier in ("FILE-001", "DB-001", "CONFIG-001", "CORE-001"):
             self.assertIn(identifier, text)
         self.assertNotIn("do-not-show-secret", text)
-        self.assertIn("service interruption", text.lower())
+        self.assertIn("indisponibilidade do site", text.lower())
 
     def test_evidence_manifest_rejects_symlinks_and_has_valid_hashes(self):
         import json
