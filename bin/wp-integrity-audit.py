@@ -643,11 +643,16 @@ def customer_findings(files, database, configs, components):
             items.append((entry.get("component_id", "COMPONENT-UNASSIGNED"), "Component",
                           entry.get("slug"), state, explanation, entry.get("main_file_sha256")))
     for identifier, kind, subject, state, explanation, digest in items:
+        risk = ("HIGH PRIORITY - residual incident indicator" if state == "RESIDUO_FAMILIA_REQUER_LIMPEZA" else
+                "MEDIUM - executable or integrity finding requires validation" if kind in ("Files", "Configuration") or state in ("CORE_MODIFICADO_REQUER_REVISAO", "PLUGIN_COM_ARQUIVOS_MODIFICADOS") else
+                "MEDIUM - component hygiene or origin review" if kind == "Component" else
+                "CONTEXT DEPENDENT - historical or unconfirmed indicator")
         clean = lambda value: str(value or "not available").replace("\r", " ").replace("\n", " ")[:250]
         lines.extend(["### " + clean(identifier) + " - " + clean(kind), "",
                       "- Item: " + clean(subject),
                       "- Classification: " + clean(state),
                       "- Explanation: " + explanation,
+                      "- Review priority: " + risk + " (not proof of active compromise)",
                       "- Evidence SHA-256: " + clean(digest),
                       "- Verification: Review the referenced evidence with the responsible technical team.", ""])
     if not items:
@@ -769,6 +774,9 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
     summary["host_unclassified_inventory"] = host_unclassified
     summary["host_persistence_indicators"] = host_indicators
     summary["persistence_risk"] = persistence_risk
+    admin_path = case / "administrator-inventory.json"
+    admin_coverage = json.loads(admin_path.read_text()) if admin_path.is_file() and not admin_path.is_symlink() else None
+    summary["administrator_inventory"] = {"coverage": admin_coverage.get("coverage"), "count": admin_coverage.get("count")} if admin_coverage else {"coverage": "NOT EXECUTED", "count": None}
     for index, item in enumerate(core.get("findings", []), 1):
         item["evidence_id"] = f"CORE-{index:03d}"
     for index, item in enumerate(configurations, 1):
@@ -1001,6 +1009,7 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
         f"- Active database markers: **{summary['active_database_markers']}**",
         f"- Suspicious processes: **{summary['suspicious_processes']}**",
         f"- WordPress Core discrepancies requiring review: **{core_count}**",
+        f"- Administrator role inventory: **{summary['administrator_inventory']['coverage']}** (count: {summary['administrator_inventory']['count'] if summary['administrator_inventory']['count'] is not None else 'not determined'})",
         f"- WordPress configuration files requiring review: **{config_count}**",
         f"- External persistence indicators: **{host_indicators}**",
         f"- Host inventory records requiring review: **{host_review}**",
