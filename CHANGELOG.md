@@ -4,6 +4,14 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 
 ## [Não publicado]
 
+## [0.21.9] - 2026-10-31
+
+### Validação de documentos PDF
+- Reforçado o teste multipágina: com PyMuPDF disponível, verificar a quantidade de páginas e a extração dos caracteres acentuados (`proteção`, `execução`, `conclusão`).
+- Verificação isolada de ReportLab + DejaVu Sans + extração via PyMuPDF concluída; a suíte completa do repositório e os cenários reais permanecem pendentes.
+- Não alteradas as regras de auditoria, o relatório estruturado JSON ou os códigos de retorno.
+
+
 ## [0.21.8] - 2026-10-31
 
 ### PDF e testes
