@@ -973,6 +973,22 @@ $table_prefix = 'wp_';
         self.assertNotIn("do-not-show-secret", text)
         self.assertIn("indisponibilidade do site", text.lower())
 
+    def test_customer_configuration_priority_in_portuguese(self):
+        texto = "\n".join(audit.customer_findings(
+            [], [], [{"evidence_id": "CONFIG-001", "path": ".htaccess",
+                       "classification": "CONFIGURACAO_REQUER_VALIDACAO"}], None))
+        self.assertIn("MÉDIA — item executável ou divergência", texto)
+        self.assertIn("Configuração", texto)
+        self.assertIn("Sobre a indisponibilidade do site", texto)
+        self.assertNotIn("Review priority:", texto)
+        self.assertNotIn("service interruption", texto)
+
+    def test_structured_persistence_risk_is_not_localized(self):
+        self.assertEqual(audit.traduzir_estado("REVIEW REQUIRED"), "REVISÃO NECESSÁRIA")
+        self.assertEqual(audit.traduzir_estado("NOT DETERMINED"), "NÃO DETERMINADO")
+        self.assertEqual(audit.traduzir_estado("LOW — no known indicators found"),
+                         "BAIXO — nenhum indicador conhecido encontrado")
+
     def test_evidence_manifest_rejects_symlinks_and_has_valid_hashes(self):
         import json
         import hashlib
