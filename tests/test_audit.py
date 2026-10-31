@@ -265,7 +265,7 @@ $table_prefix = 'wp_';
             self.assertIn(path, report)
             self.assertIn("NOT EXECUTED", report)
             self.assertIn("NOT EVALUATED", report)
-            self.assertIn("Database dump: NOT PERFORMED", report)
+            self.assertIn("Cópia SQL do banco de dados: NÃO REALIZADA", report)
             self.assertIn("File snapshot: NOT PERFORMED", report)
             self.assertNotIn("Database audit coverage:", report)
             self.assertIn("LIBERAÇÃO NÃO RECOMENDADA", report)
@@ -304,7 +304,7 @@ $table_prefix = 'wp_';
             index = json.loads((case / "evidence-index.json").read_text())
             self.assertEqual(index["database"][0]["id"], "DB-001")
             self.assertEqual(index["database"][0]["table"], "wp_options")
-            self.assertIn("Management Summary", (case / "report.md").read_text())
+            self.assertIn("Relatório Gerencial", (case / "report.md").read_text())
 
     def test_compare_cases_reports_added_removed_and_changed(self):
         import json
@@ -511,7 +511,7 @@ $table_prefix = 'wp_';
             self.assertIn("| `.htaccess` |", md)
             self.assertNotIn("ordinary.conf", md)
             client_report = (case / "report.md").read_text()
-            self.assertIn("Management Summary", client_report)
+            self.assertIn("Relatório Gerencial", client_report)
             self.assertNotIn("/etc/apache2", client_report)
             self.assertNotIn("wp-includes/version.php", client_report)
             self.assertIn("Core discrepancies", client_report)
@@ -954,7 +954,7 @@ $table_prefix = 'wp_';
             record = json.loads((case / "report.json").read_text())
             self.assertEqual(record["exit_code"], 40)
             self.assertEqual(record["status"], "REVISAO_NECESSARIA")
-            self.assertIn("Core verification: EXECUTED", (case / "report.md").read_text())
+            self.assertIn("Verificação do núcleo: EXECUTED", (case / "report.md").read_text())
 
     def test_customer_report_individual_evidence_is_redacted(self):
         findings = audit.customer_findings(
