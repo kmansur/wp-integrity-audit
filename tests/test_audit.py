@@ -1156,6 +1156,16 @@ $table_prefix = 'wp_';
             self.assertTrue(pdf.read_bytes().startswith(b"%PDF-"))
             self.assertGreater(pdf.stat().st_size, 1000)
             self.assertEqual(pdf.stat().st_mode & 0o777, 0o600)
+            # A extração verifica conteúdo, paginação e caracteres Unicode,
+            # não apenas a assinatura do arquivo PDF.
+            if importlib.util.find_spec("fitz") is not None:
+                import fitz
+                with fitz.open(pdf) as documento:
+                    self.assertGreater(len(documento), 1)
+                    conteudo = "\n".join(pagina.get_text() for pagina in documento)
+                self.assertIn("proteção", conteudo)
+                self.assertIn("execução", conteudo)
+                self.assertIn("conclusão", conteudo)
 
     def test_pdf_export_error_is_operational_error(self):
         import report_export
