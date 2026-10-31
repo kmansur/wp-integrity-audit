@@ -21,7 +21,7 @@ python3 bin/wp-integrity-audit.py --audit-db /var/www/example/public_html
 python3 bin/wp-integrity-audit.py --audit-db-post /var/www/example/public_html
 ```
 
-The legacy option set is preserved: `--audit`, `--audit-db`, `--audit-db-post`, `--apply-files`, `--apply-db`, `--recover`, `--source`, `--core-source`, `--domain-label`, `--db-host`, `--replace-plugins-themes`, `--official-sync` and `--version`. New option: `--case-root`.
+The legacy option set is preserved: `--audit`, `--audit-db`, `--audit-db-post`, `--apply-files`, `--apply-db`, `--recover`, `--source`, `--core-source`, `--domain-label`, `--db-host`, `--replace-plugins-themes`, `--official-sync` and `--version`. Optional `--case-root` overrides the default private evidence directory.
 
 Examples for **isolated disaster-recovery rehearsal only**:
 
@@ -31,7 +31,7 @@ sudo python3 bin/wp-integrity-audit.py --apply-db /srv/fixture/wordpress
 sudo python3 bin/wp-integrity-audit.py --recover /srv/fixture/wordpress --source /srv/fixtures/clean-wp-content --core-source /srv/fixtures/clean-wordpress
 ```
 
-Mutating modes require interactive confirmations; no `--yes` bypass exists. Reports default to `/var/lib/wp-integrity-audit/cases`, and are created with restrictive permissions. Case roots inside the WordPress document root are rejected.
+Mutating modes require interactive confirmations; no `--yes` bypass exists. Reports default to `/var/lib/wp-integrity-audit/cases` without any additional CLI argument; use `--case-root /other/path` only to override it. Case roots are created with restrictive permissions and are rejected inside the WordPress document root.
 
 ## Critical differences from the legacy Bash script
 
@@ -255,6 +255,17 @@ The test suite also includes a conditional PDF smoke test that renders a sample 
 
 Management PDF generation now renders to an owner-private temporary file within the evidence case. Only a completed file with a valid `%PDF-` signature is atomically published as `management-report.pdf`; a rendering failure removes the temporary file and returns exit 30. The original `report.md` remains available. Optional ReportLab installation and visual review of the final PDF are still required.
 
+## 0.21.1 default output and SMTP configuration paths
+
+The evidence root defaults to `/var/lib/wp-integrity-audit/cases`; `--case-root` is an optional override. For explicitly requested email delivery, `--email-to recipient@example.com` now loads SMTP settings from `/etc/wp-integrity-audit/config.cfg` by default. Override with `--config /secure/custom.cfg`. The historical `--smtp-config` switch remains an alias for backward compatibility. The configuration and separate password file must be protected with owner-only permissions. No email is sent unless `--email-to` is supplied.
+
+```bash
+python3 bin/wp-integrity-audit.py /var/www/example/public_html --domain-label example.com
+python3 bin/wp-integrity-audit.py /var/www/example/public_html --domain-label example.com --case-root /secure/audit-cases
+python3 bin/wp-integrity-audit.py /var/www/example/public_html --domain-label example.com --email-to recipient@example.com
+python3 bin/wp-integrity-audit.py /var/www/example/public_html --domain-label example.com --email-to recipient@example.com --config /secure/custom.cfg
+```
+
 ## 0.21.0 optional SMTP delivery
 
-To email the customer-only management PDF, run an ordinary audit with `--email-to recipient@example.com --smtp-config /etc/wp-integrity-audit/smtp.cfg`. The PDF is generated automatically even without `--pdf-report`. See `config/smtp.example.cfg` for TLS settings; copy it outside the repository and WordPress document root, then use `chmod 600` on both the configuration and the separate SMTP password file. Only STARTTLS or implicit TLS with certificate verification is supported; credentials are never passed on command lines or written into report files. No message is sent without `--email-to`. Successful submission only confirms acceptance by the configured SMTP server, not delivery or reading. Errors return exit 30. Never send the private evidence bundle or technical report to the customer.
+To email the customer-only management PDF, run an ordinary audit with `--email-to recipient@example.com` (default configuration: `/etc/wp-integrity-audit/config.cfg`; optional override: `--config /secure/custom.cfg`). The PDF is generated automatically even without `--pdf-report`. See `config/smtp.example.cfg` for TLS settings; copy it outside the repository and WordPress document root, then use `chmod 600` on both the configuration and the separate SMTP password file. Only STARTTLS or implicit TLS with certificate verification is supported; credentials are never passed on command lines or written into report files. No message is sent without `--email-to`. Successful submission only confirms acceptance by the configured SMTP server, not delivery or reading. Errors return exit 30. Never send the private evidence bundle or technical report to the customer.
