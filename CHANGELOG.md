@@ -386,3 +386,14 @@ All project documentation and source commentary are in English. Versions follow 
 - Eliminate automatic trusted-security-component classification based only on a `bitninja` substring in a filesystem path.
 
 - Add a conditional real PDF smoke test that verifies PDF magic bytes and owner-only permissions when the optional ReportLab dependency is present.
+
+## [0.20.0] - 2026-10-31
+
+### Reliability
+- Generate customer management PDFs in a private temporary file and atomically publish only after successful rendering and PDF header validation.
+- Return the documented execution error code 30 for controlled PDF export errors rather than an uncaught traceback.
+- Use a bounded five-byte signature read and remove partial temporary files on rendering failures.
+- Add a regression test for missing management source and absence of partial PDFs.
+
+### Operational limits
+- PDF export remains optional and must be visually checked with real long incident reports before customer delivery.
