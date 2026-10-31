@@ -330,3 +330,14 @@ All project documentation and source commentary are in English. Versions follow 
 
 ### Limitations
 - Reports show what current read-only probes observed; they cannot independently prove who initiated an outage or that malware executed.
+
+## [0.16.0] - 2026-10-30
+
+### Added
+- SHA-256 forensic case manifest for each regular evidence file captured in the private case directory, with individual sizes and explicit provenance limitations.
+- Separate, deliberately unfilled incident-containment record template documenting the information the incident owner must supply to justify taking a website offline.
+- Symlink-safe manifest traversal and tests proving the template cannot invent an outage or its decision maker.
+
+### Security
+- Read-only WordPress inspection remains the default; mutating modes stay disabled.
+- The manifest records hashes of evidence files at the time it is generated and does not, on its own, establish an authenticated chain of custody.
