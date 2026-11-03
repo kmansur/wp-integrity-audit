@@ -4,6 +4,31 @@ Ferramenta para auditoria de integridade e investigação de comprometimento em 
 
 > **Estado de segurança:** versão de pré-lançamento. Os procedimentos de recuperação ainda não foram validados integralmente em cenários reais de WordPress/MySQL. Não utilize os modos de alteração em produção sem ensaios independentes de recuperação.
 
+
+## Recuperação assistida — 0.23.0 (uso controlado)
+
+A recuperação é **uma operação que modifica o site e/ou o banco**, diferente da auditoria padrão. Deve ser testada primeiro em um clone descartável, com isolamento prévio, janela de manutenção, autorização do responsável e backup externo **testado por restauração**. A ferramenta não considera limpeza completa sinônimo de reativação.
+
+Para limpar opções do banco de dados identificadas e validadas individualmente, sem modificar os arquivos:
+
+```bash
+python3 bin/wp-integrity-audit.py /var/www/exemplo/public_html --apply-db --remove-db-option sc_exemplo --dry-run
+python3 bin/wp-integrity-audit.py /var/www/exemplo/public_html --apply-db --remove-db-option sc_exemplo --recovery-approve
+```
+
+Para restaurar o `wp-content` completo a partir de um diretório independente, contendo `plugins/`, `themes/` e `uploads/` (o argumento aponta para o **conteúdo** de `wp-content`, não o diretório do WordPress completo):
+
+```bash
+python3 bin/wp-integrity-audit.py /var/www/exemplo/public_html --apply-files --source /backup/wordpress/wp-content-limpo --replace-plugins-themes --dry-run
+python3 bin/wp-integrity-audit.py /var/www/exemplo/public_html --apply-files --source /backup/wordpress/wp-content-limpo --replace-plugins-themes --recovery-approve
+```
+
+Para combinar substituição de `wp-content` e remoção exata de opções, use `--recover` com `--source`, `--replace-plugins-themes` e um ou mais `--remove-db-option`. **Somente selecione nomes de opções após inspecionar e validar sua evidência**. O nome `sc_*` por si só não é autorização para exclusão, e opções serializadas como `cron` e `active_plugins` são bloqueadas.
+
+`--dry-run` gera `recovery-plan.json` privado sem modificar o WordPress ou o banco. A aplicação real exige `--recovery-approve` e confirmações interativas, inclusive backup externo e isolamento. Antes de qualquer alteração a ferramenta grava `site-before.tar.gz`, `site-before.sha256`, `database-before.sql` e `database-before.sha256` no diretório do caso. A cópia anterior de `wp-content` permanece em quarentena fora da raiz pública. **Não apague a quarentena nem os backups** antes de validação.
+
+Restrições deliberadas: não há limpeza genérica de registros serializados, exclusão automática de sessões, rotação de salts, sincronização automática do núcleo ou restauração automática de banco. Exclusões SQL por nomes múltiplos não são atômicas em conjunto. Ocorrendo falha após a primeira alteração, mantenha o site isolado e restaure os dados a partir dos backups validados sob supervisão. É indispensável verificar o estado dos arquivos, a execução do WordPress, a persistência no host e o banco antes de autorizar a reativação.
+
 ## Uso rápido
 
 A auditoria padrão armazena as evidências em `/var/lib/wp-integrity-audit/cases/`. O parâmetro `--case-root` só é necessário para utilizar outro diretório.
