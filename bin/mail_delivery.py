@@ -1,6 +1,7 @@
 """Envio SMTP explícito do relatório PDF do cliente com TLS verificado."""
 from __future__ import annotations
 import configparser
+import os
 from email.message import EmailMessage
 from email.utils import parseaddr
 from pathlib import Path
@@ -31,6 +32,22 @@ def _private_file(path: Path) -> None:
         raise MailDeliveryError("O arquivo de configuração SMTP não pode ser acessível a grupo ou outros usuários")
 
 
+def _ler_regular_limitado(path: Path, limite: int) -> bytes:
+    """Ler arquivo regular sem seguir links simbólicos, com limite de tamanho."""
+    try:
+        descritor = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+        with os.fdopen(descritor, "rb") as arquivo:
+            metadados = os.fstat(arquivo.fileno())
+            if not stat.S_ISREG(metadados.st_mode) or metadados.st_size > limite:
+                raise MailDeliveryError("Arquivo do envio inválido ou acima do limite permitido")
+            conteudo = arquivo.read(limite + 1)
+            if len(conteudo) > limite:
+                raise MailDeliveryError("Arquivo do envio acima do limite permitido")
+            return conteudo
+    except OSError as error:
+        raise MailDeliveryError("Não foi possível abrir um arquivo do envio com segurança") from error
+
+
 def send_management_report(case: Path, recipient: str, config_path: Path) -> None:
     """Enviar somente o PDF gerencial concluído utilizando TLS verificado."""
     _private_file(config_path)
@@ -48,15 +65,16 @@ def send_management_report(case: Path, recipient: str, config_path: Path) -> Non
         secret_path = Path(section.get("password_file", "")).expanduser()
         if not host or not 1 <= port <= 65535 or security not in ("starttls", "ssl"):
             raise MailDeliveryError("Servidor, porta ou modalidade TLS inválidos")
+        if not secret_path.is_absolute():
+            raise MailDeliveryError("A senha SMTP exige caminho absoluto")
         _private_file(secret_path)
-        password = secret_path.read_text(encoding="utf-8").rstrip("\r\n")
+        password = _ler_regular_limitado(secret_path, 4096).decode("utf-8").rstrip("\r\n")
         if not username or not password:
             raise MailDeliveryError("As credenciais SMTP são obrigatórias")
         pdf = case / "management-report.pdf"
         if pdf.is_symlink() or not pdf.is_file():
             raise MailDeliveryError("É necessário um PDF gerencial concluído para enviar o e-mail")
-        with pdf.open("rb") as stream:
-            payload = stream.read()
+        payload = _ler_regular_limitado(pdf, 20 * 1024 * 1024)
         if not payload.startswith(b"%PDF-"):
             raise MailDeliveryError("O PDF gerencial é inválido")
         message = EmailMessage()
