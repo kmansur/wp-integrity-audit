@@ -2,6 +2,7 @@
 from __future__ import annotations
 import configparser
 import os
+import socket
 from email.message import EmailMessage
 from email.utils import parseaddr
 from pathlib import Path
@@ -50,14 +51,45 @@ def _ler_regular_limitado(path: Path, limite: int, *, privado: bool = False) -> 
         raise MailDeliveryError("Não foi possível abrir um arquivo do envio com segurança") from error
 
 
+def _erro_smtp(error: Exception) -> str:
+    """Detalhar a etapa sem revelar endereços internos, credenciais ou respostas completas."""
+    if isinstance(error, smtplib.SMTPAuthenticationError):
+        return f"Autenticação SMTP recusada (código {error.smtp_code}); confira usuário e senha"
+    if isinstance(error, smtplib.SMTPNotSupportedError):
+        return "O servidor SMTP não oferece o recurso TLS ou autenticação exigido"
+    if isinstance(error, ssl.SSLCertVerificationError):
+        return "Validação do certificado TLS SMTP falhou; confira DNS, certificado e relógio"
+    if isinstance(error, ssl.SSLError):
+        return "Falha na negociação TLS com o servidor SMTP"
+    if isinstance(error, smtplib.SMTPRecipientsRefused):
+        return "O servidor SMTP recusou o destinatário"
+    if isinstance(error, smtplib.SMTPSenderRefused):
+        return f"O servidor SMTP recusou o remetente (código {error.smtp_code})"
+    if isinstance(error, smtplib.SMTPResponseException):
+        return f"O servidor SMTP retornou erro (código {error.smtp_code})"
+    if isinstance(error, (socket.timeout, TimeoutError)):
+        return "Tempo limite excedido na comunicação SMTP"
+    if isinstance(error, socket.gaierror):
+        return "Não foi possível resolver o nome DNS do servidor SMTP"
+    if isinstance(error, ConnectionRefusedError):
+        return "Conexão SMTP recusada; confira servidor, porta e firewall"
+    if isinstance(error, OSError):
+        return "Falha de rede ou conexão com o servidor SMTP"
+    if isinstance(error, (configparser.Error, ValueError, UnicodeError)):
+        return "Configuração SMTP inválida; confira campos, codificação e porta"
+    if isinstance(error, smtplib.SMTPException):
+        return "Falha de protocolo ou autenticação no servidor SMTP"
+    return "Falha desconhecida na comunicação SMTP"
+
+
 def send_management_report(case: Path, recipient: str, config_path: Path) -> None:
-    """Enviar somente o PDF gerencial concluído utilizando TLS verificado."""
+    """Enviar PDF gerencial via TLS verificado; sucesso indica aceite SMTP, não entrega."""
     _private_file(config_path)
     config = configparser.ConfigParser(interpolation=None)
     try:
         config.read_string(_ler_regular_limitado(config_path, 64 * 1024, privado=True).decode("utf-8"))
         if "smtp" not in config:
-            raise MailDeliveryError("Seção SMTP ausente na configuração")
+            raise MailDeliveryError("Seção [smtp] ausente na configuração")
         section = config["smtp"]
         host = section.get("host", "").strip()
         port = section.getint("port")
@@ -90,13 +122,19 @@ def send_management_report(case: Path, recipient: str, config_path: Path) -> Non
         if security == "ssl":
             with smtplib.SMTP_SSL(host, port, timeout=20, context=tls) as smtp:
                 smtp.login(username, password)
-                smtp.send_message(message)
+                recusados = smtp.send_message(message)
         else:
             with smtplib.SMTP(host, port, timeout=20) as smtp:
                 smtp.ehlo()
+                if not smtp.has_extn("starttls"):
+                    raise MailDeliveryError("O servidor não anunciou STARTTLS; envio cancelado sem transmitir credenciais")
                 smtp.starttls(context=tls)
                 smtp.ehlo()
                 smtp.login(username, password)
-                smtp.send_message(message)
+                recusados = smtp.send_message(message)
+        if recusados:
+            raise MailDeliveryError("O servidor SMTP recusou um ou mais destinatários")
+    except MailDeliveryError:
+        raise
     except (configparser.Error, OSError, ValueError, UnicodeError, smtplib.SMTPException, ssl.SSLError) as error:
-        raise MailDeliveryError("Falha na configuração ou no envio SMTP; verifique os logs restritos do servidor") from None
+        raise MailDeliveryError(_erro_smtp(error)) from None
