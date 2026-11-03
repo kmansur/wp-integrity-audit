@@ -515,7 +515,8 @@ $table_prefix = 'wp_';
             self.assertNotIn("/etc/apache2", client_report)
             self.assertNotIn("wp-includes/version.php", client_report)
             self.assertIn("Divergências do núcleo do WordPress que exigem revisão", client_report)
-            csv_rows = list(csv.reader((case / "report.csv").open()))
+            with (case / "report.csv").open(newline="", encoding="utf-8") as arquivo_csv:
+                csv_rows = list(csv.reader(arquivo_csv))
             self.assertEqual(csv_rows[0][:2], ["domain", "case_id"])
             self.assertEqual(csv_rows[1][:2], ["mbengenharia.com", "20261030T220303Z-538f44"])
 
@@ -693,6 +694,72 @@ $table_prefix = 'wp_';
             self.assertEqual(next(x for x in result["components"] if x["slug"] == "child")["state"], "TEMA_FILHO_CUSTOMIZADO")
             self.assertEqual(result["summary"]["plugins_checked"], 1)
             self.assertEqual(len((case / "component-version-report.csv").read_text().splitlines()), 5)
+
+    def test_cabecalho_popup_maker_nao_confunde_anotacao_php(self):
+        import component_versions as cv
+        with tempfile.TemporaryDirectory() as pasta:
+            raiz = Path(pasta)
+            plugin = raiz / "wp-content/plugins/popup-maker"
+            plugin.mkdir(parents=True)
+            (plugin / "bootstrap.php").write_text("<?php // arquivo auxiliar", encoding="utf-8")
+            (plugin / "popup-maker.php").write_text(
+                "<?php\n/**\n * Plugin Name:       Popup Maker\n * Version:           1.25.0\n */\n"
+                "/**\n * @param array{\n *     version: string,\n * } $dados\n */\n",
+                encoding="utf-8")
+            registro = cv.local_components(raiz, "plugin")[0]
+            self.assertEqual(registro["local_version"], "1.25.0")
+            self.assertEqual(registro["header_status"], "VALIDADO")
+            self.assertEqual(registro["main_file"], "wp-content/plugins/popup-maker/popup-maker.php")
+            with unittest.mock.patch.object(cv, "api_json", return_value=(
+                    "SUCCESS", {"version": "1.25.0"}, "https://api.wordpress.org/plugins/info/1.2/")):
+                cv.compare_official(registro)
+            self.assertEqual(registro["state"], "PLUGIN_OFICIAL_ATUAL")
+            self.assertEqual(registro["query_status"], "OFFICIAL_MATCH")
+
+    def test_cabecalho_em_comentario_nao_aceita_versao_de_outro_bloco(self):
+        import component_versions as cv
+        with tempfile.TemporaryDirectory() as pasta:
+            raiz = Path(pasta)
+            plugin = raiz / "wp-content/plugins/exemplo"
+            plugin.mkdir(parents=True)
+            (plugin / "exemplo.php").write_text(
+                "<?php\n/* Plugin Name: Exemplo */\n/** Version: 9.9.9 */\n"
+                "function exemplo() { return 'version: string,'; }\n", encoding="utf-8")
+            registro = cv.local_components(raiz, "plugin")[0]
+            self.assertIsNone(registro["local_version"])
+            self.assertEqual(registro["header_status"], "VERSAO_AUSENTE")
+            with unittest.mock.patch.object(cv, "api_json", return_value=(
+                    "SUCCESS", {"version": "9.9.9"}, "https://api.wordpress.org/plugins/info/1.2/")):
+                cv.compare_official(registro)
+            self.assertEqual(registro["state"], "PLUGIN_VERSAO_NAO_IDENTIFICADA")
+            self.assertEqual(registro["query_status"], "OFFICIAL_COMPONENT_FOUND_VERSION_UNVERIFIED")
+
+    def test_secao_de_componentes_em_portugues(self):
+        import json
+        import component_versions as cv
+        with tempfile.TemporaryDirectory() as pasta:
+            caso = Path(pasta)
+            (caso / "component-version-evidence.json").write_text(json.dumps({
+                "coverage": {"status": "EXECUTED", "local": "EXECUTED",
+                             "official": "EXECUTED", "core": "EXECUTED"},
+                "summary": {"core_version": "7.1.3", "plugins_checked": 1,
+                            "plugins_outdated": 0, "plugins_requiring_provenance_review": 0}
+            }))
+            (caso / "report.md").write_text("# Relatório gerencial\n")
+            cv.append_management_section(caso)
+            texto = (caso / "report.md").read_text()
+            self.assertIn("## Versões e componentes", texto)
+            self.assertIn("WordPress instalado: 7.1.3", texto)
+            self.assertNotIn("Versions and components", texto)
+            self.assertNotIn("Coverage status:", texto)
+
+    def test_cron_informativo_nao_aparece_como_alerta_do_cliente(self):
+        texto = "\n".join(audit.customer_findings(
+            [], [{"evidence_id": "DB-009", "kind": "cron_metadata",
+                  "name": "cron", "state": "INFORMATIONAL", "sha256": "a" * 64}],
+            [], None))
+        self.assertNotIn("DB-009 - Banco de dados", texto)
+        self.assertIn("Nenhuma ocorrência individual", texto)
 
     def test_component_official_api_failure_is_not_absence(self):
         import component_versions as cv
