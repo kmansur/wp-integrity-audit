@@ -1305,6 +1305,24 @@ $table_prefix = 'wp_';
                     mail_delivery.send_management_report(caso, "cliente@example.com", cfg)
                 envio.assert_not_called()
 
+    def test_smtp_limita_configuracao_e_valida_permissoes_no_descritor(self):
+        import mail_delivery
+        with tempfile.TemporaryDirectory() as pasta:
+            raiz = Path(pasta)
+            arquivo = raiz / "smtp.cfg"
+            with arquivo.open("wb") as stream:
+                stream.truncate(64 * 1024 + 1)
+            arquivo.chmod(0o600)
+            with self.assertRaises(mail_delivery.MailDeliveryError):
+                mail_delivery._ler_regular_limitado(arquivo, 64 * 1024, privado=True)
+            arquivo.write_text("[smtp]\n", encoding="utf-8")
+            arquivo.chmod(0o644)
+            with self.assertRaises(mail_delivery.MailDeliveryError):
+                mail_delivery._ler_regular_limitado(arquivo, 64 * 1024, privado=True)
+            arquivo.chmod(0o600)
+            self.assertEqual(mail_delivery._ler_regular_limitado(arquivo, 64 * 1024, privado=True),
+                             b"[smtp]\n")
+
     def test_mail_delivery_requires_private_config(self):
         import mail_delivery
         with tempfile.TemporaryDirectory() as folder:
