@@ -11,7 +11,7 @@ python3 -m unittest discover -s tests -v
 python3 bin/wp-integrity-audit.py --version
 ```
 
-**Atenção ao versionamento:** esta correção foi registrada na branch remota Python sobre a versão 0.24.0. Se um servidor estiver executando 0.26.0 com alterações não publicadas ou locais, não substitua o script por uma revisão anterior. Compare os commits e integre somente a correção de codificação, preservando as melhorias locais; depois execute os testes novamente.
+**Atenção ao versionamento:** esta correção foi integrada seletivamente à linha local 0.26.0. Não substitua uma instalação 0.26.0 por uma revisão remota 0.24.x; compare os commits e preserve as melhorias de segurança locais antes de atualizar servidores.
 
 
 Ferramenta para auditoria de integridade e investigação de comprometimento em sites WordPress, destinada a servidores Debian e Ubuntu.
