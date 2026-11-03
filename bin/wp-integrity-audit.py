@@ -34,7 +34,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 
-VERSION = "0.24.5"
+VERSION = "0.25.0"
 IOC = re.compile(r"SC_ADV_BEGIN|--sc-cli|--sc-succ|trace-inspector-pad|cipher-feeder|_sc_fpc|sc_cron_guard|sc_persist_manifest|sc_own_manifest|function ceya|Axiom Sentinel Snap|SCV:[0-9]+")
 PATTERN_NAMES = (".sc_", ".gr_", ".gk_", ".kk_", ".wp-object-cache")
 SCRIPT_EXTENSIONS = {".php", ".phtml", ".phar", ".inc", ".php5", ".php7", ".php8", ".pht", ".phps"}
@@ -43,6 +43,14 @@ GENERIC_WEB_SHELL = re.compile(
     rb"|(?:assert|eval)\s*\(\s*\$_(?:GET|POST|REQUEST|COOKIE)\b"
     rb"|(?:system|shell_exec|passthru)\s*\(\s*\$_(?:GET|POST|REQUEST)\b",
     re.I)
+OBFUSCATION_PATTERNS = {
+    "LONG_STRING_ARRAY": re.compile(r"array\s*\(\s*['\"][^'\"]{1,120}['\"](?:\s*,\s*['\"][^'\"]{1,120}['\"]){15,}", re.I | re.S),
+    "RANDOM_FUNCTION_NAMES": re.compile(r"function\s+[A-Za-z_][A-Za-z0-9_]{14,}\s*\(", re.I),
+    "DYNAMIC_GLOBALS": re.compile(r"\$GLOBALS\s*\[\s*['\"](?:__scf_|[A-Za-z0-9_]{18,})", re.I),
+    "ENCODING_OR_COMPRESSION": re.compile(r"\b(?:base64_decode|gzinflate|gzuncompress|str_rot13|convert_uudecode|pack|hex2bin)\s*\(", re.I),
+    "DYNAMIC_CALL": re.compile(r"(?:call_user_func|create_function|assert|eval)\s*\(", re.I),
+    "CHR_ORD_ASSEMBLY": re.compile(r"\b(?:chr|ord)\s*\(\s*(?:0x[0-9a-f]+|[0-9]{2,3})", re.I),
+}
 
 SENSITIVE = re.compile(r"(?i)(password|passwd|secret|token|api[_-]?key)\s*[:=]\s*[^\s,;]+")
 LONG_VALUE = re.compile(r"(?<![\w])[A-Za-z0-9_/-]{40,}(?![\w])")
@@ -210,6 +218,14 @@ def classify_file(relative: str, name: str, text: str, indicator: str | None) ->
     return ("ARQUIVO_SUSPEITO_REQUER_VALIDACAO", "Suspicious filename requires manual review")
 
 
+def obfuscation_indicators(text: str) -> list[str]:
+    """Return multiple independent static obfuscation signals, never execute code."""
+    hits = [name for name, pattern in OBFUSCATION_PATTERNS.items() if pattern.search(text)]
+    # A single base64/pack call is common in legitimate software; require a
+    # combination of independent signals before escalating generic PHP.
+    return hits
+
+
 def file_audit(target: Path, case: Path) -> list[dict]:
     """Inspect known IOC filenames and all script content in bounded chunks."""
     findings: list[dict] = []
@@ -225,13 +241,17 @@ def file_audit(target: Path, case: Path) -> list[dict]:
         snippet = ""
         safe_text = ""
         generic_match = False
+        obfuscation_hits: list[str] = []
         if path.suffix.lower() in SCRIPT_EXTENSIONS:
             try:
                 with path.open("rb") as stream:
                     overlap = b""
+                    bounded = bytearray()
                     while chunk := stream.read(65536):
                         sample = overlap + chunk
                         decoded = sample.decode("utf-8", "replace")
+                        if len(bounded) < 8_000_000:
+                            bounded.extend(chunk[:8_000_000 - len(bounded)])
                         if not safe_text:
                             safe_text = decoded[:4096]
                         match = IOC.search(decoded)
@@ -241,6 +261,7 @@ def file_audit(target: Path, case: Path) -> list[dict]:
                             snippet = redact(decoded[max(0, match.start() - 40):match.end() + 60])
                             break
                         overlap = sample[-256:]
+                    obfuscation_hits = obfuscation_indicators(bytes(bounded).decode("utf-8", "replace"))
             except OSError:
                 continue
         if not (unusual or upload_php or hidden_php or match or generic_match):
@@ -252,6 +273,8 @@ def file_audit(target: Path, case: Path) -> list[dict]:
             classification, reason = "CACHE_PLUGIN_REQUER_VALIDACAO", "MetForm icon cache candidate; origin and complete content not verified"
         if generic_match and not match:
             classification, reason = "WEB_SHELL_HEURISTIC_REQUIRES_REVIEW", "Potential dynamic execution or obfuscation pattern"
+        elif len(obfuscation_hits) >= 3 and not match:
+            classification, reason = "PHP_OFUSCACAO_REQUER_QUARENTENA", "Multiple independent PHP obfuscation signals; preserve evidence and quarantine reversibly"
         if upload_php and not match and not generic_match and reviewed_metform_cache(relative, path):
             classification, reason = "LEGITIMO_VALIDADO", "Exact SHA-256 matches reviewed MetForm cache artifact; not plugin-wide trust"
         if hidden_php and not match and not generic_match and classification == "ARQUIVO_SUSPEITO_REQUER_VALIDACAO":
@@ -264,6 +287,7 @@ def file_audit(target: Path, case: Path) -> list[dict]:
                 "classification": classification, "reason": reason,
                 "indicator": match.group(0) if match else ("filename" if unusual else "upload PHP"),
                 "snippet": snippet,
+                "obfuscation_indicators": obfuscation_hits,
             })
         except OSError:
             continue
@@ -627,7 +651,7 @@ def audit_status(files: list[dict], processes: list[str],
         "validated_legitimate_files": sum(x.get("classification") == "LEGITIMO_VALIDADO" for x in files),
         "security_configuration_review": sum(x.get("classification") == "CONFIGURACAO_PLUGIN_SEGURANCA_REQUER_VALIDACAO" for x in files),
         "confirmed_compromised_files": confirmed_files,
-        "file_indicators_requiring_review": sum(x.get("classification") in ("IOC_REQUER_VALIDACAO", "ARQUIVO_SUSPEITO_REQUER_VALIDACAO", "PHP_UPLOAD_REQUER_VALIDACAO", "PHP_DIRETORIO_OCULTO_REQUER_VALIDACAO", "CACHE_PLUGIN_REQUER_VALIDACAO", "WEB_SHELL_HEURISTIC_REQUIRES_REVIEW") for x in files),
+        "file_indicators_requiring_review": sum(x.get("classification") in ("IOC_REQUER_VALIDACAO", "ARQUIVO_SUSPEITO_REQUER_VALIDACAO", "PHP_UPLOAD_REQUER_VALIDACAO", "PHP_DIRETORIO_OCULTO_REQUER_VALIDACAO", "CACHE_PLUGIN_REQUER_VALIDACAO", "WEB_SHELL_HEURISTIC_REQUIRES_REVIEW", "PHP_OFUSCACAO_REQUER_QUARENTENA") for x in files),
         "suspicious_processes": len(processes),
     }
     if database is None:

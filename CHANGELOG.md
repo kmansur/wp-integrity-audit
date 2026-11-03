@@ -651,3 +651,10 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 ### Security
 - Detect the observed `Axiom Sentinel Snap`/`SCV:*` obfuscated component signature even when the malicious copy is renamed to a generic PHP filename such as `core_*.php`.
 
+## [0.25.0] - 2026-11-03
+
+### Security
+- Add bounded, non-executing multi-signal PHP obfuscation detection.
+- Classify files with at least three independent obfuscation indicators as `PHP_OFUSCACAO_REQUER_QUARENTENA`.
+- Preserve the original file and hash in private evidence; no automatic deletion or quarantine is performed by audit mode.
+
