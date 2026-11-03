@@ -223,6 +223,42 @@ $table_prefix = 'wp_';
                 import shutil
                 shutil.rmtree(estagio)
 
+    def test_remediacao_cron_serializado_preserva_outros_hooks(self):
+        import remediacao_serializada as rs
+        evento = ("array", [(b"hash", ("array", [(b"schedule", False), (b"args", ("array", []))]))])
+        anterior = ("array", [(1700000000, ("array", [(b"sc_cron_fetch", evento),
+                                                       (b"woocommerce_hook", evento)])),
+                               (b"version", 2)])
+        origem = rs.serializar(anterior)
+        novo, quantidade = rs.remover_hook_cron(origem, "sc_cron_fetch")
+        self.assertEqual(quantidade, 1)
+        verificado = rs.LeitorPHP(novo).completo()
+        self.assertEqual([k for k, _ in verificado[1][0][1][1]], [b"woocommerce_hook"])
+        self.assertIn(b"version", novo)
+        self.assertEqual(rs.remover_hook_cron(novo, "sc_cron_fetch")[1], 0)
+
+    def test_remediacao_plugin_reindexa_e_preserva_outros(self):
+        import remediacao_serializada as rs
+        origem = rs.serializar(("array", [(0, b"akismet/akismet.php"),
+                                          (1, b"trace-inspector-pad/trace-inspector-pad.php"),
+                                          (2, b"elementor/elementor.php")]))
+        novo, quantidade = rs.desativar_plugin(origem, "trace-inspector-pad/trace-inspector-pad.php")
+        self.assertEqual(quantidade, 1)
+        self.assertEqual(rs.LeitorPHP(novo).completo(), ("array", [
+            (0, b"akismet/akismet.php"), (1, b"elementor/elementor.php")]))
+
+    def test_remediacao_serializada_rejeita_objetos_e_dados_invalidos(self):
+        import remediacao_serializada as rs
+        entradas = [b'O:4:"Test":0:{}', b'a:1:{i:0;s:2:"x";}', b's:3:"abc";trash']
+        for entrada in entradas:
+            with self.subTest(entrada=entrada):
+                with self.assertRaises(rs.SerializacaoInsegura):
+                    rs.LeitorPHP(entrada).completo()
+        with self.assertRaises(rs.SerializacaoInsegura):
+            rs.desativar_plugin(b"a:0:{}", "../teste.php")
+        with self.assertRaises(rs.SerializacaoInsegura):
+            rs.remover_hook_cron(b"a:0:{}", "hook;DELETE")
+
     def test_salt_rotation_preserves_other_configuration(self):
         with tempfile.TemporaryDirectory() as directory:
             config = Path(directory) / "wp-config.php"
