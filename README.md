@@ -1,5 +1,19 @@
 # Auditoria de Integridade WordPress — branch Python
 
+## Diagnóstico de codificação — 0.24.1
+
+Quando um comando externo devolve bytes não UTF-8 (por exemplo, `0xE1`), a ferramenta representa o octeto como `\\xe1` em vez de encerrar a auditoria com `UnicodeDecodeError`. As consultas ao MySQL solicitam `utf8mb4` explicitamente. O escape de bytes é uma representação técnica, **não** a recuperação definitiva da codificação original; ainda é necessário avaliar dados legados antes de concluir que não existem indicadores.
+
+Para validar em Debian/Ubuntu:
+
+```bash
+python3 -m unittest discover -s tests -v
+python3 bin/wp-integrity-audit.py --version
+```
+
+**Atenção ao versionamento:** esta correção foi registrada na branch remota Python sobre a versão 0.24.0. Se um servidor estiver executando 0.26.0 com alterações não publicadas ou locais, não substitua o script por uma revisão anterior. Compare os commits e integre somente a correção de codificação, preservando as melhorias locais; depois execute os testes novamente.
+
+
 Ferramenta para auditoria de integridade e investigação de comprometimento em sites WordPress, destinada a servidores Debian e Ubuntu.
 
 > **Estado de segurança:** versão de pré-lançamento. Os procedimentos de recuperação ainda não foram validados integralmente em cenários reais de WordPress/MySQL. Não utilize os modos de alteração em produção sem ensaios independentes de recuperação.
