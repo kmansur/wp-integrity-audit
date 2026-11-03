@@ -127,8 +127,14 @@ def write_private(path: Path, text: str) -> None:
         stream.write(text)
 
 def run(argv: list[str], **kwargs) -> subprocess.CompletedProcess:
-    """Execute a fixed argument vector, never through a shell."""
-    return subprocess.run(argv, check=True, text=True, **kwargs)
+    """Executar sem shell e representar bytes externos inválidos sem descartá-los.
+
+    O modo backslashreplace preserva os octetos não UTF-8 como sequências
+    literais (ex.: \\xe1). Não interpretar texto assim convertido como
+    autorização de exclusão, alteração SQL ou prova negativa de indicadores.
+    """
+    return subprocess.run(argv, check=True, text=True, encoding="utf-8",
+                          errors="backslashreplace", **kwargs)
 
 def ask(message: str) -> None:
     if not sys.stdin.isatty() or input(message + " [type YES]: ").strip() != "YES":
@@ -1272,7 +1278,8 @@ def database_client(config: dict[str, str], case: Path):
         cnf.unlink(missing_ok=True)
 
 def query_db(option_file: str, dbname: str, sql: str) -> list[list[str]]:
-    proc = run(["mysql", f"--defaults-extra-file={option_file}", "--batch", "--skip-column-names", dbname],
+    proc = run(["mysql", f"--defaults-extra-file={option_file}",
+                "--default-character-set=utf8mb4", "--batch", "--skip-column-names", dbname],
                input=sql, capture_output=True)
     return [line.split("\t") for line in proc.stdout.splitlines()]
 
