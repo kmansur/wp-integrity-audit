@@ -25,6 +25,9 @@ O arquivo de configuração e o arquivo separado com a senha SMTP devem permanec
 
 ## Relatórios em português
 
+A versão `0.21.11` atualiza as asserções dos testes de integração MySQL para os relatórios em português, preservando os identificadores técnicos e as regras de auditoria. A liberação da próxima fase depende da aprovação integral do pipeline, incluindo a integração MySQL. Os modos de recuperação continuam experimentais e não homologados para produção.
+
+
 A versão 0.21.10 também apresenta em português o registro de contenção do incidente. Esse registro não representa autorização de retirada do site do ar nem comprovação de indisponibilidade; exige preenchimento documental pelo responsável.
 
 
