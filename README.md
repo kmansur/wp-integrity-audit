@@ -25,6 +25,11 @@ O arquivo de configuração e o arquivo separado com a senha SMTP devem permanec
 
 ## Relatórios em português
 
+A versão `0.22.0` reforça as rotinas de exportação e envio: o arquivo `report.md` tem limite de **8 MiB** para geração PDF e o anexo PDF tem limite de **20 MiB** para envio SMTP. A senha SMTP deve estar em arquivo privado de caminho absoluto e tamanho máximo de **4 KiB**. A abertura dos arquivos de entrada protegidos impede seguir links simbólicos. Falhas de validação cancelam a operação, sem enviar um documento inválido.
+
+O CI dispõe de um job específico para testar ReportLab e PyMuPDF em Python 3.12, incluindo acentos e paginação. O modo de auditoria permanece somente leitura no WordPress; não utilize recuperação automatizada em produção. Antes de qualquer uso de e-mail com dados de clientes, valide o transporte SMTP em ambiente controlado e autorize o destinatário.
+
+
 A versão `0.21.12` automatiza a inspeção dos cabeçalhos de plugins e temas, inclusive a versão declarada e o arquivo principal, sem executar PHP. O parser considera apenas o bloco de metadados e não confunde anotações posteriores, como `version: string,`, com a versão do plugin. O inventário `component-version-evidence.json` e o CSV registram `header_status`. Quando a versão local não pode ser verificada, a consulta oficial não a classifica como correspondente. A evidência informativa de cron continua no registro técnico, sem ser apresentada ao cliente como indicador de incidente sem confirmação.
 
 A seção de componentes do relatório é produzida em português e os achados de versões mostram a instalada e a referência consultada. O SHA-256 apresentado para componentes representa o arquivo principal quando disponível, **não** uma verificação do pacote completo. Os identificadores estruturados permanecem inalterados; a auditoria continua somente leitura por padrão. Não é necessário executar manualmente `grep`, `find` ou o parser para identificar a versão de um plugin.
