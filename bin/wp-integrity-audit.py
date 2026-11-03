@@ -1381,8 +1381,8 @@ def official_sync(target: Path, stage: Path, case: Path) -> None:
 
 def validate_source(source: Path, target: Path) -> Path:
     source = source.resolve(strict=True)
-    if not source.is_dir() or source == target / "wp-content" or target in source.parents:
-        raise AuditError("Source must be an independent clean directory")
+    if not source.is_dir() or source == target or target in source.parents or source in target.parents:
+        raise AuditError("Fonte limpa deve ser independente e não conter nem estar dentro do site")
     # shutil.copytree follows symlinks unless explicitly forbidden.
     # Reject special files and symlinks BEFORE copying any untrusted source.
     for directory, dirs, files in os.walk(source, followlinks=False):
@@ -1399,8 +1399,8 @@ def validate_source(source: Path, target: Path) -> Path:
                 overlap = b""
                 while chunk := stream.read(65536):
                     sample = overlap + chunk
-                    if IOC.search(sample.decode("utf-8", "replace")):
-                        raise AuditError(f"Known IOC in proposed clean source: {path}")
+                    if IOC.search(sample.decode("utf-8", "replace")) or GENERIC_WEB_SHELL.search(sample):
+                        raise AuditError(f"Indicador de código suspeito na fonte de recuperação: {path}")
                     overlap = sample[-256:]
     return source
 
@@ -1834,6 +1834,8 @@ def parse_args() -> argparse.Namespace:
         parser.error("A substituição de wp-content exige --replace-plugins-themes")
     if args.mode == "apply-db" and not args.remove_db_option:
         parser.error("--apply-db exige pelo menos uma opção --remove-db-option")
+    if args.mode in ("apply-db", "apply-files", "recover") and (args.email_to or args.pdf_report or args.bundle_evidence):
+        parser.error("Recuperação não pode combinar envio, PDF ou pacote de evidências na mesma execução")
     return args
 
 def present_management_report(case: Path, *, show: bool = False,
