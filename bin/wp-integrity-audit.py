@@ -1434,7 +1434,13 @@ def stage_files(target: Path, source: Path, case: Path, replace: bool, sync: boo
             atual = arquivo.stat()
             if (atual.st_uid, atual.st_gid) != (dono.st_uid, dono.st_gid):
                 os.chown(arquivo, dono.st_uid, dono.st_gid, follow_symlinks=False)
-            os.chmod(arquivo, stat.S_IMODE(modo) & ~0o002)
+            # Não importar modos inseguros ou restritivos da fonte confiável.
+            # Quando houver arquivo equivalente, preservar o modo original do site.
+            igual = correspondente == original / relativo and (
+                stat.S_ISDIR(dono.st_mode) == stat.S_ISDIR(modo))
+            permissao = (stat.S_IMODE(dono.st_mode) if igual else
+                         0o755 if stat.S_ISDIR(modo) else 0o644)
+            os.chmod(arquivo, permissao & ~0o002)
         return stage
     except BaseException:
         shutil.rmtree(stage, ignore_errors=True)
