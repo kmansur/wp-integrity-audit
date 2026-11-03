@@ -358,7 +358,7 @@ def audit(target: Path, case: Path, *, offline: bool = False,
     (case / "component-version-report.md").write_text("\n".join(lines) + "\n")
     with (case / "component-version-report.csv").open("w", newline="") as stream:
         writer = csv.DictWriter(stream, fieldnames=("component_id", "type", "slug", "name", "local_version",
-                                                     "official_version", "source", "active", "parent_theme", "main_file", "main_file_sha256", "state", "query_status", "query_url", "checksum_status", "review_guidance"))
+                                                     "official_version", "source", "active", "parent_theme", "main_file", "main_file_sha256", "header_status", "state", "query_status", "query_url", "checksum_status", "review_guidance"))
         writer.writeheader()
         writer.writerows({key: item.get(key) for key in writer.fieldnames} for item in records)
     return result
