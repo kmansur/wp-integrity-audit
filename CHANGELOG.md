@@ -4,6 +4,19 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 
 ## [Não publicado]
 
+## [0.22.1] - 2026-11-03
+
+### Clareza das evidências gerenciais
+- Cada ocorrência individual do relatório gerencial passa a indicar a natureza do achado e uma conclusão limitada ao que a evidência permite afirmar.
+- Resíduos compatíveis com o incidente, referências históricas, manutenção de componentes e procedência/versão não confirmadas são diferenciados; atualizações pendentes não são tratadas como prova de malware.
+- Incluídos na apresentação gerencial componentes com estado genérico de revisão de versão/procedência, preservando os estados estruturados utilizados no JSON.
+- Novos testes de regressão verificam a distinção e asseguram que metadados informativos do cron não gerem alertas individuais.
+- Não foram alterados mecanismos de recuperação, assinaturas de malware nem códigos de retorno.
+
+### Limitações
+- A natureza indicada é uma categorização do achado, não um certificado de segurança nem autorização de reativação.
+
+
 ## [0.22.0] - 2026-11-03
 
 ### Segurança operacional e homologação
