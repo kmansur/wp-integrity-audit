@@ -177,14 +177,39 @@ class MySQLFixtureTests(unittest.TestCase):
         self.assertIn("|---|---|---|---|\n", report)
 
     def test_safe_cleanup_preserves_legitimate_options(self):
-        audit.sql_cleanup(self.cnf, self.dbname, "wp_", self.case)
+        self.query("INSERT INTO wp_options(option_name,option_value) VALUES ('sc_legitima','valor legitimo')")
+        plano = audit.database_cleanup_plan(self.cnf, self.dbname, "wp_", ["sc_fake"])
+        self.assertEqual([row["option_name"] for row in plano], ["sc_fake"])
+        audit.sql_cleanup(self.cnf, self.dbname, "wp_", self.case, requested=["sc_fake"])
         values = dict(self.query(
             "SELECT option_name, option_value FROM wp_options WHERE option_name IN ('active_plugins','cron')"
         ))
         self.assertIn("active_plugins", values)
         self.assertIn("cron", values)
         self.assertEqual(self.query("SELECT COUNT(*) FROM wp_options WHERE option_name='sc_fake'"), [["0"]])
-        self.assertEqual(self.query("SELECT COUNT(*) FROM wp_usermeta WHERE meta_key='session_tokens'"), [["0"]])
+        self.assertEqual(self.query("SELECT COUNT(*) FROM wp_options WHERE option_name='sc_legitima'"), [["1"]])
+        self.assertEqual(self.query("SELECT COUNT(*) FROM wp_usermeta WHERE meta_key='session_tokens'"), [["1"]])
+        self.assertEqual(self.query("SELECT COUNT(*) FROM wp_usermeta WHERE meta_key='wp_application_passwords'"), [["1"]])
+        registro = json.loads((self.case / "database-cleanup-result.json").read_text())
+        self.assertEqual(registro["removed"], ["sc_fake"])
+
+    def test_database_cleanup_without_explicit_selection_does_not_delete(self):
+        audit.sql_cleanup(self.cnf, self.dbname, "wp_", self.case)
+        self.assertEqual(self.query("SELECT COUNT(*) FROM wp_options WHERE option_name='sc_fake'"), [["1"]])
+        self.assertEqual(self.query("SELECT COUNT(*) FROM wp_usermeta WHERE meta_key='session_tokens'"), [["1"]])
+
+    def test_database_cleanup_resists_stale_digest(self):
+        plan = audit.database_cleanup_plan(self.cnf, self.dbname, "wp_", ["sc_fake"])
+        self.assertEqual(len(plan), 1)
+        self.query("UPDATE wp_options SET option_value='modificado' WHERE option_name='sc_fake'")
+        # A correspondência do hash anterior nunca autoriza exclusão de valor alterado.
+        option = plan[0]
+        rows = self.query(
+            "DELETE FROM wp_options WHERE option_name='sc_fake' AND "
+            f"SHA2(option_value,256)='{option['value_sha256']}'; SELECT ROW_COUNT();"
+        )
+        self.assertEqual(rows, [["0"]])
+        self.assertEqual(self.query("SELECT COUNT(*) FROM wp_options WHERE option_name='sc_fake'"), [["1"]])
 
     def test_recovery_snapshot_contains_site_and_database(self):
         """Check archive/dump integrity using only the disposable CI database."""
@@ -237,7 +262,7 @@ class MySQLFixtureTests(unittest.TestCase):
     def test_refuses_to_delete_malicious_serialized_option(self):
         self.query("UPDATE wp_options SET option_value='cipher-feeder' WHERE option_name='cron'")
         with self.assertRaises(audit.AuditError):
-            audit.sql_cleanup(self.cnf, self.dbname, "wp_", self.case)
+            audit.sql_cleanup(self.cnf, self.dbname, "wp_", self.case, requested=["sc_fake"])
         self.assertEqual(self.query("SELECT option_value FROM wp_options WHERE option_name='cron'"),
                          [["cipher-feeder"]])
 
