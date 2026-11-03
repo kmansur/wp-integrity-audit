@@ -623,3 +623,15 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 - Sending is always opt-in. SMTP errors return 30 and do not convert unresolved audit findings into success. An accepted SMTP submission does not guarantee mailbox delivery.
 
 - Reject mail delivery options when running historical case comparison; email can only be triggered during an explicit audit.
+## [0.24.2] - 2026-11-03
+
+### Added
+- Contextual validation for deny-only `.htaccess` protections used by uploads and common security/backup plugins; rules with handlers, rewrites or grants remain review findings.
+- Complete hash-bound manifests for incident-associated plugin directories and reversible directory quarantine helper.
+- `bin/remediar_usuario_wp.py` for exact-ID WordPress administrator removal, refusing accounts with authored posts or comments and preserving pseudonymous evidence.
+- Explicit incident-family classification for `kinetic-relay-live` in component provenance reports.
+
+### Safety
+- Directory quarantine requires every regular file to match an existing private evidence manifest, rejects symlinks and is reversible by rename.
+- User remediation never evaluates PHP, never accepts credentials on the command line and records only a login hash.
+

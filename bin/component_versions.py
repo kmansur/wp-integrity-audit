@@ -11,6 +11,7 @@ import urllib.parse
 import urllib.request
 
 API = "https://api.wordpress.org"
+INCIDENT_COMPONENT_SLUGS = {"kinetic-relay-live"}
 VERSION_RE = re.compile(r"^[0-9]+(?:\.[0-9]+){1,4}(?:[-+._][A-Za-z0-9.-]+)?$")
 HEADERS = re.compile(r"(?im)^\s*(?:/\*)?\s*\*?\s*(Plugin Name|Theme Name|Version|Template|Update URI|Plugin URI|Theme URI)\s*:\s*([^\r\n]{0,250})")
 HEADER_BLOCK = re.compile(r"/\*.*?\*/", re.S)
@@ -114,6 +115,8 @@ def local_components(target: Path, kind: str, active_plugins: set[str] | None = 
         update_uri = info.get("update_uri", "")
         custom_uri = bool(update_uri and "wordpress.org" not in update_uri.lower())
         default_state = ("PLUGIN_REQUER_REVISAO" if kind == "plugin" else "TEMA_REQUER_REVISAO")
+        if kind == "plugin" and slug in INCIDENT_COMPONENT_SLUGS:
+            default_state = "PLUGIN_FAMILIA_INCIDENTE_REQUER_QUARENTENA"
         if parent and kind == "theme":
             default_state = "TEMA_FILHO_CUSTOMIZADO"
         elif kind == "plugin" and not local_version:
@@ -140,6 +143,12 @@ def compare_official(record: dict) -> None:
     action = ("plugin_information" if kind == "plugin" else "theme_information")
     status, data, url = api_json(path, {"action": action, "request[slug]": slug})
     record["query_url"] = url
+    if kind == "plugin" and slug in INCIDENT_COMPONENT_SLUGS:
+        record["incident_family_candidate"] = True
+        record["review_guidance"] = (
+            "Componente associado aos indicadores observados no incidente; "
+            "mantenha isolado e faça quarentena reversível após preservar evidências."
+        )
     if status == "API_UNAVAILABLE":
         record["query_status"] = status
         return
@@ -172,6 +181,8 @@ def compare_official(record: dict) -> None:
             record["query_status"] = "OFFICIAL_VERSION_DIFFERENT_UNVERIFIED"
             record["state"] = "PLUGIN_REQUER_REVISAO" if kind == "plugin" else "TEMA_REQUER_REVISAO"
             record["review_guidance"] = "A versão local difere da versão divulgada na fonte oficial; confirme a procedência sem assumir correspondência."
+    if kind == "plugin" and slug in INCIDENT_COMPONENT_SLUGS:
+        record["state"] = "PLUGIN_FAMILIA_INCIDENTE_REQUER_QUARENTENA"
 
 def official_plugin_checksums(record: dict, target: Path) -> None:
     """Compare official plugin MD5 manifest; never download executable packages."""
@@ -327,6 +338,26 @@ def audit(target: Path, case: Path, *, offline: bool = False,
         core["state"] = "CORE_CHECKSUM_INDISPONIVEL"
         core["query_status"] = "SKIPPED"
     records = [core] + plugins + themes
+    # For incident-associated components, preserve a complete file manifest so
+    # a later exact-directory quarantine can be hash-bound without rescanning
+    # an untrusted directory heuristically.
+    directory_evidence = {}
+    for rec in plugins:
+        if rec.get("slug") not in INCIDENT_COMPONENT_SLUGS:
+            continue
+        root = target / "wp-content" / "plugins" / rec["slug"]
+        files = []
+        for file in sorted(root.rglob("*")):
+            if file.is_symlink():
+                files.append({"path": file.relative_to(target).as_posix(),
+                              "classification": "SYMLINK_REQUER_REVISAO"})
+                continue
+            if not file.is_file():
+                continue
+            files.append({"path": file.relative_to(target).as_posix(), "sha256": file_digest(file),
+                          "size": file.stat().st_size,
+                          "classification": "PLUGIN_FAMILIA_INCIDENTE_REQUER_QUARENTENA"})
+        directory_evidence[rec["slug"]] = files
     coverage = {"local": "EXECUTED", "official": "SKIPPED" if offline else
                 "UNAVAILABLE" if any(r["query_status"] == "API_UNAVAILABLE" for r in records)
                 else "EXECUTED", "reason": "Offline mode" if offline else None,
@@ -341,9 +372,11 @@ def audit(target: Path, case: Path, *, offline: bool = False,
                           "themes_outdated": sum(r["state"] == "TEMA_OFICIAL_DESATUALIZADO" for r in themes),
                           "unlisted": sum(r["query_status"] == "NOT_FOUND_OFFICIAL_REPOSITORY" for r in records),
                           "plugins_requiring_provenance_review": sum(p["state"] in ("PLUGIN_ORIGEM_NAO_CONFIRMADA_REQUER_REVISAO", "PLUGIN_VERSAO_NAO_IDENTIFICADA", "PLUGIN_PREMIUM_REQUER_FONTE_CONFIAVEL") for p in plugins),
+                          "incident_components_requiring_quarantine": sum(p["state"] == "PLUGIN_FAMILIA_INCIDENTE_REQUER_QUARENTENA" for p in plugins),
                           "plugins_premium_custom": sum(r["state"] in ("PLUGIN_PREMIUM_REQUER_FONTE_CONFIAVEL", "PLUGIN_CUSTOMIZADO") for r in plugins),
                           "themes_premium_custom": sum(r["state"] in ("TEMA_PREMIUM_REQUER_FONTE_CONFIAVEL", "TEMA_CUSTOMIZADO", "TEMA_FILHO_CUSTOMIZADO") for r in themes)}}
     (case / "component-version-evidence.json").write_text(json.dumps(result, indent=2, ensure_ascii=False))
+    (case / "component-directory-evidence.json").write_text(json.dumps(directory_evidence, indent=2, ensure_ascii=False))
     lines = ["# Versões e procedência dos componentes", "",
              f"- WordPress instalado: {core['local_version'] or 'Não identificado'}",
              f"- WordPress de referência: {core['official_version'] or 'Não determinado'}",
@@ -407,6 +440,7 @@ def append_management_section(case: Path) -> None:
             f"- Plugins desatualizados: {summary.get('plugins_outdated', 0)}",
             f"- Plugins premium/personalizados: {summary.get('plugins_premium_custom', 0)}",
             f"- Plugins para revisão de origem/versão: {summary.get('plugins_requiring_provenance_review', 0)}",
+            f"- Componentes associados ao incidente que exigem quarentena: {summary.get('incident_components_requiring_quarantine', 0)}",
             f"- Temas verificados: {summary.get('themes_checked', 0)}",
             f"- Temas desatualizados: {summary.get('themes_outdated', 0)}",
             f"- Temas premium/personalizados: {summary.get('themes_premium_custom', 0)}",

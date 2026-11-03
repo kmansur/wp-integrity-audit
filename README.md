@@ -407,3 +407,16 @@ python3 bin/wp-integrity-audit.py /var/www/example/public_html --domain-label ex
 ## 0.21.0 optional SMTP delivery
 
 To email the customer-only management PDF, run an ordinary audit with `--email-to recipient@example.com` (default configuration: `/etc/wp-integrity-audit/config.cfg`; optional override: `--config /secure/custom.cfg`). The PDF is generated automatically even without `--pdf-report`. See `config/smtp.example.cfg` for TLS settings; copy it outside the repository and WordPress document root, then use `chmod 600` on both the configuration and the separate SMTP password file. Only STARTTLS or implicit TLS with certificate verification is supported; credentials are never passed on command lines or written into report files. No message is sent without `--email-to`. Successful submission only confirms acceptance by the configured SMTP server, not delivery or reading. Errors return exit 30. Never send the private evidence bundle or technical report to the customer.
+# Quarentena de componente e usuário
+
+Após uma auditoria somente leitura, um componente associado ao incidente pode
+ser preservado e isolado com `bin/remediar_arquivos_wp.py --directory`. O
+comando exige o manifesto privado `component-directory-evidence.json`, hash
+correspondente de cada arquivo, ausência de links simbólicos e confirmação
+interativa. O diretório é apenas renomeado para fora do `wp-content`, portanto
+a reversão é possível; nenhum PHP é executado.
+
+Para um usuário WordPress sem posts ou comentários, use
+`bin/remediar_usuario_wp.py --user-id ID --dry-run` e só depois `--apply` após
+backup e isolamento. A ferramenta recusa automaticamente contas com conteúdo.
+

@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Quarentena pontual de arquivos maliciosos do WordPress com evidência SHA-256.
+"""Quarentena reversível de arquivos ou diretórios WordPress previamente auditados.
 
-Não executa PHP e não remove diretórios inteiros ou componentes por heurística.
+Nunca executa PHP. Diretórios só podem ser movidos quando o operador informa o
+caminho exato e todos os arquivos regulares têm evidência/hash correspondente.
 """
 from __future__ import annotations
 import argparse
@@ -53,6 +54,56 @@ def validar(site: Path, caso: Path, relativo: str):
         raise RemocaoRecusada("Hash mudou desde a auditoria")
     return path, digest, dados, st
 
+
+def validar_diretorio(site: Path, caso: Path, relativo: str):
+    if not re.fullmatch(r"wp-content/(?:[A-Za-z0-9_.-]+/)*[A-Za-z0-9_.-]+", relativo):
+        raise RemocaoRecusada("Diretório relativo inválido")
+    raiz = site.resolve(strict=True)
+    path = raiz / relativo
+    content = (raiz / "wp-content").resolve(strict=True)
+    if path.is_symlink() or not path.is_dir() or content not in path.parents:
+        raise RemocaoRecusada("Diretório inexistente, link simbólico ou fora de wp-content")
+    evidencia = caso / "file-evidence.json"
+    if evidencia.is_symlink() or not evidencia.is_file():
+        raise RemocaoRecusada("Evidência de arquivos ausente")
+    registros = json.loads(evidencia.read_text(encoding="utf-8"))
+    by_path = {v.get("path"): v for v in registros if isinstance(v, dict)}
+    component_evidence = caso / "component-directory-evidence.json"
+    if component_evidence.is_file() and not component_evidence.is_symlink():
+        try:
+            components = json.loads(component_evidence.read_text(encoding="utf-8"))
+            for entries in components.values():
+                for item in entries:
+                    by_path.setdefault(item.get("path"), item)
+        except (OSError, ValueError, AttributeError):
+            raise RemocaoRecusada("Evidência de componente inválida")
+    arquivos = []
+    total = 0
+    for item in sorted(path.rglob("*")):
+        if item.is_symlink():
+            raise RemocaoRecusada("Diretório contém link simbólico")
+        if not item.is_file():
+            continue
+        rel = item.relative_to(raiz).as_posix()
+        dados, info = leitura_segura(item)
+        digest = hashlib.sha256(dados).hexdigest()
+        registro = by_path.get(rel)
+        if not registro or registro.get("sha256") != digest:
+            raise RemocaoRecusada(f"Arquivo sem evidência correspondente ou hash alterado: {rel}")
+        if registro.get("classification") not in {
+            "IOC_REQUER_VALIDACAO", "ARQUIVO_SUSPEITO_REQUER_VALIDACAO",
+            "PHP_DIRETORIO_OCULTO_REQUER_VALIDACAO", "WEB_SHELL_HEURISTIC_REQUIRES_REVIEW",
+            "PLUGIN_FAMILIA_INCIDENTE_REQUER_QUARENTENA", "WORDPRESS_PERSISTENCE_REQUIRES_CONTEXT",
+        }:
+            raise RemocaoRecusada(f"Arquivo não classificado para quarentena: {rel}")
+        total += len(dados)
+        if total > 200_000_000:
+            raise RemocaoRecusada("Diretório excede 200 MiB")
+        arquivos.append((item, rel, digest, info))
+    if not arquivos:
+        raise RemocaoRecusada("Diretório sem arquivos regulares")
+    return path, arquivos
+
 def executar(site: Path, caso: Path, relativo: str, *, aplicar=False) -> dict:
     path, digest, dados, info = validar(site, caso, relativo)
     resultado = {"arquivo": relativo, "sha256": digest,
@@ -89,11 +140,42 @@ def executar(site: Path, caso: Path, relativo: str, *, aplicar=False) -> dict:
         json.dump(resultado, f, indent=2, ensure_ascii=False)
     return resultado
 
+
+def executar_diretorio(site: Path, caso: Path, relativo: str, *, aplicar=False) -> dict:
+    path, arquivos = validar_diretorio(site, caso, relativo)
+    resultado = {"diretorio": relativo, "arquivos": len(arquivos),
+                 "sha256": {rel: digest for _, rel, digest, _ in arquivos},
+                 "estado": "QUARENTENA_APLICADA" if aplicar else "SIMULACAO"}
+    if not aplicar:
+        return resultado
+    if os.geteuid() != 0:
+        raise RemocaoRecusada("Aplicação exige root")
+    ps = subprocess.run(["ps", "-eo", "args="], check=True, capture_output=True, text=True).stdout
+    if any(s in linha for linha in ps.splitlines() for s in ("--sc-cli", "--sc-succ", "cipher-feeder", ".gr_")):
+        raise RemocaoRecusada("Processos suspeitos ativos: isole e preserve antes de modificar arquivos")
+    destino_root = caso / "quarentena-wordpress"
+    destino_root.mkdir(mode=0o700, exist_ok=True)
+    os.chmod(destino_root, 0o700)
+    destino = destino_root / (hashlib.sha256(str(path).encode()).hexdigest()[:16] + "-" + path.name)
+    if destino.exists() or destino.is_symlink():
+        raise RemocaoRecusada("Destino de quarentena já existe")
+    # Rename is atomic and reversible within the same filesystem.  Preserve
+    # the original directory hierarchy in the case directory.
+    path.rename(destino)
+    resultado["copia"] = str(destino)
+    registro = destino_root / (destino.name + ".json")
+    fd = os.open(registro, os.O_CREAT | os.O_EXCL | os.O_WRONLY | getattr(os, "O_NOFOLLOW", 0), 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        json.dump(resultado, f, indent=2, ensure_ascii=False)
+    return resultado
+
 def main():
     p = argparse.ArgumentParser(description="Quarentena pontual de malware WordPress confirmado")
     p.add_argument("--site", required=True, type=Path)
     p.add_argument("--case", required=True, type=Path)
-    p.add_argument("--file", required=True, help="Caminho relativo exato dentro de wp-content")
+    grupo = p.add_mutually_exclusive_group(required=True)
+    grupo.add_argument("--file", help="Caminho relativo exato dentro de wp-content")
+    grupo.add_argument("--directory", help="Diretório relativo exato previamente evidenciado")
     modos = p.add_mutually_exclusive_group(required=True)
     modos.add_argument("--dry-run", action="store_true")
     modos.add_argument("--apply", action="store_true")
@@ -101,7 +183,9 @@ def main():
     if args.apply and (not sys.stdin.isatty() or
                        input("Confirme isolamento, backup e evidência digitando QUARENTENA: ").strip() != "QUARENTENA"):
         raise RemocaoRecusada("Confirmação negada")
-    print(json.dumps(executar(args.site, args.case, args.file, aplicar=args.apply),
+    resultado = (executar(args.site, args.case, args.file, aplicar=args.apply)
+                 if args.file else executar_diretorio(args.site, args.case, args.directory, aplicar=args.apply))
+    print(json.dumps(resultado,
                      indent=2, ensure_ascii=False))
     return 40 if args.apply else 0
 

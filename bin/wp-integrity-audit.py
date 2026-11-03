@@ -34,7 +34,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 
-VERSION = "0.24.1"
+VERSION = "0.24.2"
 IOC = re.compile(r"SC_ADV_BEGIN|--sc-cli|--sc-succ|trace-inspector-pad|cipher-feeder|_sc_fpc|sc_cron_guard|sc_persist_manifest|sc_own_manifest|function ceya")
 PATTERN_NAMES = (".sc_", ".gr_", ".gk_", ".kk_", ".wp-object-cache")
 SCRIPT_EXTENSIONS = {".php", ".phtml", ".phar", ".inc", ".php5", ".php7", ".php8", ".pht", ".phps"}
@@ -315,6 +315,45 @@ def akismet_access_guard(content: str) -> bool:
     return deny and grant and not stack
 
 
+def deny_only_security_guard(relative: str, content: str) -> bool:
+    """Recognize narrowly-scoped vendor protection rules without trusting them.
+
+    These rules only deny execution/access and contain no rewrites, handlers,
+    PHP overrides, auto-prepend directives, or grants.  A positive match is a
+    contextual validation, not a cryptographic authenticity claim.
+    """
+    if not content or len(content) > 1_048_576:
+        return False
+    normalized = re.sub(r"\s+", " ", content).strip().lower()
+    if any(token in normalized for token in (
+            "rewriteengine", "rewriterule", "rewritecond", "sethandler",
+            "addhandler", "php_value", "php_flag", "auto_prepend_file",
+            "auto_append_file", "require all granted", "allow from all",
+            "proxy_pass", "http://", "https://")):
+        return False
+    if not ("require all denied" in normalized or "deny from all" in normalized):
+        return False
+    allowed_path = (
+        relative == "wp-content/uploads/.htaccess" or
+        relative.startswith("wp-content/plugins/wordfence/") or
+        relative.startswith("wp-content/plugins/litespeed-cache/") or
+        relative.startswith("wp-content/plugins/updraftplus/") or
+        relative.startswith("wp-content/cache/"))
+    if not allowed_path:
+        return False
+    # Only deny directives and simple Files/FilesMatch/IfModule containers.
+    for line in content.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if re.fullmatch(r"</?(?:IfModule|Files|FilesMatch)(?:\s+[^>]*)?>", line, re.I):
+            continue
+        if re.fullmatch(r"(?:Require\s+all\s+denied|Deny\s+from\s+all|Order\s+allow,deny)", line, re.I):
+            continue
+        return False
+    return True
+
+
 def configuration_audit(target: Path, case: Path) -> list[dict]:
     """Read-only configuration inventory. Never export configuration contents.
 
@@ -348,6 +387,9 @@ def configuration_audit(target: Path, case: Path) -> list[dict]:
                               else "CONFIGURACAO_INVENTARIADA_SEM_INDICADOR")
             if (relative == "wp-content/plugins/akismet/.htaccess"
                     and info.st_size <= 1048576 and akismet_access_guard(content)):
+                classification = "CONFIGURACAO_LEGITIMA_VALIDADA"
+                indicators = []
+            elif info.st_size <= 1048576 and deny_only_security_guard(relative, content):
                 classification = "CONFIGURACAO_LEGITIMA_VALIDADA"
                 indicators = []
             findings.append({
@@ -678,13 +720,16 @@ def customer_findings(files, database, configs, components):
                      "TEMA_REQUER_REVISAO", "TEMA_NAO_ENCONTRADO_NO_REPOSITORIO",
                      "CORE_MODIFICADO_REQUER_REVISAO", "CORE_AUSENTE_REQUER_REVISAO",
                      "PLUGIN_COM_ARQUIVOS_MODIFICADOS", "TEMA_COM_ARQUIVOS_MODIFICADOS",
-                     "PLUGIN_OFICIAL_DESATUALIZADO", "TEMA_OFICIAL_DESATUALIZADO"):
+                     "PLUGIN_OFICIAL_DESATUALIZADO", "TEMA_OFICIAL_DESATUALIZADO",
+                     "PLUGIN_FAMILIA_INCIDENTE_REQUER_QUARENTENA"):
             explanation = ("Atualização disponível; a versão desatualizada não comprova comprometimento."
                            if state.endswith("DESATUALIZADO") else
                            "Origem oficial não confirmada. Verifique fornecedor, licença, pacote e hash; isso não comprova malware."
                            if state in ("PLUGIN_ORIGEM_NAO_CONFIRMADA_REQUER_REVISAO", "TEMA_NAO_ENCONTRADO_NO_REPOSITORIO") else
                            "Não foi possível identificar a versão instalada; verifique o pacote manualmente."
                            if state == "PLUGIN_VERSAO_NAO_IDENTIFICADA" else
+                           "Componente associado aos indicadores do incidente; preserve evidências e faça quarentena reversível antes de qualquer reativação."
+                           if state == "PLUGIN_FAMILIA_INCIDENTE_REQUER_QUARENTENA" else
                            "Uma divergência de integridade exige comparação com uma versão confiável.")
             versao_local = entry.get("local_version") or "não identificada"
             versao_oficial = entry.get("official_version") or "não disponível"
@@ -703,6 +748,9 @@ def customer_findings(files, database, configs, components):
         elif state in ("CORE_DESATUALIZADO", "PLUGIN_OFICIAL_DESATUALIZADO", "TEMA_OFICIAL_DESATUALIZADO"):
             natureza = "MANUTENÇÃO / ATUALIZAÇÃO"
             conclusao = "Versão anterior à referência consultada; não comprova comprometimento."
+        elif state == "PLUGIN_FAMILIA_INCIDENTE_REQUER_QUARENTENA":
+            natureza = "COMPONENTE ASSOCIADO AO INCIDENTE"
+            conclusao = "O componente deve permanecer isolado/quarentenado até validação de origem e conteúdo."
         elif kind == "Componente" and state in ("PLUGIN_ORIGEM_NAO_CONFIRMADA_REQUER_REVISAO",
                 "TEMA_NAO_ENCONTRADO_NO_REPOSITORIO", "PLUGIN_VERSAO_NAO_IDENTIFICADA",
                 "PLUGIN_REQUER_REVISAO", "TEMA_REQUER_REVISAO"):
@@ -711,7 +759,8 @@ def customer_findings(files, database, configs, components):
         else:
             natureza = "VERIFICAÇÃO DE SEGURANÇA PENDENTE"
             conclusao = "Achado técnico sujeito a validação contextual; execução maliciosa não demonstrada."
-        risk = ("PRIORIDADE ALTA — indicador residual do incidente" if state == "RESIDUO_FAMILIA_REQUER_LIMPEZA" else
+        risk = ("PRIORIDADE ALTA — componente associado ao incidente" if state == "PLUGIN_FAMILIA_INCIDENTE_REQUER_QUARENTENA" else
+                "PRIORIDADE ALTA — indicador residual do incidente" if state == "RESIDUO_FAMILIA_REQUER_LIMPEZA" else
                 "MÉDIA — item executável ou divergência de integridade que exige validação" if kind in ("Arquivos", "Configuração") or state in ("CORE_MODIFICADO_REQUER_REVISAO", "PLUGIN_COM_ARQUIVOS_MODIFICADOS") else
                 "MÉDIA — origem ou manutenção do componente exige revisão" if kind == "Componente" else
                 "DEPENDENTE DO CONTEXTO — indicador histórico ou não confirmado")
@@ -889,7 +938,8 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
     summary["component_coverage"] = component_result["coverage"] if component_result else {"local": "SKIPPED", "official": "SKIPPED"}
     critical_component_review = bool(component_result and any(
         item.get("state") in ("CORE_MODIFICADO_REQUER_REVISAO", "CORE_AUSENTE_REQUER_REVISAO",
-                              "PLUGIN_COM_ARQUIVOS_MODIFICADOS", "TEMA_COM_ARQUIVOS_MODIFICADOS")
+                              "PLUGIN_COM_ARQUIVOS_MODIFICADOS", "TEMA_COM_ARQUIVOS_MODIFICADOS",
+                              "PLUGIN_FAMILIA_INCIDENTE_REQUER_QUARENTENA")
         for item in component_result["components"]))
     summary["critical_component_review"] = critical_component_review
     component_review = bool(component_result and any(item.get("state") in (
