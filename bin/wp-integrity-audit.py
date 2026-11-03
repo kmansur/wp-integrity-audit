@@ -1518,7 +1518,7 @@ def sql_cleanup(option_file: str, dbname: str, prefix: str, case: Path,
     if suspicious:
         write_private(case / "manual-serialized-cleanup.json",
                       json.dumps({"options_for_manual_review": [x[0] for x in suspicious]}))
-        raise AuditError("Indicadores em opções serializadas: revisão manual obrigatória; nenhuma alteração SQL realizada")
+        raise AuditError("Persistem indicadores em opções serializadas; remoção adicional exige revisão")
     plan = database_cleanup_plan(option_file, dbname, prefix, requested)
     write_private(case / "database-cleanup-plan.json",
                   json.dumps({"requested": requested, "selected": plan}, ensure_ascii=False, indent=2))
@@ -2055,7 +2055,10 @@ def main() -> int:
                     raise AuditError("Fonte limpa deve conter plugins, themes e uploads: cópia completa de wp-content")
             else:
                 source = None
-            # Verifique opções serializadas antes de qualquer mutação e de qualquer troca.
+            serial_plan = (planejar_serializados(cnf, dbname, prefix,
+                            args.remove_cron_hook, args.deactivate_plugin)
+                           if args.mode in ("apply-db", "recover") else [])
+            # Persistência em opções não selecionadas para correção permanece bloqueante.
             if args.mode in ("apply-db", "recover"):
                 options = sql_identifier(prefix + "options")
                 precheck = query_db(cnf, dbname,
@@ -2063,13 +2066,16 @@ def main() -> int:
                     "AND (option_value LIKE '%cipher-feeder%' OR option_value LIKE '%trace-inspector-pad%' "
                     "OR option_value LIKE '%sc_cron_guard%' OR option_value LIKE '%sc_persist_manifest%' "
                     "OR option_value LIKE '%sc_cron_fetch%');")
-                if precheck:
-                    raise AuditError("Persistência serializada detectada; recuperação automática bloqueada")
+                selected = {item["option_name"] for item in serial_plan}
+                if any(row[0] not in selected for row in precheck):
+                    raise AuditError("Persistência serializada não selecionada; correção bloqueada")
             plan = database_cleanup_plan(cnf, dbname, prefix, args.remove_db_option) if args.mode in ("apply-db", "recover") else []
             write_private(case / "recovery-plan.json", json.dumps({
                 "mode": args.mode, "dry_run": args.dry_run,
                 "clean_source": str(source) if source else None,
                 "database_options": plan,
+                "serialized_updates": [{k: v for k, v in item.items() if not k.startswith("_")}
+                                       for item in serial_plan],
                 "core_changes": False,
                 "sessions_changed": False,
             }, ensure_ascii=False, indent=2))
@@ -2085,15 +2091,7 @@ def main() -> int:
                 compare_components(target, source, case)
                 stage = stage_files(target, source, case, True, False)
             try:
-                if args.mode in ("apply-db", "recover"):
-                    # Preflight serialized database options before changing files.
-                    opt = sql_identifier(prefix + "options")
-                    sql = (f"SELECT option_name FROM {opt} WHERE option_name IN ('active_plugins','cron') "
-                           "AND (option_value LIKE '%cipher-feeder%' OR option_value LIKE '%trace-inspector-pad%' "
-                           "OR option_value LIKE '%sc_cron_guard%' OR option_value LIKE '%sc_persist_manifest%' "
-                           "OR option_value LIKE '%sc_cron_fetch%');")
-                    if query_db(cnf, dbname, sql):
-                        raise AuditError("Opções serializadas suspeitas exigem limpeza manual")
+                # A validação do hash é repetida no UPDATE; valores alterados não são sobrescritos.
                 ask("Confirme o plano de alterações nos arquivos e/ou banco de dados")
             except BaseException:
                 # Staging may already exist when operator declines or SQL
@@ -2110,6 +2108,11 @@ def main() -> int:
                 if args.mode in ("apply-db", "recover"):
                     # A failed SQL client may have committed before raising.
                     database_started = True
+                    if serial_plan:
+                        aplicar_serializados(cnf, dbname, prefix, serial_plan)
+                        write_private(case / "serialized-remediation-result.json",
+                                      json.dumps([{k: v for k, v in item.items() if not k.startswith("_")}
+                                                  for item in serial_plan], ensure_ascii=False, indent=2))
                     sql_cleanup(cnf, dbname, prefix, case, requested=args.remove_db_option)
                 # Credenciais e salts são alterados somente em operação separada;
                 # sem rotação implícita que possa quebrar autenticações ou integrações.
