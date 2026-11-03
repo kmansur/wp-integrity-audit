@@ -4,6 +4,26 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 
 ## [Não publicado]
 
+## [0.23.0] - 2026-11-03
+
+### Recuperação assistida de arquivos e banco
+- Reabilitados modos de recuperação assistida `--apply-files`, `--apply-db` e `--recover`, com `--dry-run` para simular e `--recovery-approve` mais duas confirmações interativas para operações efetivas.
+- `--apply-files` e `--recover` exigem `--source` com um `wp-content` completo e previamente verificado, incluindo diretórios `plugins`, `themes` e `uploads`, e a opção explícita `--replace-plugins-themes`.
+- A cópia limpa não pode ficar dentro do site nem abranger o diretório do site. Rejeitam-se arquivos especiais, symlinks, indicadores conhecidos e padrões genéricos de webshell.
+- O estágio restaura UID/GID conforme o destino original quando possível e remove permissão de escrita para outros usuários; troca o `wp-content` por renomeação mantendo a versão antiga em quarentena fora do document root.
+- `--apply-db` e `--recover` utilizam somente `--remove-db-option NOME` (repetível), com nome exato, SHA-256 do valor no momento do planejamento e verificação antes de cada exclusão; nenhuma limpeza indiscriminada por prefixo `sc_*`.
+- Nunca se apagam automaticamente sessões, senhas de aplicação, `cron`, `active_plugins`, opções centrais ou registros serializados, e não ocorre rotação implícita de salts.
+- Operação real exige snapshot do site em TAR.GZ com leitura de validação e dump SQL com hash SHA-256 antes da primeira alteração, além de confirmação de isolamento e backup externo.
+- Sempre ocorre auditoria após operações reais e relatório de pendências; indicadores remanescentes impedem declaração de sucesso.
+- A opção `--core-source` e sincronização automática de pacotes oficiais permanecem bloqueadas, assim como envio SMTP durante recuperação.
+- Testes unitários e integração MySQL cobrem seleção explícita, preservação de dados legítimos, fonte limpa e propriedade de arquivos.
+
+### Cuidados e limites
+- Pré-lançamento para utilização assistida; testar primeiro em clone descartável. A exclusão de múltiplas opções SQL é realizada em passos por nome e hash, **não é uma transação única**; uma falha pode exigir recuperação a partir do dump.
+- O operador deve obter previamente cópia confiável completa de `wp-content` (não reutilizar arquivos potencialmente infectados sem investigação). A auditoria não remove automaticamente persistência no host, entradas de cron serializadas ou códigos maliciosos embutidos em opções complexas.
+- A reativação não é automática e depende de aprovação técnica. A recuperação ainda não foi homologada em ambiente real de produção.
+
+
 ## [0.22.2] - 2026-11-03
 
 ### Diagnóstico e confirmação de envio SMTP
