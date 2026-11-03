@@ -646,3 +646,8 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 ### Fixed
 - Recognize the standard Wordfence deny-only rewrite/fallback template as a legitimate security guard, while retaining review for handlers, grants and auto-prepend directives.
 
+## [0.24.5] - 2026-11-03
+
+### Security
+- Detect the observed `Axiom Sentinel Snap`/`SCV:*` obfuscated component signature even when the malicious copy is renamed to a generic PHP filename such as `core_*.php`.
+
