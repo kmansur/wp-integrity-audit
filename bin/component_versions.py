@@ -156,6 +156,8 @@ def compare_official(record: dict) -> None:
         record["query_status"] = "NOT_FOUND_OFFICIAL_REPOSITORY"
         record["state"] = "PLUGIN_ORIGEM_NAO_CONFIRMADA_REQUER_REVISAO" if kind == "plugin" else "TEMA_NAO_ENCONTRADO_NO_REPOSITORIO"
         record["review_guidance"] = "Não localizado no repositório oficial consultado. Isso não comprova malware; confirme fornecedor, licença, origem do pacote e hash."
+        if kind == "plugin" and slug in INCIDENT_COMPONENT_SLUGS:
+            record["state"] = "PLUGIN_FAMILIA_INCIDENTE_REQUER_QUARENTENA"
         return
     official = str(data["version"])
     if kind == "plugin" and not record.get("local_version"):
@@ -164,6 +166,8 @@ def compare_official(record: dict) -> None:
         record["official_version"] = official
         record["source"] = "wordpress.org"
         record["query_status"] = "OFFICIAL_COMPONENT_FOUND_VERSION_UNVERIFIED"
+        if slug in INCIDENT_COMPONENT_SLUGS:
+            record["state"] = "PLUGIN_FAMILIA_INCIDENTE_REQUER_QUARENTENA"
         return
     record["official_version"] = official
     record["source"] = "wordpress.org"

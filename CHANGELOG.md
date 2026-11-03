@@ -635,3 +635,9 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 - Directory quarantine requires every regular file to match an existing private evidence manifest, rejects symlinks and is reversible by rename.
 - User remediation never evaluates PHP, never accepts credentials on the command line and records only a login hash.
 
+## [0.24.3] - 2026-11-03
+
+### Fixed
+- Preserve the explicit incident-family quarantine classification for `kinetic-relay-live` even when the official repository API returns not-found or incomplete metadata.
+- Recognize narrowly scoped deny-only protection files under `wp-content/updraft` and WP Rocket cache paths without treating them as compromise indicators.
+

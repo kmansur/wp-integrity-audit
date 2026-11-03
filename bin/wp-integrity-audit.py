@@ -34,7 +34,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 
-VERSION = "0.24.2"
+VERSION = "0.24.3"
 IOC = re.compile(r"SC_ADV_BEGIN|--sc-cli|--sc-succ|trace-inspector-pad|cipher-feeder|_sc_fpc|sc_cron_guard|sc_persist_manifest|sc_own_manifest|function ceya")
 PATTERN_NAMES = (".sc_", ".gr_", ".gk_", ".kk_", ".wp-object-cache")
 SCRIPT_EXTENSIONS = {".php", ".phtml", ".phar", ".inc", ".php5", ".php7", ".php8", ".pht", ".phps"}
@@ -338,7 +338,9 @@ def deny_only_security_guard(relative: str, content: str) -> bool:
         relative.startswith("wp-content/plugins/wordfence/") or
         relative.startswith("wp-content/plugins/litespeed-cache/") or
         relative.startswith("wp-content/plugins/updraftplus/") or
-        relative.startswith("wp-content/cache/"))
+        relative.startswith("wp-content/cache/") or
+        relative.startswith("wp-content/updraft/") or
+        relative.startswith("wp-content/plugins/wp-rocket/"))
     if not allowed_path:
         return False
     # Only deny directives and simple Files/FilesMatch/IfModule containers.
