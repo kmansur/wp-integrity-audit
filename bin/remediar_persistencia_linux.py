@@ -12,9 +12,10 @@ import os
 from pathlib import Path
 import re
 import stat
+import subprocess
 import sys
 
-RAIZES = (Path("/etc/cron.d"), Path("/etc/profile.d"))
+RAIZES = (Path("/etc/cron.d"), Path("/etc/profile.d"), Path("/etc/systemd/system"))
 
 class QuarentenaRecusada(RuntimeError):
     """Validação de segurança impediu operação."""
@@ -35,6 +36,8 @@ def validar_candidato(caso: Path, caminho: Path, *, raizes=RAIZES) -> tuple[str,
         raise QuarentenaRecusada("Exige caminho absoluto regular, sem links")
     if not any(caminho.parent.resolve(strict=True) == raiz.resolve(strict=True) for raiz in raizes):
         raise QuarentenaRecusada("Diretório não autorizado para quarentena automatizada")
+    if caminho.parent == Path("/etc/systemd/system") and caminho.suffix not in (".service", ".timer"):
+        raise QuarentenaRecusada("Somente unidades systemd service/timer podem ser selecionadas")
     evidencia = caso / "host-persistence.json"
     if evidencia.is_symlink() or not evidencia.is_file():
         raise QuarentenaRecusada("Inventário do Linux não localizado no caso")
@@ -58,6 +61,15 @@ def executar(caso: Path, caminho: Path, *, aplicar: bool, raizes=RAIZES) -> dict
         return plano
     if os.geteuid() != 0:
         raise QuarentenaRecusada("Aplicação de quarentena no Linux exige root")
+    if caminho.parent == Path("/etc/systemd/system"):
+        # Arquivos de unidades ativas ou habilitadas exigem contenção manual e
+        # análise de dependências, não alteração automática de serviços.
+        ativo = subprocess.run(["systemctl", "is-active", caminho.name],
+                               capture_output=True, text=True, check=False)
+        habilitado = subprocess.run(["systemctl", "is-enabled", caminho.name],
+                                    capture_output=True, text=True, check=False)
+        if ativo.stdout.strip() != "inactive" or habilitado.stdout.strip() != "disabled":
+            raise QuarentenaRecusada("Unidade systemd ativa/habilitada ou estado indefinido; intervenção manual obrigatória")
     vault = caso / "quarentena-linux"
     if vault.is_symlink():
         raise QuarentenaRecusada("Destino de quarentena inseguro")
@@ -82,6 +94,8 @@ def executar(caso: Path, caminho: Path, *, aplicar: bool, raizes=RAIZES) -> dict
         # Preservar a cópia em caso de falha para investigação; não tocar em outros arquivos.
         raise
     plano["copia"] = str(destino)
+    if caminho.parent == Path("/etc/systemd/system"):
+        plano["pendencia"] = "Avaliar systemctl daemon-reload e dependências; serviço não foi modificado"
     (vault / (resumo + ".json")).write_text(json.dumps(plano, indent=2, ensure_ascii=False) + "\n",
                                             encoding="utf-8")
     os.chmod(vault / (resumo + ".json"), 0o600)
