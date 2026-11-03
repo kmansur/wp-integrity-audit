@@ -2062,8 +2062,9 @@ def main() -> int:
                 if stage is not None:
                     shutil.rmtree(stage, ignore_errors=True)
             create_evidence_manifest(case)
-            print("Recuperação assistida concluída; revise o relatório e valide o site antes de reativá-lo.")
-            return 0
+            print("Alterações assistidas aplicadas; auditoria completa posterior e validação manual obrigatórias.")
+            print("Status operacional: REVISÃO PENDENTE. Não reative o site com base somente nesta execução.")
+            return 40
 
 if __name__ == "__main__":
     try:
