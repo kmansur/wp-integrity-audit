@@ -32,7 +32,7 @@ def _private_file(path: Path) -> None:
         raise MailDeliveryError("O arquivo de configuração SMTP não pode ser acessível a grupo ou outros usuários")
 
 
-def _ler_regular_limitado(path: Path, limite: int) -> bytes:
+def _ler_regular_limitado(path: Path, limite: int, *, privado: bool = False) -> bytes:
     """Ler arquivo regular sem seguir links simbólicos, com limite de tamanho."""
     try:
         descritor = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
@@ -40,6 +40,8 @@ def _ler_regular_limitado(path: Path, limite: int) -> bytes:
             metadados = os.fstat(arquivo.fileno())
             if not stat.S_ISREG(metadados.st_mode) or metadados.st_size > limite:
                 raise MailDeliveryError("Arquivo do envio inválido ou acima do limite permitido")
+            if privado and metadados.st_mode & (stat.S_IRWXG | stat.S_IRWXO):
+                raise MailDeliveryError("Arquivo confidencial com permissões excessivas")
             conteudo = arquivo.read(limite + 1)
             if len(conteudo) > limite:
                 raise MailDeliveryError("Arquivo do envio acima do limite permitido")
@@ -53,7 +55,8 @@ def send_management_report(case: Path, recipient: str, config_path: Path) -> Non
     _private_file(config_path)
     config = configparser.ConfigParser(interpolation=None)
     try:
-        if not config.read(config_path, encoding="utf-8") or "smtp" not in config:
+        config.read_string(_ler_regular_limitado(config_path, 64 * 1024, privado=True).decode("utf-8"))
+        if "smtp" not in config:
             raise MailDeliveryError("Seção SMTP ausente na configuração")
         section = config["smtp"]
         host = section.get("host", "").strip()
@@ -68,7 +71,7 @@ def send_management_report(case: Path, recipient: str, config_path: Path) -> Non
         if not secret_path.is_absolute():
             raise MailDeliveryError("A senha SMTP exige caminho absoluto")
         _private_file(secret_path)
-        password = _ler_regular_limitado(secret_path, 4096).decode("utf-8").rstrip("\r\n")
+        password = _ler_regular_limitado(secret_path, 4096, privado=True).decode("utf-8").rstrip("\r\n")
         if not username or not password:
             raise MailDeliveryError("As credenciais SMTP são obrigatórias")
         pdf = case / "management-report.pdf"
