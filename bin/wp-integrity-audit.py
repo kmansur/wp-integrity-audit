@@ -22,6 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import component_versions
 import report_export
 import mail_delivery
+import remediacao_serializada as serial_wp
 import re
 import secrets
 import shutil
@@ -1536,6 +1537,72 @@ def sql_cleanup(option_file: str, dbname: str, prefix: str, case: Path,
     write_private(case / "database-cleanup-result.json",
                   json.dumps({"removed": [x["option_name"] for x in plan]}, ensure_ascii=False, indent=2))
 
+def planejar_serializados(option_file: str, dbname: str, prefix: str,
+                         hooks: list[str], plugins: list[str]) -> list[dict]:
+    """Consultar opções explicitamente selecionadas; não exportar valores sensíveis."""
+    if len(hooks) + len(plugins) > 30 or len(set(hooks)) != len(hooks) or len(set(plugins)) != len(plugins):
+        raise AuditError("Seletores de cron/plugins duplicados ou excessivos")
+    options = sql_identifier(prefix + "options")
+    plano = []
+    for nome, seletores, transformador in (
+        ("cron", hooks, serial_wp.remover_hook_cron),
+        ("active_plugins", plugins, serial_wp.desativar_plugin),
+    ):
+        if not seletores:
+            continue
+        tamanho = query_db(option_file, dbname,
+            f"SELECT OCTET_LENGTH(option_value) FROM {options} WHERE option_name='{nome}'")
+        if len(tamanho) != 1 or len(tamanho[0]) != 1 or not tamanho[0][0].isdigit():
+            raise AuditError(f"Opção {nome} não localizada ou inválida")
+        if int(tamanho[0][0]) > 2_000_000:
+            raise AuditError(f"Opção {nome} grande demais para remediação serializada segura")
+        rows = query_db(option_file, dbname,
+            f"SELECT HEX(option_value), SHA2(option_value,256) FROM {options} WHERE option_name='{nome}'")
+        if len(rows) != 1 or len(rows[0]) != 2 or not re.fullmatch(r"[0-9A-Fa-f]{64}", rows[0][1]):
+            raise AuditError("Resposta inválida ao ler estrutura serializada")
+        try:
+            atual = bytes.fromhex(rows[0][0])
+            if atual.decode("utf-8").encode("utf-8") != atual:
+                raise AuditError("Valor serializado não está em UTF-8")
+            novo = atual
+            contagem = 0
+            for seletor in seletores:
+                novo, n = transformador(novo, seletor)
+                if n == 0:
+                    raise AuditError(f"Seletor não encontrado na opção {nome}: {seletor}")
+                contagem += n
+        except (ValueError, UnicodeError, serial_wp.SerializacaoInsegura) as error:
+            raise AuditError(f"Estrutura de {nome} não pode ser alterada com segurança") from None
+        plano.append({"option_name": nome, "selectors": list(seletores), "removed": contagem,
+                      "old_sha256": rows[0][1].lower(), "new_sha256": serial_wp.sha256_bytes(novo),
+                      "_new_hex": novo.hex()})
+    return plano
+
+
+def aplicar_serializados(option_file: str, dbname: str, prefix: str,
+                         plano: list[dict]) -> None:
+    """Atualização otimista de cada opção pelo hash anterior, sem apagar outras opções."""
+    options = sql_identifier(prefix + "options")
+    for item in plano:
+        nome = item["option_name"]
+        if nome not in ("cron", "active_plugins"):
+            raise AuditError("Opção serializada não autorizada")
+        # Evita o comando de UPDATE com conteúdo PHP/SQL arbitrário: apenas hexadecimal.
+        raw_hex = item["_new_hex"]
+        if not re.fullmatch(r"[0-9a-f]*", raw_hex):
+            raise AuditError("Valor binário inválido")
+        rows = query_db(option_file, dbname,
+            f"UPDATE {options} SET option_value=CONVERT(UNHEX('{raw_hex}') USING utf8mb4) "
+            f"WHERE option_name='{nome}' AND SHA2(option_value,256)='{item['old_sha256']}'; "
+            "SELECT ROW_COUNT();")
+        if rows != [["1"]]:
+            raise AuditError(f"Opção {nome} alterada simultaneamente; recuperação interrompida")
+        verificacao = query_db(option_file, dbname,
+            f"SELECT SHA2(option_value,256) FROM {options} WHERE option_name='{nome}'")
+        if verificacao != [[item["new_sha256"]]]:
+            raise AuditError(f"Validação da atualização serializada falhou para {nome}")
+
+
 def rotate_salts(path: Path) -> None:
     """Atomically rewrite literal auth keys without executing wp-config.php."""
     if path.is_symlink():
@@ -1775,6 +1842,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--replace-plugins-themes", action="store_true")
     parser.add_argument("--remove-db-option", action="append", default=[], metavar="NOME",
                         help="Opção exata do WordPress autorizada para exclusão; repetível, sem curingas")
+    parser.add_argument("--remove-cron-hook", action="append", default=[], metavar="HOOK",
+                        help="Remove apenas eventos de hook exato do cron serializado")
+    parser.add_argument("--deactivate-plugin", action="append", default=[], metavar="CAMINHO",
+                        help="Desativa entrada exata em active_plugins (ex.: plugin/plugin.php)")
     parser.add_argument("--recovery-approve", action="store_true",
                         help="Confirma intenção de recuperar após ensaio em ambiente isolado (ainda requer confirmação interativa)")
     parser.add_argument("--dry-run", action="store_true",
@@ -1834,16 +1905,16 @@ def parse_args() -> argparse.Namespace:
         parser.error("--core-source is only valid with --recover")
     if args.official_sync:
         parser.error("--official-sync permanece desabilitado até validar downloads e assinaturas")
-    if args.remove_db_option and args.mode not in ("apply-db", "recover"):
-        parser.error("--remove-db-option exige --apply-db ou --recover")
+    if (args.remove_db_option or args.remove_cron_hook or args.deactivate_plugin) and args.mode not in ("apply-db", "recover"):
+        parser.error("Seletores de banco exigem --apply-db ou --recover")
     if (args.dry_run or args.recovery_approve) and args.mode not in ("apply-files", "apply-db", "recover"):
         parser.error("--dry-run e --recovery-approve exigem modo de recuperação")
     if args.mode in ("apply-files", "apply-db", "recover") and not (args.dry_run or args.recovery_approve):
         parser.error("Use --dry-run para simular ou --recovery-approve para execução assistida")
     if args.mode in ("apply-files", "recover") and not args.replace_plugins_themes:
         parser.error("A substituição de wp-content exige --replace-plugins-themes")
-    if args.mode == "apply-db" and not args.remove_db_option:
-        parser.error("--apply-db exige pelo menos uma opção --remove-db-option")
+    if args.mode == "apply-db" and not (args.remove_db_option or args.remove_cron_hook or args.deactivate_plugin):
+        parser.error("--apply-db exige --remove-db-option, --remove-cron-hook ou --deactivate-plugin")
     if args.mode in ("apply-db", "apply-files", "recover") and (args.email_to or args.pdf_report or args.bundle_evidence):
         parser.error("Recuperação não pode combinar envio, PDF ou pacote de evidências na mesma execução")
     return args
