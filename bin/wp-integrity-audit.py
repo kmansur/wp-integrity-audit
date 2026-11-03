@@ -38,9 +38,13 @@ import urllib.parse
 import urllib.request
 import zipfile
 
-VERSION = "0.28.0"
-IOC = re.compile(r"SC_ADV_BEGIN|--sc-cli|--sc-succ|trace-inspector-pad|cipher-feeder|_sc_fpc|sc_cron_guard|sc_cron_recovery|e1v61n2r1im6t7_|sc_persist_manifest|sc_own_manifest|kinetic-relay-live|function ceya|Axiom Sentinel Snap|SCV:[0-9]+")
-PATTERN_NAMES = (".sc_", ".gr_", ".gk_", ".kk_", ".wp-object-cache")
+VERSION = "0.28.5"
+IOC = re.compile(r"SC_ADV_BEGIN|--sc-cli|--sc-succ|trace-inspector-pad|trace-librarian-tag|agile-interface-vox|f88225c2|cipher-feeder|_sc_fpc|sc_cron_guard|sc_cron_recovery|e1v61n2r1im6t7_|sc_persist_manifest|sc_own_manifest|kinetic-relay-live|function ceya|Axiom Sentinel Snap|SCV:[0-9]+")
+PATTERN_NAMES = (".sc_", ".gr_", ".gk_", ".kk_", ".wp-object-cache", "f88225c2.zip")
+# Random option names confirmed during this incident. Keep this list explicit;
+# the generic hexadecimal-name heuristic below remains review-only to avoid
+# deleting legitimate plugin tokens.
+CONFIRMED_RANDOM_OPTION_NAMES = frozenset({"fb4d39ec46f4"})
 SCRIPT_EXTENSIONS = {".php", ".phtml", ".phar", ".inc", ".php5", ".php7", ".php8", ".pht", ".phps"}
 GENERIC_WEB_SHELL = re.compile(
     rb"eval\s*\(\s*base64_decode\s*\(|gzinflate\s*\(\s*base64_decode\s*\("
@@ -291,6 +295,9 @@ def file_audit(target: Path, case: Path) -> list[dict]:
         relative = path.relative_to(target).as_posix()
         name = path.name
         unusual = name.startswith(PATTERN_NAMES) or name == "trace-inspector-pad.php" or "cipher-feeder" in name
+        known_payload_filename = (name == "f88225c2.zip" or
+                                  "trace-librarian-tag" in relative or
+                                  "agile-interface-vox" in relative)
         upload_php = relative.startswith("wp-content/uploads/") and path.suffix.lower() in SCRIPT_EXTENSIONS
         hidden_php = (path.suffix.lower() in (".php", ".phtml", ".phar") and
                       any(part.startswith(".") and part not in (".", "..", ".well-known")
@@ -331,7 +338,8 @@ def file_audit(target: Path, case: Path) -> list[dict]:
         behavioral_review = behavioral_score >= 5
         if not (unusual or upload_php or hidden_php or match or generic_match or license_bypass or behavioral_review):
             continue
-        classification, reason = classify_file(relative, name, safe_text, match.group(0) if match else None)
+        filename_indicator = match.group(0) if match else ("known-payload-name" if known_payload_filename else None)
+        classification, reason = classify_file(relative, name, safe_text, filename_indicator)
         if upload_php and not match and name == "index.php" and known_upload_guard(path):
             classification, reason = "LEGITIMO_VALIDADO", "Exact WordPress directory-listing guard content"
         elif upload_php and not match and metform_icon_cache_candidate(relative, path):
@@ -354,7 +362,7 @@ def file_audit(target: Path, case: Path) -> list[dict]:
             findings.append({
                 "path": relative, "sha256": sha256(path), "size": path.stat().st_size,
                 "classification": classification, "reason": reason,
-                "indicator": match.group(0) if match else ("filename" if unusual else "upload PHP"),
+                "indicator": match.group(0) if match else ("known-payload-name" if known_payload_filename else ("filename" if unusual else "upload PHP")),
                 "snippet": snippet,
                 "obfuscation_indicators": obfuscation_hits,
                 "behavioral_indicators": behavioral_hits,
@@ -1453,6 +1461,11 @@ def decode_database_encoded_value(value: str) -> dict | None:
         b"sc_", b"--sc-cli", b"trace-inspector-pad", b"cipher-feeder",
     )
     markers = [marker.decode("ascii") for marker in marker_names if marker in lower]
+    control_count = sum(1 for byte in final if byte < 32 and byte not in (9, 10, 13))
+    printable_count = sum(1 for byte in final if 32 <= byte < 127 or byte in (9, 10, 13))
+    printable_ratio = printable_count / max(1, len(final))
+    obfuscated_candidate = (not markers and len(final) >= 128 and control_count >= 3
+                            and 0.55 <= printable_ratio <= 0.98)
     return {
         "encoding": final_label,
         "encoded_length_bytes": len(value.encode("utf-8", "replace")),
@@ -1461,6 +1474,7 @@ def decode_database_encoded_value(value: str) -> dict | None:
         "decoded_sha256": hashlib.sha256(final).hexdigest(),
         "decoded_markers": markers,
         "decoded_php": b"<?php" in lower,
+        "obfuscated_candidate": obfuscated_candidate,
     }
 
 
@@ -1522,7 +1536,9 @@ def database_encoded_scan(option_file: str, dbname: str, prefix: str) -> list[di
             if decoded is None:
                 continue
             markers = decoded["decoded_markers"]
-            state = "RESIDUO_FAMILIA_REQUER_LIMPEZA" if markers else "VALOR_CODIFICADO_REQUER_VALIDACAO"
+            state = ("RESIDUO_FAMILIA_REQUER_LIMPEZA" if markers or str(row[0]) in CONFIRMED_RANDOM_OPTION_NAMES else
+                     "VALOR_CODIFICADO_OBFUSCADO_REQUER_VALIDACAO" if decoded.get("obfuscated_candidate") else
+                     "VALOR_CODIFICADO_REQUER_VALIDACAO")
             findings.append({
                 "kind": "encoded_payload",
                 "name": safe_option_name(str(row[0])),
@@ -1536,9 +1552,47 @@ def database_encoded_scan(option_file: str, dbname: str, prefix: str) -> list[di
                 "decoded_length_bytes": decoded["decoded_length_bytes"],
                 "decoded_sha256": decoded["decoded_sha256"],
                 "decoded_markers": markers,
+                "obfuscated_candidate": decoded.get("obfuscated_candidate", False),
                 "source_table_suffix": suffix,
                 "source_column_name": value_column,
             })
+    # Short Base64 values in random hexadecimal option names are common
+    # transient/token candidates. They are not treated as incident residues;
+    # preserve only metadata and require contextual review.
+    options = sql_identifier(prefix + "options")
+    short_sql = (f"SELECT option_name, option_value FROM {options} "
+                 "WHERE option_name REGEXP '^[A-Fa-f0-9]{12,64}$' "
+                 "AND OCTET_LENGTH(option_value) BETWEEN 8 AND 63 LIMIT 500;")
+    known_names = {item["name"] for item in findings}
+    for row in query_db(option_file, dbname, short_sql):
+        if len(row) != 2 or str(row[0]) in known_names:
+            continue
+        raw = re.sub(r"\s+", "", str(row[1]))
+        if not re.fullmatch(r"[A-Za-z0-9+/]{8,63}={0,2}", raw):
+            continue
+        try:
+            decoded = base64.b64decode(raw, validate=True)
+        except (ValueError, binascii.Error):
+            continue
+        if not decoded or len(decoded) > 128:
+            continue
+        findings.append({
+            "kind": "encoded_payload",
+            "name": safe_option_name(str(row[0])),
+            "length": str(len(str(row[1]).encode("utf-8", "replace"))),
+            "state": ("RESIDUO_FAMILIA_REQUER_LIMPEZA" if str(row[0]) in CONFIRMED_RANDOM_OPTION_NAMES
+                      else "VALOR_CODIFICADO_CURTO_REQUER_VALIDACAO"),
+            "sha256": hashlib.sha256(str(row[1]).encode("utf-8", "replace")).hexdigest(),
+            "value_length_bytes": len(str(row[1]).encode("utf-8", "replace")),
+            "value_classification": "BASE64_SHORT",
+            "safe_excerpt": "[CONTEÚDO CODIFICADO OMITIDO]",
+            "decoded_excerpt": "[CONTEÚDO DECODIFICADO OMITIDO]",
+            "decoded_length_bytes": len(decoded),
+            "decoded_sha256": hashlib.sha256(decoded).hexdigest(),
+            "decoded_markers": [],
+            "source_table_suffix": "options",
+            "source_column_name": "option_value",
+        })
     return findings
 
 
@@ -1584,7 +1638,14 @@ def database_cron_structure_scan(option_file: str, dbname: str, prefix: str) -> 
     table = sql_identifier(prefix + "options")
     rows = query_db(option_file, dbname,
                     f"SELECT HEX(option_value), SHA2(option_value,256) FROM {table} WHERE option_name='cron';")
-    if len(rows) != 1 or len(rows[0]) != 2 or not re.fullmatch(r"[0-9A-Fa-f]+", rows[0][0]):
+    if not rows:
+        return []
+    if len(rows) != 1 or len(rows[0]) != 2:
+        raise AuditError("Invalid serialized cron evidence")
+    # A missing or empty cron option is valid after conservative cleanup.
+    if rows[0][0] == "":
+        return []
+    if not re.fullmatch(r"[0-9A-Fa-f]+", rows[0][0]):
         raise AuditError("Invalid serialized cron evidence")
     raw = bytes.fromhex(rows[0][0])
     try:
