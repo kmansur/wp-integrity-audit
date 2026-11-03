@@ -31,6 +31,29 @@ class PythonAuditTests(unittest.TestCase):
     def test_database_encoded_value_rejects_long_non_base64_text(self):
         self.assertIsNone(audit.decode_database_encoded_value("A" * 200 + "!"))
 
+    def test_database_reversed_component_reference_is_classified_without_execution(self):
+        result = audit.classify_database_reversed_reference(
+            "9b679f82530c", "5.1.2|php.xob-reggol-nevah"
+        )
+        self.assertIsNotNone(result)
+        self.assertEqual(result["reversed_reference"], "haven-logger-box.php")
+        self.assertEqual(result["component_version"], "5.1.2")
+        self.assertEqual(result["classification"],
+                         "REFERENCIA_COMPONENTE_REVERSIVEL_REQUER_REVISAO")
+
+    def test_database_reversed_component_reference_ignores_arbitrary_hex_options(self):
+        self.assertIsNone(audit.classify_database_reversed_reference(
+            "9b679f82530c", "valor|php.tnetnoc"
+        ))
+
+    def test_reversed_component_reference_keeps_database_review_risk(self):
+        status, code, summary = audit.audit_status(
+            [], [], [{"kind": "reversed_reference", "state":
+                      "RESIDUO_COMPONENTE_REFERENCIA_REQUER_REVISAO", "length": "26"}]
+        )
+        self.assertEqual((status, code), ("AUDITORIA_INCOMPLETA", 40))
+        self.assertEqual(summary["reversed_component_references_requiring_review"], 1)
+
     def test_version_and_modules(self):
         self.assertRegex(audit.VERSION, r"^\d+\.\d+\.\d+$")
         self.assertTrue(callable(audit.file_audit))

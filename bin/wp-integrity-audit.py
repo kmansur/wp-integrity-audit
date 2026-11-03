@@ -37,7 +37,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 
-VERSION = "0.26.0"
+VERSION = "0.26.1"
 IOC = re.compile(r"SC_ADV_BEGIN|--sc-cli|--sc-succ|trace-inspector-pad|cipher-feeder|_sc_fpc|sc_cron_guard|sc_persist_manifest|sc_own_manifest|function ceya|Axiom Sentinel Snap|SCV:[0-9]+")
 PATTERN_NAMES = (".sc_", ".gr_", ".gk_", ".kk_", ".wp-object-cache")
 SCRIPT_EXTENSIONS = {".php", ".phtml", ".phar", ".inc", ".php5", ".php7", ".php8", ".pht", ".phps"}
@@ -672,9 +672,13 @@ def audit_status(files: list[dict], processes: list[str],
     encoded_review = sum(1 for x in (database or [])
                         if x.get("kind") == "encoded_payload"
                         and x.get("state") == "VALOR_CODIFICADO_REQUER_VALIDACAO")
+    reversed_review = sum(1 for x in (database or [])
+                          if x.get("kind") == "reversed_reference"
+                          and x.get("state") == "RESIDUO_COMPONENTE_REFERENCIA_REQUER_REVISAO")
     summary = {
         "confirmed_family_residues": count("family_option") + encoded_family,
         "encoded_payloads_requiring_review": encoded_review,
+        "reversed_component_references_requiring_review": reversed_review,
         "historical_references": count("historical_cache"),
         "informational_records": count("session_rows") + count("application_password_rows"),
         "active_database_markers": sum(count(k) for k in ("marker_option", "cron_marker", "active_plugins_marker")),
@@ -696,7 +700,7 @@ def audit_status(files: list[dict], processes: list[str],
         return "AUDITORIA_INCOMPLETA", 40, summary
     if summary["confirmed_family_residues"]:
         return "RESIDUOS_REQUEREM_LIMPEZA", 10, summary
-    if summary["file_indicators_requiring_review"]:
+    if summary["file_indicators_requiring_review"] or reversed_review:
         return "AUDITORIA_INCOMPLETA", 40, summary
     return "SEM_MARCADOR_EXPLICITO", 0, summary
 
@@ -772,6 +776,8 @@ def customer_findings(files, database, configs, components):
                        if kind == "historical_cache" else
                        "Resíduo no banco de dados compatível com um padrão do incidente; valide antes de qualquer correção."
                        if kind == "family_option" else
+                       "Referência curta reversível a um componente PHP sem procedência confirmada; preserve a evidência e valide a origem antes de qualquer correção."
+                       if kind == "reversed_reference" else
                        "Indicador relacionado ao incidente no banco de dados que exige investigação.")
         items.append((entry.get("evidence_id", "DB-UNASSIGNED"), "Banco de dados", entry.get("name"),
                       entry.get("state"), description, entry.get("sha256")))
@@ -816,6 +822,9 @@ def customer_findings(files, database, configs, components):
         if state == "RESIDUO_FAMILIA_REQUER_LIMPEZA":
             natureza = "INDICADOR RESIDUAL DO INCIDENTE"
             conclusao = "Compatível com indicador conhecido; exige confirmação e avaliação técnica."
+        elif state == "RESIDUO_COMPONENTE_REFERENCIA_REQUER_REVISAO":
+            natureza = "REFERÊNCIA REVERSÍVEL DE COMPONENTE"
+            conclusao = "A referência invertida aponta para um arquivo PHP de componente não confirmado; isso exige investigação, mas não prova execução isoladamente."
         elif state == "HISTORICAL_REFERENCE":
             natureza = "REFERÊNCIA HISTÓRICA"
             conclusao = "Registro histórico; não comprova execução ativa nem persistência."
@@ -1092,6 +1101,7 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
         f"- Código de saída: **{exit_code}**",
         f"- Resíduos da família investigada: **{summary['confirmed_family_residues']}**",
         f"- Payloads codificados que exigem revisão: **{summary.get('encoded_payloads_requiring_review', 0)}**",
+        f"- Referências reversíveis de componentes que exigem revisão: **{summary.get('reversed_component_references_requiring_review', 0)}**",
         f"- Referências históricas: **{summary['historical_references']}**",
         f"- Registros informativos: **{summary['informational_records']}**",
         f"- Indicadores ativos no banco de dados: **{summary['active_database_markers']}**",
@@ -1146,6 +1156,9 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
                 f"- Evidência sem dados sigilosos: `{item['safe_excerpt']}`",
                 f"- Valor interpretado: `{item['safe_excerpt'] if item.get('value_classification') == 'ESCALAR_TEXTO_NUMERO_NAO_CODIFICADO' else '[NOT_EXPOSED]'}`",
                 f"- Trecho decodificado: `{item['decoded_excerpt']}`",
+                *([f"- Referência reversa interpretada: `{item['reversed_reference']}`",
+                   f"- Versão associada: `{item['component_version'] or '[NÃO IDENTIFICADA]'}`"]
+                  if item.get('kind') == 'reversed_reference' else []),
                 *([f"- Tamanho após decodificação: {item['decoded_length_bytes']} bytes",
                    f"- SHA-256 após decodificação: `{item['decoded_sha256']}`",
                    f"- Marcadores no conteúdo decodificado: {', '.join(item.get('decoded_markers', [])) or 'nenhum'}"]
@@ -1183,6 +1196,7 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
             f"- Resíduos da família investigada: **{positive('family_option')}**.",
             f"- Payloads codificados com marcadores da família: **{sum(item.get('state') == 'RESIDUO_FAMILIA_REQUER_LIMPEZA' for item in database if item['kind'] == 'encoded_payload')}**.",
             f"- Payloads codificados sem marcador explícito: **{sum(item.get('state') == 'VALOR_CODIFICADO_REQUER_VALIDACAO' for item in database if item['kind'] == 'encoded_payload')}**.",
+            f"- Referências reversíveis de componentes: **{sum(item.get('state') == 'RESIDUO_COMPONENTE_REFERENCIA_REQUER_REVISAO' for item in database if item['kind'] == 'reversed_reference')}**.",
             f"- Referências históricas: **{positive('historical_cache')}**.",
             f"- Registros informativos: **{sum(int(item['length']) for item in database if item['kind'] in ('session_rows', 'application_password_rows'))}**.",
             f"- Indicadores ativos no banco de dados: **{positive('marker_option') + positive('cron_marker') + positive('active_plugins_marker')}**.",
@@ -1203,7 +1217,8 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
         lines.append(f"- Referências históricas no cache de atualização de plugins: **{total('historical_cache')}**; isso não comprova execução ativa.")
         for kind, name in (("cron_marker", "cron"), ("active_plugins_marker", "active_plugins")):
             lines.append(f"- Indicadores conhecidos em `{name}`: **{total(kind)}**.")
-        if family or total("marker_option") or total("cron_marker") or total("active_plugins_marker"):
+        if (family or total("marker_option") or total("cron_marker") or
+                total("active_plugins_marker") or total("reversed_reference")):
             lines.append("- **Persistem indicadores de comprometimento no banco de dados; não declare esta instalação segura.**")
         else:
             lines.append("- Nenhum dos indicadores pesquisados foi encontrado no banco de dados; isso não certifica a integridade do site.")
@@ -1236,6 +1251,7 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
         f"- Código de saída: **{exit_code}**",
         f"- Resíduos da família investigada: **{summary['confirmed_family_residues']}**",
         f"- Payloads codificados que exigem revisão: **{summary.get('encoded_payloads_requiring_review', 0)}**",
+        f"- Referências reversíveis de componentes que exigem revisão: **{summary.get('reversed_component_references_requiring_review', 0)}**",
         f"- Referências históricas: **{summary['historical_references']}**",
         f"- Registros informativos: **{summary['informational_records']}**",
         f"- Indicadores ativos no banco de dados: **{summary['active_database_markers']}**",
@@ -1246,7 +1262,7 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
         f"- Indicadores de persistência externa: **{host_indicators}**",
         f"- Registros do servidor que exigem revisão: **{host_review}**",
         "", "## Visão geral dos riscos", "",
-        f"- Risco do banco de dados: **{'ALTO' if summary['confirmed_family_residues'] or summary['active_database_markers'] else 'BAIXO — nenhum indicador pesquisado encontrado no banco de dados' if audited else 'NÃO DETERMINADO'}**",
+        f"- Risco do banco de dados: **{'ALTO' if summary['confirmed_family_residues'] or summary['active_database_markers'] else 'REVISÃO NECESSÁRIA — referência reversível de componente encontrada' if summary.get('reversed_component_references_requiring_review') else 'BAIXO — nenhum indicador pesquisado encontrado no banco de dados' if audited else 'NÃO DETERMINADO'}**",
         f"- Risco dos arquivos: **{'ALTO — arquivos correlacionados a execução maliciosa' if summary['confirmed_compromised_files'] else 'REVISÃO NECESSÁRIA' if summary['file_indicators_requiring_review'] else 'BAIXO PARA OS INDICADORES PESQUISADOS'}**",
         f"- Risco do núcleo do WordPress: **{'MÉDIO — REVISÃO NECESSÁRIA' if core_count else 'MÉDIO — versão desatualizada; somas de verificação oficiais validadas' if component_result and component_result['summary'].get('core_outdated') and component_result['coverage'].get('core') == 'EXECUTED' else 'NENHUMA DIVERGÊNCIA EXPLÍCITA IDENTIFICADA' if component_result and component_result['coverage'].get('core') == 'EXECUTED' else 'NÃO DETERMINADO'}**",
         f"- Risco de persistência externa: **{traduzir_estado(persistence_risk)}**",
@@ -1383,6 +1399,36 @@ def decode_database_encoded_value(value: str) -> dict | None:
     }
 
 
+def classify_database_reversed_reference(option_name: str, value: str) -> dict | None:
+    """Identify short, reversible component references without executing them.
+
+    The incident family stored values such as ``5.1.2|php.xob-reggol-nevah``
+    in randomly named hexadecimal options.  This is not Base64 and therefore
+    was invisible to the encoded-payload scanner.  Only short values whose
+    reversed component has a PHP suffix *and* a known component/incident term
+    are classified; arbitrary hexadecimal options are left untouched.
+    """
+    if not re.fullmatch(r"[A-Fa-f0-9]{12,64}", option_name):
+        return None
+    raw = value.strip()
+    if not (1 <= len(raw) <= 512) or "|" not in raw:
+        return None
+    parts = raw.split("|")
+    reversed_component = parts[-1][::-1]
+    if not re.fullmatch(r"[A-Za-z0-9._-]+\.php", reversed_component, re.I):
+        return None
+    if not re.search(r"(?:haven|kinetic|relay|logger|trace|rocket|sc[_-])",
+                     reversed_component, re.I):
+        return None
+    version = parts[0] if re.fullmatch(r"\d+(?:\.\d+){1,4}", parts[0]) else None
+    return {
+        "original_value": raw,
+        "reversed_reference": reversed_component,
+        "component_version": version,
+        "classification": "REFERENCIA_COMPONENTE_REVERSIVEL_REQUER_REVISAO",
+    }
+
+
 def database_encoded_scan(option_file: str, dbname: str, prefix: str) -> list[dict]:
     """Find Base64/GZIP payloads in common WordPress text columns.
 
@@ -1428,6 +1474,38 @@ def database_encoded_scan(option_file: str, dbname: str, prefix: str) -> list[di
                 "source_table_suffix": suffix,
                 "source_column_name": value_column,
             })
+    return findings
+
+
+def database_reversed_reference_scan(option_file: str, dbname: str, prefix: str) -> list[dict]:
+    """Find short reversed PHP component references in random option names."""
+    table = sql_identifier(prefix + "options")
+    sql = (f"SELECT option_name, option_value FROM {table} "
+           "WHERE option_name REGEXP '^[A-Fa-f0-9]{12,64}$' "
+           "AND OCTET_LENGTH(option_value) BETWEEN 1 AND 512 LIMIT 500;")
+    findings: list[dict] = []
+    for row in query_db(option_file, dbname, sql):
+        if len(row) != 2:
+            raise AuditError("Malformed reversed-reference scan row")
+        result = classify_database_reversed_reference(row[0], row[1])
+        if result is None:
+            continue
+        original = result["original_value"]
+        findings.append({
+            "kind": "reversed_reference",
+            "name": safe_option_name(str(row[0])),
+            "length": str(len(original.encode("utf-8", "replace"))),
+            "state": "RESIDUO_COMPONENTE_REFERENCIA_REQUER_REVISAO",
+            "sha256": hashlib.sha256(original.encode("utf-8", "replace")).hexdigest(),
+            "value_length_bytes": len(original.encode("utf-8", "replace")),
+            "value_classification": result["classification"],
+            "safe_excerpt": original[:160],
+            "decoded_excerpt": result["reversed_reference"],
+            "reversed_reference": result["reversed_reference"],
+            "component_version": result["component_version"],
+            "source_table_suffix": "options",
+            "source_column_name": "option_value",
+        })
     return findings
 
 def database_audit(option_file: str, dbname: str, prefix: str, case: Path,
@@ -1540,6 +1618,10 @@ def database_audit(option_file: str, dbname: str, prefix: str, case: Path,
     # Scan for encoded payloads after the targeted family checks. This is
     # read-only and deliberately does not deserialize or execute any value.
     findings.extend(database_encoded_scan(option_file, dbname, prefix))
+    # Some incident artifacts are short reversible references rather than
+    # Base64/GZIP payloads; inspect them separately without treating all hex
+    # option names as malicious.
+    findings.extend(database_reversed_reference_scan(option_file, dbname, prefix))
     write_private(case / ("database-post-audit.json" if post else "database-evidence.json"),
                   json.dumps(findings, indent=2))
     return findings

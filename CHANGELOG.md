@@ -4,6 +4,15 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 
 ## [Não publicado]
 
+## [0.26.1] - 2026-11-03
+
+### Referências reversíveis em opções do banco
+- A auditoria passa a examinar opções de nome hexadecimal aleatório com valores curtos no formato de referência reversível.
+- Referências como `5.1.2|php.xob-reggol-nevah` são interpretadas somente em memória como `haven-logger-box.php`, preservando o valor original limitado, hash, versão e classificação no relatório privado.
+- A detecção é restrita a nomes hexadecimais, sufixo PHP e termos de componentes/incidente conhecidos; valores arbitrários não são classificados automaticamente.
+- O achado gera `AUDITORIA_INCOMPLETA` (código 40), exige revisão de procedência e não autoriza remoção automática.
+- Incluídos testes para detecção e rejeição de falsos positivos; nenhum PHP ou valor do banco é executado.
+
 ## [0.26.0] - 2026-11-03
 
 ### Detecção de payloads codificados no banco
