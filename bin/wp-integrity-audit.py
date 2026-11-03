@@ -1430,7 +1430,7 @@ def stage_files(target: Path, source: Path, case: Path, replace: bool, sync: boo
             if not (stat.S_ISREG(modo) or stat.S_ISDIR(modo)):
                 raise AuditError("Arquivo especial ou link detectado no estágio")
             os.chown(arquivo, dono.st_uid, dono.st_gid, follow_symlinks=False)
-            os.chmod(arquivo, stat.S_IMODE(modo) & ~0o002, follow_symlinks=False)
+            os.chmod(arquivo, stat.S_IMODE(modo) & ~0o002)
         return stage
     except BaseException:
         shutil.rmtree(stage, ignore_errors=True)
