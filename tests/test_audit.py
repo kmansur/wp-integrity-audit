@@ -182,6 +182,17 @@ $table_prefix = 'wp_';
             with self.assertRaises(audit.AuditError):
                 audit.validate_source(limpa, site)
 
+    def test_fonte_de_recuperacao_rejeita_diretorio_de_indicador(self):
+        with tempfile.TemporaryDirectory() as pasta:
+            raiz = Path(pasta)
+            site = raiz / "site"
+            fonte = raiz / "fonte"
+            site.mkdir()
+            (fonte / ".sc_exemplo").mkdir(parents=True)
+            (fonte / ".sc_exemplo" / "arquivo.txt").write_text("texto", encoding="utf-8")
+            with self.assertRaises(audit.AuditError):
+                audit.validate_source(fonte, site)
+
     def test_stage_de_recuperacao_preserva_propriedade_e_bloqueia_escrita_publica(self):
         with tempfile.TemporaryDirectory() as pasta:
             raiz = Path(pasta)
