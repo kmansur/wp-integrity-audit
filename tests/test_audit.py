@@ -150,6 +150,62 @@ $table_prefix = 'wp_';
             )
             audit.preflight_recovery_sources(site, None)
 
+    def test_plano_sql_rejeita_opcoes_criticas_e_nomes_inseguros(self):
+        for nome in ("cron", "active_plugins", "siteurl", "home", "wp_user_roles",
+                     "wp_capabilities", "opcao';DROP", "nome com espaço", "a" * 192):
+            with self.subTest(nome=nome):
+                with self.assertRaises(audit.AuditError):
+                    audit.database_cleanup_plan("unused.cnf", "fixture", "wp_", [nome])
+        with self.assertRaises(audit.AuditError):
+            audit.database_cleanup_plan("unused.cnf", "fixture", "wp_", ["sc_fake", "sc_fake"])
+        self.assertEqual(audit.database_cleanup_plan("unused.cnf", "fixture", "wp_", []), [])
+
+    def test_fonte_de_recuperacao_nao_pode_abranger_site(self):
+        with tempfile.TemporaryDirectory() as pasta:
+            raiz = Path(pasta)
+            site = raiz / "site"
+            site.mkdir()
+            (site / "wp-content").mkdir()
+            with self.assertRaises(audit.AuditError):
+                audit.validate_source(raiz, site)
+            with self.assertRaises(audit.AuditError):
+                audit.validate_source(site / "wp-content", site)
+
+    def test_fonte_de_recuperacao_rejeita_webshell_generica(self):
+        with tempfile.TemporaryDirectory() as pasta:
+            raiz = Path(pasta)
+            site = raiz / "site"
+            limpa = raiz / "limpa"
+            site.mkdir()
+            limpa.mkdir()
+            (limpa / "payload.php").write_bytes(b"<?php eval(base64_decode('aGVsbG8='));")
+            with self.assertRaises(audit.AuditError):
+                audit.validate_source(limpa, site)
+
+    def test_stage_de_recuperacao_preserva_propriedade_e_bloqueia_escrita_publica(self):
+        with tempfile.TemporaryDirectory() as pasta:
+            raiz = Path(pasta)
+            site, fonte, caso = (raiz / s for s in ("site", "fonte", "caso"))
+            (site / "wp-content/plugins").mkdir(parents=True)
+            (site / "wp-content/themes").mkdir()
+            (site / "wp-content/uploads").mkdir()
+            (site / "wp-content/uploads/data.txt").write_text("original")
+            for pasta_rel in ("plugins", "themes", "uploads"):
+                (fonte / pasta_rel).mkdir(parents=True, exist_ok=True)
+            (fonte / "uploads/data.txt").write_text("arquivo limpo")
+            (fonte / "uploads/data.txt").chmod(0o666)
+            caso.mkdir()
+            estagio = audit.stage_files(site, fonte, caso, True, False)
+            try:
+                arquivo = estagio / "uploads/data.txt"
+                self.assertEqual(arquivo.read_text(), "arquivo limpo")
+                self.assertEqual(arquivo.stat().st_uid, (site / "wp-content/uploads/data.txt").stat().st_uid)
+                self.assertEqual(arquivo.stat().st_gid, (site / "wp-content/uploads/data.txt").stat().st_gid)
+                self.assertFalse(arquivo.stat().st_mode & stat.S_IWOTH)
+            finally:
+                import shutil
+                shutil.rmtree(estagio)
+
     def test_salt_rotation_preserves_other_configuration(self):
         with tempfile.TemporaryDirectory() as directory:
             config = Path(directory) / "wp-config.php"
