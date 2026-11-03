@@ -15,6 +15,11 @@ python3 bin/wp-integrity-audit.py /var/www/exemplo/public_html --domain-label ex
 
 ## Envio do relatório gerencial por e-mail
 
+A partir da versão **0.22.2**, a rotina de envio fornece diagnósticos seguros por categoria (DNS, conexão, TLS, autenticação ou recusa SMTP) e confirmação explícita quando o servidor SMTP aceita o e-mail. **Aceite SMTP não significa entrega na caixa de entrada**: em caso de não recebimento, verifique a fila e os logs do servidor, além de políticas antispam, SPF, DKIM e DMARC. Nunca inclua senhas, conteúdo da configuração ou logs SMTP completos em chamados públicos.
+
+Antes de testar o envio, confira se o PDF pode ser gerado com a biblioteca opcional ReportLab, se `/etc/wp-integrity-audit/config.cfg` e o arquivo de senha estão protegidos com permissões `0600`, e se a porta e o modo TLS correspondem ao servidor SMTP. STARTTLS é obrigatório quando configurado, sem fallback inseguro. Não é necessário divulgar o conteúdo desses arquivos para diagnóstico.
+
+
 O envio exige a opção `--email-to` e utiliza, por padrão, o arquivo privado `/etc/wp-integrity-audit/config.cfg`. Para escolher outro arquivo, utilize `--config`. A opção antiga `--smtp-config` continua aceita.
 
 ```bash
