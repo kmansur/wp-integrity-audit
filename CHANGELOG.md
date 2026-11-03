@@ -4,6 +4,19 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 
 ## [Não publicado]
 
+## [0.22.2] - 2026-11-03
+
+### Diagnóstico e confirmação de envio SMTP
+- As falhas SMTP passam a informar, sem expor segredos, a categoria operacional: resolução DNS, conexão recusada, tempo limite, negociação/certificado TLS, autenticação e remetente/destinatário recusado.
+- STARTTLS configurado exige anúncio explícito da extensão antes da autenticação. Não há redução automática para comunicação sem criptografia.
+- Respostas de recusa de destinatários do servidor SMTP deixam de ser consideradas sucesso.
+- O terminal identifica a geração do PDF e apresenta confirmação explícita somente após o servidor SMTP aceitar a mensagem; aceitação não garante entrega na caixa postal.
+- Novos testes de regressão usam servidores SMTP simulados, sem tráfego de rede real. Fluxos de auditoria e códigos de retorno permanecem inalterados.
+
+### Homologação
+- Executar teste real em destinatário autorizado após aprovação do pipeline. Verificar logs do servidor SMTP e políticas de entrega quando houver aceite sem recebimento.
+
+
 ## [0.22.1] - 2026-11-03
 
 ### Clareza das evidências gerenciais
