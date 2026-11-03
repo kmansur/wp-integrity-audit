@@ -1429,7 +1429,9 @@ def stage_files(target: Path, source: Path, case: Path, replace: bool, sync: boo
             modo = arquivo.lstat().st_mode
             if not (stat.S_ISREG(modo) or stat.S_ISDIR(modo)):
                 raise AuditError("Arquivo especial ou link detectado no estágio")
-            os.chown(arquivo, dono.st_uid, dono.st_gid, follow_symlinks=False)
+            atual = arquivo.stat()
+            if (atual.st_uid, atual.st_gid) != (dono.st_uid, dono.st_gid):
+                os.chown(arquivo, dono.st_uid, dono.st_gid, follow_symlinks=False)
             os.chmod(arquivo, stat.S_IMODE(modo) & ~0o002)
         return stage
     except BaseException:
@@ -1962,8 +1964,8 @@ def main() -> int:
                 raise AuditError("Recuperação exige root; simulação não exige")
             if args.dry_run and args.recovery_approve:
                 raise AuditError("Não combine --dry-run com --recovery-approve")
-            if args.mode == "recover" and processes:
-                raise AuditError("Matching suspicious processes are still active; isolate the host first")
+            if processes:
+                raise AuditError("Processos suspeitos ainda ativos; interrompa-os e isole o site antes de recuperar")
             if args.core_source is not None:
                 raise AuditError("Substituição do núcleo ainda não homologada; --core-source bloqueado")
             if (target / "wp-content").is_symlink():
