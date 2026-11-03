@@ -21,6 +21,7 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 ### Cuidados e limites
 - Pré-lançamento para utilização assistida; testar primeiro em clone descartável. A exclusão de múltiplas opções SQL é realizada em passos por nome e hash, **não é uma transação única**; uma falha pode exigir recuperação a partir do dump.
 - O operador deve obter previamente cópia confiável completa de `wp-content` (não reutilizar arquivos potencialmente infectados sem investigação). A auditoria não remove automaticamente persistência no host, entradas de cron serializadas ou códigos maliciosos embutidos em opções complexas.
+- Após aplicar alterações, o modo de recuperação retorna código **40 (revisão pendente)** até nova auditoria e liberação técnica; a aplicação não é apresentada como garantia de limpeza.
 - A reativação não é automática e depende de aprovação técnica. A recuperação ainda não foi homologada em ambiente real de produção.
 
 
