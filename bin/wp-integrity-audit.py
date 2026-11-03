@@ -2023,7 +2023,7 @@ def main() -> int:
                            "OR option_value LIKE '%sc_cron_fetch%');")
                     if query_db(cnf, dbname, sql):
                         raise AuditError("Opções serializadas suspeitas exigem limpeza manual")
-                ask("Confirm all planned site/database modifications")
+                ask("Confirme o plano de alterações nos arquivos e/ou banco de dados")
             except BaseException:
                 # Staging may already exist when operator declines or SQL
                 # preflight fails. Never abandon an untracked working copy.
