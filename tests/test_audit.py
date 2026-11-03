@@ -37,6 +37,45 @@ class PythonAuditTests(unittest.TestCase):
         self.assertTrue(callable(audit.sql_cleanup))
         self.assertTrue(callable(audit.official_sync))
 
+    def test_subprocesso_nao_utf8_preserva_octetos_sem_travar(self):
+        """Saída Latin-1 de ferramenta externa não pode derrubar a auditoria."""
+        import sys
+        resultado = audit.run(
+            [sys.executable, "-c", "import sys; sys.stdout.buffer.write(b'linha:\\xe1\\n')"],
+            capture_output=True,
+        )
+        self.assertEqual(resultado.stdout, "linha:\\xe1\n")
+        self.assertNotIn("\ufffd", resultado.stdout)
+
+    def test_inventario_de_processos_tolera_argumentos_nao_utf8(self):
+        """Processo com byte legado não derruba o inventário de IOC."""
+        import subprocess
+        with tempfile.TemporaryDirectory() as pasta:
+            caso = Path(pasta)
+            saida = subprocess.CompletedProcess(
+                args=["ps"], returncode=0,
+                stdout="152 1 usuario php /site/.gr_abc argumento\\xe1\n",
+                stderr="",
+            )
+            with unittest.mock.patch.object(audit, "run", return_value=saida):
+                encontrados = audit.process_audit(caso)
+            self.assertEqual(len(encontrados), 1)
+            self.assertIn(".gr_abc", encontrados[0])
+            self.assertTrue((caso / "process-evidence.json").is_file())
+
+    def test_consulta_mysql_exige_utf8mb4(self):
+        import subprocess
+        esperado = subprocess.CompletedProcess(
+            args=["mysql"], returncode=0,
+            stdout="wp_option\t64\n", stderr=""
+        )
+        with unittest.mock.patch.object(audit, "run", return_value=esperado) as executa:
+            registros = audit.query_db("/tmp/configuracao-sintetica.cnf", "wordpress", "SELECT 1;")
+        self.assertEqual(registros, [["wp_option", "64"]])
+        argv = executa.call_args.args[0]
+        self.assertIn("--default-character-set=utf8mb4", argv)
+        self.assertEqual(executa.call_args.kwargs["input"], "SELECT 1;")
+
     def test_literal_config_parser(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "wp-config.php"
