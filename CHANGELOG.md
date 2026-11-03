@@ -23,6 +23,13 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 - O relatório técnico preserva o caminho do processo, mascarando somente segredos explícitos e endereços IP.
 - Incluídos testes de regressão para classificação, risco e preservação do caminho.
 
+### Correção de codificação na auditoria
+- Execução de comandos externos com decodificação UTF-8 explícita e `backslashreplace`: bytes externos incompatíveis são representados como sequências `\\xNN`, sem perda silenciosa nem exceção `UnicodeDecodeError`.
+- Consultas MySQL solicitam explicitamente `utf8mb4` ao cliente, reduzindo inconsistências dependentes do locale do sistema e de caracteres acentuados.
+- Testes de regressão cobrem saída de subprocesso com byte Latin-1, inventário de processos com representações de octetos não UTF-8 e parâmetros de charset do cliente MySQL.
+- Nenhuma alteração nos modos destrutivos, classificações de risco, geração de PDF ou política de envio de e-mail.
+- A correção foi integrada seletivamente à linha 0.26.0 sem substituir as melhorias de segurança locais.
+
 ## [0.24.0] - 2026-11-03
 
 ### Remediação seletiva de WordPress e Linux
