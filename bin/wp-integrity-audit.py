@@ -1416,6 +1416,21 @@ def stage_files(target: Path, source: Path, case: Path, replace: bool, sync: boo
             raise AuditError("Source has plugins/themes; explicitly specify --replace-plugins-themes")
         # Re-check the entire stage, including official downloads.
         validate_source(stage, target)
+        # A cópia limpa não pode assumir propriedade root no lugar do usuário web.
+        original = target / "wp-content"
+        for arquivo in [stage, *sorted(stage.rglob("*"))]:
+            relativo = arquivo.relative_to(stage)
+            correspondente = original / relativo
+            while not correspondente.exists() and correspondente != original:
+                correspondente = correspondente.parent
+            if correspondente.is_symlink() or not correspondente.exists():
+                raise AuditError("Destino original inseguro ao restaurar propriedade")
+            dono = correspondente.stat()
+            modo = arquivo.lstat().st_mode
+            if not (stat.S_ISREG(modo) or stat.S_ISDIR(modo)):
+                raise AuditError("Arquivo especial ou link detectado no estágio")
+            os.chown(arquivo, dono.st_uid, dono.st_gid, follow_symlinks=False)
+            os.chmod(arquivo, stat.S_IMODE(modo) & ~0o002, follow_symlinks=False)
         return stage
     except BaseException:
         shutil.rmtree(stage, ignore_errors=True)
@@ -1817,6 +1832,8 @@ def parse_args() -> argparse.Namespace:
         parser.error("Use --dry-run para simular ou --recovery-approve para execução assistida")
     if args.mode in ("apply-files", "recover") and not args.replace_plugins_themes:
         parser.error("A substituição de wp-content exige --replace-plugins-themes")
+    if args.mode == "apply-db" and not args.remove_db_option:
+        parser.error("--apply-db exige pelo menos uma opção --remove-db-option")
     return args
 
 def present_management_report(case: Path, *, show: bool = False,
@@ -1945,8 +1962,6 @@ def main() -> int:
                 raise AuditError("Não combine --dry-run com --recovery-approve")
             if args.mode == "recover" and processes:
                 raise AuditError("Matching suspicious processes are still active; isolate the host first")
-            if args.mode == "recover":
-                preflight_recovery_sources(target, args.core_source)
             if args.core_source is not None:
                 raise AuditError("Substituição do núcleo ainda não homologada; --core-source bloqueado")
             if (target / "wp-content").is_symlink():
