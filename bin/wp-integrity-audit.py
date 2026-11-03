@@ -33,7 +33,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 
-VERSION = "0.21.11"
+VERSION = "0.21.12"
 IOC = re.compile(r"SC_ADV_BEGIN|--sc-cli|--sc-succ|trace-inspector-pad|cipher-feeder|_sc_fpc|sc_cron_guard|sc_persist_manifest|sc_own_manifest|function ceya")
 PATTERN_NAMES = (".sc_", ".gr_", ".gk_", ".kk_", ".wp-object-cache")
 SCRIPT_EXTENSIONS = {".php", ".phtml", ".phar", ".inc", ".php5", ".php7", ".php8", ".pht", ".phps"}
@@ -623,6 +623,9 @@ def customer_findings(files, database, configs, components):
         if entry.get("state") in ("ABSENT", "NOT_FOUND") or entry.get("kind") in ("session_rows", "application_password_rows"):
             continue
         kind = entry.get("kind")
+        # Metadados de cron representam inventário; não são um indicador de ataque.
+        if kind == "cron_metadata":
+            continue
         description = ("Referência histórica ao incidente, sem comprovação de execução ativa de código."
                        if kind == "historical_cache" else
                        "Resíduo no banco de dados compatível com um padrão do incidente; valide antes de qualquer correção."
@@ -656,8 +659,12 @@ def customer_findings(files, database, configs, components):
                            "Não foi possível identificar a versão instalada; verifique o pacote manualmente."
                            if state == "PLUGIN_VERSAO_NAO_IDENTIFICADA" else
                            "Uma divergência de integridade exige comparação com uma versão confiável.")
+            versao_local = entry.get("local_version") or "não identificada"
+            versao_oficial = entry.get("official_version") or "não disponível"
+            detalhe = (f"Versão instalada: {versao_local}; versão de referência: {versao_oficial}. "
+                       "O SHA-256, quando disponível, refere-se apenas ao arquivo principal, não ao pacote inteiro. ")
             items.append((entry.get("component_id", "COMPONENT-UNASSIGNED"), "Componente",
-                          entry.get("slug"), state, explanation, entry.get("main_file_sha256")))
+                          entry.get("slug"), state, detalhe + explanation, entry.get("main_file_sha256")))
     for identifier, kind, subject, state, explanation, digest in items:
         risk = ("PRIORIDADE ALTA — indicador residual do incidente" if state == "RESIDUO_FAMILIA_REQUER_LIMPEZA" else
                 "MÉDIA — item executável ou divergência de integridade que exige validação" if kind in ("Arquivos", "Configuração") or state in ("CORE_MODIFICADO_REQUER_REVISAO", "PLUGIN_COM_ARQUIVOS_MODIFICADOS") else
