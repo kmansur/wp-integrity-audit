@@ -51,6 +51,16 @@ def validar_candidato(caso: Path, caminho: Path, *, raizes=RAIZES) -> tuple[str,
         raise QuarentenaRecusada("Hash do arquivo diverge da evidência; execute nova auditoria")
     return resumo, info, conteudo
 
+def validar_unidade_systemd(nome: str) -> None:
+    # Não modificar unidades que ainda possam iniciar processos no sistema.
+    ativo = subprocess.run(["systemctl", "is-active", nome],
+                           capture_output=True, text=True, check=False)
+    habilitado = subprocess.run(["systemctl", "is-enabled", nome],
+                                capture_output=True, text=True, check=False)
+    if ativo.stdout.strip() != "inactive" or habilitado.stdout.strip() != "disabled":
+        raise QuarentenaRecusada("Unidade systemd ativa/habilitada ou estado indefinido; intervenção manual obrigatória")
+
+
 def executar(caso: Path, caminho: Path, *, aplicar: bool, raizes=RAIZES) -> dict:
     if caso.is_symlink() or not caso.is_dir() or stat.S_IMODE(caso.stat().st_mode) & 0o077:
         raise QuarentenaRecusada("Diretório do caso deve ser privado e não pode ser link")
@@ -62,14 +72,7 @@ def executar(caso: Path, caminho: Path, *, aplicar: bool, raizes=RAIZES) -> dict
     if os.geteuid() != 0:
         raise QuarentenaRecusada("Aplicação de quarentena no Linux exige root")
     if caminho.parent == Path("/etc/systemd/system"):
-        # Arquivos de unidades ativas ou habilitadas exigem contenção manual e
-        # análise de dependências, não alteração automática de serviços.
-        ativo = subprocess.run(["systemctl", "is-active", caminho.name],
-                               capture_output=True, text=True, check=False)
-        habilitado = subprocess.run(["systemctl", "is-enabled", caminho.name],
-                                    capture_output=True, text=True, check=False)
-        if ativo.stdout.strip() != "inactive" or habilitado.stdout.strip() != "disabled":
-            raise QuarentenaRecusada("Unidade systemd ativa/habilitada ou estado indefinido; intervenção manual obrigatória")
+        validar_unidade_systemd(caminho.name)
     vault = caso / "quarentena-linux"
     if vault.is_symlink():
         raise QuarentenaRecusada("Destino de quarentena inseguro")
