@@ -204,7 +204,10 @@ $table_prefix = 'wp_';
             for pasta_rel in ("plugins", "themes", "uploads"):
                 (fonte / pasta_rel).mkdir(parents=True, exist_ok=True)
             (fonte / "uploads/data.txt").write_text("arquivo limpo")
-            (fonte / "uploads/data.txt").chmod(0o666)
+            (fonte / "uploads/data.txt").chmod(0o600)
+            (fonte / "uploads/novo.txt").write_text("arquivo novo")
+            (fonte / "uploads/novo.txt").chmod(0o600)
+            (site / "wp-content/uploads/data.txt").chmod(0o644)
             caso.mkdir()
             estagio = audit.stage_files(site, fonte, caso, True, False)
             try:
@@ -213,6 +216,9 @@ $table_prefix = 'wp_';
                 self.assertEqual(arquivo.stat().st_uid, (site / "wp-content/uploads/data.txt").stat().st_uid)
                 self.assertEqual(arquivo.stat().st_gid, (site / "wp-content/uploads/data.txt").stat().st_gid)
                 self.assertFalse(arquivo.stat().st_mode & stat.S_IWOTH)
+                self.assertEqual(stat.S_IMODE(arquivo.stat().st_mode), 0o644)
+                novo = estagio / "uploads/novo.txt"
+                self.assertEqual(stat.S_IMODE(novo.stat().st_mode), 0o644)
             finally:
                 import shutil
                 shutil.rmtree(estagio)
