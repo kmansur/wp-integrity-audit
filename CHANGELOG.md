@@ -4,6 +4,20 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 
 ## [Não publicado]
 
+## [0.22.0] - 2026-11-03
+
+### Segurança operacional e homologação
+- Leitura do relatório gerencial por descritor de arquivo com rejeição de links simbólicos e limite de 8 MiB para exportação PDF, reduzindo riscos de leitura não controlada.
+- Leitura limitada a 20 MiB para o PDF anexado ao e-mail SMTP e a 4 KiB para a senha SMTP, com verificação de arquivo regular e rejeição de symlinks. O arquivo de senha exige caminho absoluto.
+- Divergência de versão local superior à versão oficial não é mais marcada como correspondência: estado de consulta `OFFICIAL_VERSION_DIFFERENT_UNVERIFIED` exige revisão de procedência, sem afirmar comprometimento.
+- Novos testes de regressão para arquivos acima do limite, links simbólicos, senha relativa e versões oficiais divergentes.
+- Pipeline com job dedicado de validação PDF: ReportLab e PyMuPDF no Python 3.12, incluindo testes de paginação e acentuação quando disponíveis.
+
+### Limitações
+- Os modos de recuperação permanecem experimentais e não são homologados para produção.
+- Ainda são necessários testes operacionais em Debian/Ubuntu reais, teste SMTP ponta a ponta em servidor controlado e avaliação de concorrência, permissões e cadeia de custódia sob condições adversas.
+
+
 ## [0.21.12] - 2026-11-03
 
 ### Correção do inventário de componentes
