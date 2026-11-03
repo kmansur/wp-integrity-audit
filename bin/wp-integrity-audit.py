@@ -34,7 +34,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 
-VERSION = "0.24.0"
+VERSION = "0.24.1"
 IOC = re.compile(r"SC_ADV_BEGIN|--sc-cli|--sc-succ|trace-inspector-pad|cipher-feeder|_sc_fpc|sc_cron_guard|sc_persist_manifest|sc_own_manifest|function ceya")
 PATTERN_NAMES = (".sc_", ".gr_", ".gk_", ".kk_", ".wp-object-cache")
 SCRIPT_EXTENSIONS = {".php", ".phtml", ".phar", ".inc", ".php5", ".php7", ".php8", ".pht", ".phps"}
@@ -61,6 +61,20 @@ def redact(value: object) -> str:
     value = LONG_VALUE.sub("[LONG_VALUE_REDACTED]", value)
     value = re.sub(r"(?<!\d)(?:\d{1,3}\.){3}\d{1,3}(?!\d)", "[IP_REDACTED]", value)
     return value[:240]
+
+
+def redact_process_line(value: object) -> str:
+    """Redact secrets in process arguments without destroying executable paths.
+
+    Process command lines are evidentiary data.  The generic ``redact`` helper
+    intentionally masks long tokens, but doing that to a command line can hide
+    the exact ``.sc_*``/``.gr_*`` path needed for containment.  Keep paths and
+    arguments intact, masking only explicit secret assignments and IP literals.
+    """
+    text = str(value)
+    text = SENSITIVE.sub(lambda m: m.group(1) + "=[REDACTED]", text)
+    text = re.sub(r"(?<!\d)(?:\d{1,3}\.){3}\d{1,3}(?!\d)", "[IP_REDACTED]", text)
+    return text.replace("\x00", " ").replace("\n", " ").replace("\r", " ")[:4096]
 
 def sanitize_relative_path(path: str) -> str:
     """Preserve relative evidence paths while masking explicit sensitive values."""
@@ -508,7 +522,8 @@ def recent_file_timeline(target: Path, case: Path, days: int = 30) -> list[dict]
 
 def process_audit(case: Path) -> list[str]:
     result = run(["ps", "-eo", "pid=,ppid=,user=,args="], capture_output=True).stdout
-    matches = [redact(line) for line in result.splitlines() if any(x in line for x in ("--sc-cli", "--sc-succ", "cipher-feeder", ".gr_"))]
+    matches = [redact_process_line(line) for line in result.splitlines()
+               if any(x in line for x in ("--sc-cli", "--sc-succ", "cipher-feeder", ".gr_"))]
     write_private(case / "process-evidence.json", json.dumps(matches, indent=2))
     return matches
 
@@ -537,6 +552,11 @@ def audit_status(files: list[dict], processes: list[str],
         int(x["length"]) if kind in ("session_rows", "application_password_rows")
         else int(x.get("state") not in ("ABSENT", "NOT_FOUND"))
         for x in (database or []) if x.get("kind") == kind)
+    # A direct family process is execution evidence, not merely a heuristic
+    # filename match.  When it is present, direct IOC-bearing files are
+    # correlated as confirmed compromised files for the management summary.
+    direct_file_iocs = sum(x.get("classification") == "IOC_REQUER_VALIDACAO" for x in files)
+    confirmed_files = direct_file_iocs if processes else 0
     summary = {
         "confirmed_family_residues": count("family_option"),
         "historical_references": count("historical_cache"),
@@ -544,15 +564,19 @@ def audit_status(files: list[dict], processes: list[str],
         "active_database_markers": sum(count(k) for k in ("marker_option", "cron_marker", "active_plugins_marker")),
         "validated_legitimate_files": sum(x.get("classification") == "LEGITIMO_VALIDADO" for x in files),
         "security_configuration_review": sum(x.get("classification") == "CONFIGURACAO_PLUGIN_SEGURANCA_REQUER_VALIDACAO" for x in files),
-        "confirmed_compromised_files": 0,  # Heuristic file matches are not forensic confirmation.
+        "confirmed_compromised_files": confirmed_files,
         "file_indicators_requiring_review": sum(x.get("classification") in ("IOC_REQUER_VALIDACAO", "ARQUIVO_SUSPEITO_REQUER_VALIDACAO", "PHP_UPLOAD_REQUER_VALIDACAO", "PHP_DIRETORIO_OCULTO_REQUER_VALIDACAO", "CACHE_PLUGIN_REQUER_VALIDACAO", "WEB_SHELL_HEURISTIC_REQUIRES_REVIEW") for x in files),
         "suspicious_processes": len(processes),
     }
     if database is None:
         return "AUDITORIA_INCOMPLETA", 40, summary
-    # Heuristic markers alone cannot establish executed compromise.
-    # Reserve exit 20 for independently confirmed execution evidence.
-    if summary["active_database_markers"] or summary["suspicious_processes"]:
+    # A process selected by process_audit contains the incident family's
+    # execution markers (--sc-cli/--sc-succ/.gr_*/cipher-feeder).  This is
+    # independent execution evidence and takes precedence over review-only
+    # findings.  Database markers alone remain conservative review findings.
+    if summary["suspicious_processes"]:
+        return "COMPROMETIMENTO_CONFIRMADO", 20, summary
+    if summary["active_database_markers"]:
         return "AUDITORIA_INCOMPLETA", 40, summary
     if summary["confirmed_family_residues"]:
         return "RESIDUOS_REQUEREM_LIMPEZA", 10, summary
@@ -604,6 +628,7 @@ def traduzir_estado(valor: object) -> str:
         "NOT DETERMINED": "NÃO DETERMINADO",
         "REVIEW REQUIRED": "REVISÃO NECESSÁRIA",
         "LOW — no known indicators found": "BAIXO — nenhum indicador conhecido encontrado",
+        "HIGH — active WordPress incident indicators": "ALTO — indicadores ativos de incidente no WordPress",
         "EXECUTED": "EXECUTADA",
         "NOT EXECUTED": "NÃO EXECUTADA",
         "COMPLETE": "CONCLUÍDA",
@@ -812,6 +837,13 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
     status, exit_code, summary = audit_status(findings, processes, database)
     optional_issues = optional_probe_review(case)
     core, configurations, host_records = supplementary_evidence(case)
+    persistence_path = case / "wordpress-persistence.json"
+    wordpress_persistence = []
+    if persistence_path.is_file() and not persistence_path.is_symlink():
+        loaded_persistence = json.loads(persistence_path.read_text(encoding="utf-8"))
+        if not isinstance(loaded_persistence, list):
+            raise AuditError("Malformed WordPress persistence evidence")
+        wordpress_persistence = loaded_persistence
     core_count = len(core.get("findings", []))
     config_count = sum(x.get("classification") == "CONFIGURACAO_REQUER_VALIDACAO" for x in configurations)
     config_inventoried = len(configurations)
@@ -822,12 +854,19 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
     host_known = sum(x.get("classification") == "COMPONENTE_DE_SEGURANCA_CONHECIDO" for x in host_records)
     host_unclassified = len(host_records) - host_indicators - host_review - host_known
     host_legitimate = host_known + host_unclassified
-    persistence_risk = ("NOT DETERMINED" if not (case / "host-persistence.json").is_file()
-                        else "REVIEW REQUIRED" if host_indicators or host_review
-                        else "LOW — no known indicators found")
+    # Keep host persistence separate from WordPress persistence.  A clean host
+    # inventory must not downgrade an active PHP process or WordPress drop-in.
+    if summary["suspicious_processes"] or summary["confirmed_compromised_files"] \
+            or summary["confirmed_family_residues"] or summary["active_database_markers"]:
+        persistence_risk = "HIGH — active WordPress incident indicators"
+    else:
+        persistence_risk = ("NOT DETERMINED" if not (case / "host-persistence.json").is_file()
+                            else "REVIEW REQUIRED" if host_indicators or host_review
+                            else "LOW — no known indicators found")
     summary["host_known_security_components"] = host_known
     summary["host_unclassified_inventory"] = host_unclassified
     summary["host_persistence_indicators"] = host_indicators
+    summary["wordpress_persistence_review"] = len(wordpress_persistence)
     summary["persistence_risk"] = persistence_risk
     admin_path = case / "administrator-inventory.json"
     admin_coverage = json.loads(admin_path.read_text()) if admin_path.is_file() and not admin_path.is_symlink() else None
@@ -938,6 +977,7 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
         f"- Divergências no núcleo do WordPress: **{core_count}**",
         f"- Arquivos de configuração pendentes de análise: **{config_count}**",
         f"- Indicadores de persistência externa: **{host_indicators}**",
+        f"- Itens de persistência do WordPress para revisão: **{summary['wordpress_persistence_review']}**",
         f"- Registros do inventário do servidor: **{len(host_records)}** (segurança conhecida: {host_known}; não classificados: {host_unclassified}; suspeitos: {host_indicators}; revisão: {host_review})",
         *[f"- Problema em verificação opcional: {issue}" for issue in optional_issues],
         "- Recomendação para reativação: **LIBERAÇÃO NÃO RECOMENDADA**",
@@ -957,6 +997,9 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
         # Preserve actual relative file paths, including long directory names.
         path = sanitize_relative_path(finding["path"])
         lines.append(f"| `{path}` | {finding['classification']} | {finding['sha256']} |")
+    lines.extend(["", "## Evidências de processos", "",
+                  "As linhas abaixo preservam o caminho do executável para contenção; segredos explícitos e endereços IP são mascarados."])
+    lines.extend(f"- `{redact_process_line(process)}`" for process in processes)
     if audited:
         lines.extend(["", "## Evidências do banco de dados", "",
                       f"- Banco de dados: `{safe_option_name(db_name or 'UNKNOWN')}`",
@@ -1070,13 +1113,13 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
         f"- Registros do servidor que exigem revisão: **{host_review}**",
         "", "## Visão geral dos riscos", "",
         f"- Risco do banco de dados: **{'ALTO' if summary['confirmed_family_residues'] or summary['active_database_markers'] else 'BAIXO — nenhum indicador pesquisado encontrado no banco de dados' if audited else 'NÃO DETERMINADO'}**",
-        f"- Risco dos arquivos: **{'REVISÃO NECESSÁRIA' if summary['file_indicators_requiring_review'] else 'BAIXO PARA OS INDICADORES PESQUISADOS'}**",
+        f"- Risco dos arquivos: **{'ALTO — arquivos correlacionados a execução maliciosa' if summary['confirmed_compromised_files'] else 'REVISÃO NECESSÁRIA' if summary['file_indicators_requiring_review'] else 'BAIXO PARA OS INDICADORES PESQUISADOS'}**",
         f"- Risco do núcleo do WordPress: **{'MÉDIO — REVISÃO NECESSÁRIA' if core_count else 'MÉDIO — versão desatualizada; somas de verificação oficiais validadas' if component_result and component_result['summary'].get('core_outdated') and component_result['coverage'].get('core') == 'EXECUTED' else 'NENHUMA DIVERGÊNCIA EXPLÍCITA IDENTIFICADA' if component_result and component_result['coverage'].get('core') == 'EXECUTED' else 'NÃO DETERMINADO'}**",
         f"- Risco de persistência externa: **{traduzir_estado(persistence_risk)}**",
         "- A ausência de indicadores conhecidos não comprova ausência de persistência.",
         "", "## Recomendação", "",
-        "**REATIVAÇÃO DEPENDE DE REVISÃO TÉCNICA**" if exit_code else "**SEM INDICADORES EXPLÍCITOS; REATIVAÇÃO AINDA EXIGE APROVAÇÃO TÉCNICA**",
-        "Resolva as pendências identificadas e valide a segurança do ambiente antes da reativação." if exit_code else "Não foram encontrados os indicadores pesquisados; isso não garante que o site esteja livre de comprometimento.",
+        "**COMPROMETIMENTO CONFIRMADO — REATIVAÇÃO BLOQUEADA**" if exit_code == 20 else "**REATIVAÇÃO DEPENDE DE REVISÃO TÉCNICA**" if exit_code else "**SEM INDICADORES EXPLÍCITOS; REATIVAÇÃO AINDA EXIGE APROVAÇÃO TÉCNICA**",
+        "Contenha o processo, preserve as evidências e execute recuperação controlada antes de qualquer reativação." if exit_code == 20 else "Resolva as pendências identificadas e valide a segurança do ambiente antes da reativação." if exit_code else "Não foram encontrados os indicadores pesquisados; isso não garante que o site esteja livre de comprometimento.",
         "", "## Abrangência da auditoria", "",
         f"- Auditoria do banco de dados: {'EXECUTADA' if audited else 'NÃO EXECUTADA'}",
         f"- Verificação do núcleo: {traduzir_estado(summary['component_coverage'].get('core', core.get('status', 'NOT EXECUTED')))}",

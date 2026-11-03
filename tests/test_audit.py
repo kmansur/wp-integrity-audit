@@ -415,6 +415,34 @@ $table_prefix = 'wp_';
             self.assertEqual(index["database"][0]["table"], "wp_options")
             self.assertIn("Relatório Gerencial", (case / "report.md").read_text())
 
+    def test_active_family_process_confirms_compromise_and_preserves_path(self):
+        finding = {"path": "wp-content/db.php", "classification": "IOC_REQUER_VALIDACAO"}
+        status, code, summary = audit.audit_status(
+            [finding],
+            [" 123 1 site php /srv/site/wp-content/.sc_abcd/.gr_long.php --sc-cli"],
+            [],
+        )
+        self.assertEqual((status, code), ("COMPROMETIMENTO_CONFIRMADO", 20))
+        self.assertEqual(summary["confirmed_compromised_files"], 1)
+        line = audit.redact_process_line(
+            "123 php /srv/site/wp-content/.sc_abcd/.gr_" + "x" * 80 + ".php --sc-cli"
+        )
+        self.assertIn(".sc_abcd/.gr_", line)
+        self.assertNotIn("LONG_VALUE_REDACTED", line)
+
+    def test_wordpress_indicators_raise_persistence_risk(self):
+        import json
+        with tempfile.TemporaryDirectory() as directory:
+            case = Path(directory)
+            audit.write_private(case / "wordpress-persistence.json", json.dumps([
+                {"path": "wp-content/db.php", "classification": "WORDPRESS_PERSISTENCE_REQUIRES_CONTEXT"}
+            ]))
+            audit.make_report(case, "audit", [], ["123 1 site php .sc_x/.gr_y.php --sc-cli"], [], "fixture", "wp_")
+            document = json.loads((case / "report.json").read_text())
+            self.assertEqual(document["status"], "COMPROMETIMENTO_CONFIRMADO")
+            self.assertEqual(document["persistence_risk"], "HIGH — active WordPress incident indicators")
+            self.assertIn("Evidências de processos", (case / "technical-report.md").read_text())
+
     def test_compare_cases_reports_added_removed_and_changed(self):
         import json
         with tempfile.TemporaryDirectory() as directory:

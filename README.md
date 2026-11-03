@@ -233,7 +233,7 @@ Audit reports now explicitly state whether a database dump and full-file snapsho
 
 The default audit creates `report.md` and `report.json`. Both include a final status and an executive summary, with separate family-residue, historical, informational, active-marker, file-pattern and process counters.
 
-Audit exit codes: `0` means no known explicit markers under the completed targeted audit; `10` means family residues require remediation; `20` is reserved for independently confirmed compromise (the current heuristic detector does **not** assert this automatically); `30` means an audit/connection error; `40` means incomplete evidence, including an intentional `--files-only` run or indicators requiring investigation. These are process return codes, not shell error strings. Automation should not equate code 0 with permission to reopen a site.
+Audit exit codes: `0` means no known explicit markers under the completed targeted audit; `10` means family residues require remediation; `20` means independently confirmed compromise, including a process matching the incident family's execution markers; `30` means an audit/connection error; `40` means incomplete evidence, including an intentional `--files-only` run or indicators requiring investigation. These are process return codes, not shell error strings. Automation should not equate code 0 with permission to reopen a site.
 
 The `report.json` contains high-level summary and result status only; detailed evidence remains in separately protected case files. This stage does not yet provide CSV consolidation, optional forensic dumps or a full host-persistence audit.
 
@@ -355,7 +355,7 @@ The component management summary now separately counts plugins requiring source/
 
 ## 0.14.0 terminal report display and review-aware status
 
-After normal audit completion, `report.md` is printed on an interactive standard-output TTY and its case path is always shown. If stdout is redirected or piped, only the report path is printed, even with `--show-report`. `--no-show-report` takes priority over `--show-report`. The internal `technical-report.md` is never auto-displayed. Automation exit codes are unchanged: 0 no selected markers or unresolved reviews; 10 known residues; 20 independently confirmed compromise (reserved); 30 execution error; 40 incomplete audit or unresolved review. Non-malware Core update, configuration and provenance/version review findings now yield `REVISAO_NECESSARIA` with exit 40; this does not indicate confirmed compromise.
+After normal audit completion, `report.md` is printed on an interactive standard-output TTY and its case path is always shown. If stdout is redirected or piped, only the report path is printed, even with `--show-report`. `--no-show-report` takes priority over `--show-report`. The internal `technical-report.md` is never auto-displayed. Automation exit codes are unchanged: 0 no selected markers or unresolved reviews; 10 known residues; 20 independently confirmed compromise, including a matching family process; 30 execution error; 40 incomplete audit or unresolved review. Non-malware Core update, configuration and provenance/version review findings now yield `REVISAO_NECESSARIA` with exit 40; this does not indicate confirmed compromise.
 
 Akismet static-asset allowlists are checked for executable file extensions, without rejecting harmless filename substrings such as `refresh`.
 

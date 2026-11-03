@@ -4,6 +4,15 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 
 ## [Não publicado]
 
+## [0.24.1] - 2026-11-03
+
+### Classificação de incidente e evidências de processo
+- Processos que correspondem aos marcadores de execução da família passam a produzir `COMPROMETIMENTO_CONFIRMADO` (código 20), em vez de serem apresentados apenas como auditoria incompleta.
+- Arquivos com IOC direto são correlacionados ao processo ativo e contabilizados como comprometidos confirmados no resumo.
+- O risco de persistência passa a considerar indicadores ativos do WordPress, sem ser reduzido por uma varredura externa do host sem achados.
+- O relatório técnico preserva o caminho do processo, mascarando somente segredos explícitos e endereços IP.
+- Incluídos testes de regressão para classificação, risco e preservação do caminho.
+
 ## [0.24.0] - 2026-11-03
 
 ### Remediação seletiva de WordPress e Linux
