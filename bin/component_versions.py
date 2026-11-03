@@ -12,7 +12,8 @@ import urllib.request
 
 API = "https://api.wordpress.org"
 VERSION_RE = re.compile(r"^[0-9]+(?:\.[0-9]+){1,4}(?:[-+._][A-Za-z0-9.-]+)?$")
-HEADERS = re.compile(r"(?im)^\s*(?:(?:/\*)?\s*\*?\s*)?(Plugin Name|Theme Name|Version|Template|Update URI|Plugin URI|Theme URI)\s*:\s*([^\r\n]{0,250})")
+HEADERS = re.compile(r"(?im)^\\s*\\*?\\s*(Plugin Name|Theme Name|Version|Template|Update URI|Plugin URI|Theme URI)\\s*:\\s*([^\\r\\n]{0,250})")
+HEADER_BLOCK = re.compile(r"/\\*.*?\\*/", re.S)
 STATIC_ROOT = {"index.php", "wp-activate.php", "wp-blog-header.php", "wp-comments-post.php", "wp-config-sample.php",
                "wp-cron.php", "wp-links-opml.php", "wp-load.php", "wp-login.php", "wp-mail.php",
                "wp-settings.php", "wp-signup.php", "wp-trackback.php", "xmlrpc.php"}
@@ -32,8 +33,15 @@ def headers(path: Path) -> dict:
     if path.is_symlink() or not path.is_file():
         return {}
     with path.open("rb") as handle:
-        data = handle.read(16384).decode("utf-8-sig", "replace")
-    return {key.lower().replace(" ", "_"): value.strip() for key, value in HEADERS.findall(data)}
+        data = handle.read(8192).decode("utf-8-sig", "replace")
+    # Não interpretar anotações de tipos ou strings PHP como cabeçalhos.
+    for match in HEADER_BLOCK.finditer(data):
+        campos = {}
+        for key, value in HEADERS.findall(match.group()):
+            campos.setdefault(key.lower().replace(" ", "_"), value.strip())
+        if campos.get("plugin_name") or campos.get("theme_name"):
+            return campos
+    return {}
 
 def api_json(path: str, params: dict, *, timeout: int = 12) -> tuple[str, dict | None, str]:
     query = urllib.parse.urlencode(params)
@@ -97,9 +105,11 @@ def local_components(target: Path, kind: str, active_plugins: set[str] | None = 
             info = headers(main)
         slug = entry.name
         name = info.get("plugin_name" if kind == "plugin" else "theme_name") or slug
-        local_version = info.get("version") or None
-        if local_version and not VERSION_RE.fullmatch(local_version):
-            local_version = None
+        declared_version = info.get("version") or None
+        local_version = declared_version if declared_version and VERSION_RE.fullmatch(declared_version) else None
+        header_status = ("CABECALHO_NAO_LOCALIZADO" if not info else
+                         "VERSAO_AUSENTE" if not declared_version else
+                         "VERSAO_INVALIDA" if not local_version else "VALIDADO")
         parent = info.get("template") if kind == "theme" else None
         update_uri = info.get("update_uri", "")
         custom_uri = bool(update_uri and "wordpress.org" not in update_uri.lower())
@@ -116,6 +126,7 @@ def local_components(target: Path, kind: str, active_plugins: set[str] | None = 
                   "query_status": "SKIPPED", "query_url": None,
                   "main_file": main.relative_to(target).as_posix() if main else None,
                   "main_file_sha256": file_digest(main) if main and main.is_file() and not main.is_symlink() else None,
+                  "header_status": header_status,
                   "active": (None if active_plugins is None else any(p.startswith(slug + "/") for p in active_plugins)) if kind == "plugin" else (slug == stylesheet),
                   "parent_theme": parent, "child_theme": bool(parent),
                   "update_uri_present": bool(update_uri)}
@@ -135,15 +146,15 @@ def compare_official(record: dict) -> None:
     if status == "NOT_FOUND_OFFICIAL_REPOSITORY" or not data or not data.get("version"):
         record["query_status"] = "NOT_FOUND_OFFICIAL_REPOSITORY"
         record["state"] = "PLUGIN_ORIGEM_NAO_CONFIRMADA_REQUER_REVISAO" if kind == "plugin" else "TEMA_NAO_ENCONTRADO_NO_REPOSITORIO"
-        record["review_guidance"] = "Not listed on WordPress.org; this is not malware evidence. Verify vendor, license, package source, and hash with the site owner."
+        record["review_guidance"] = "Não localizado no repositório oficial consultado. Isso não comprova malware; confirme fornecedor, licença, origem do pacote e hash."
         return
     official = str(data["version"])
     if kind == "plugin" and not record.get("local_version"):
         record["state"] = "PLUGIN_VERSAO_NAO_IDENTIFICADA"
-        record["review_guidance"] = "Local version could not be read from the installed plugin header. Validate installed files and version manually, especially if active."
+        record["review_guidance"] = "Versão não encontrada em cabeçalho válido do arquivo principal; confira os metadados e o pacote instalado, especialmente se ativo."
         record["official_version"] = official
         record["source"] = "wordpress.org"
-        record["query_status"] = "OFFICIAL_MATCH"
+        record["query_status"] = "OFFICIAL_COMPONENT_FOUND_VERSION_UNVERIFIED"
         return
     record["official_version"] = official
     record["source"] = "wordpress.org"
@@ -327,20 +338,21 @@ def audit(target: Path, case: Path, *, offline: bool = False,
                           "plugins_premium_custom": sum(r["state"] in ("PLUGIN_PREMIUM_REQUER_FONTE_CONFIAVEL", "PLUGIN_CUSTOMIZADO") for r in plugins),
                           "themes_premium_custom": sum(r["state"] in ("TEMA_PREMIUM_REQUER_FONTE_CONFIAVEL", "TEMA_CUSTOMIZADO", "TEMA_FILHO_CUSTOMIZADO") for r in themes)}}
     (case / "component-version-evidence.json").write_text(json.dumps(result, indent=2, ensure_ascii=False))
-    lines = ["# Component versions and provenance", "", f"- WordPress installed: {core['local_version'] or 'Unknown'}",
-             f"- WordPress expected: {core['official_version'] or 'Not determined'}",
-             f"- Core: {core['state']}", f"- Core outdated: {result['summary']['core_outdated']}", f"- Plugins checked: {len(plugins)}",
-             f"- Plugins outdated: {result['summary']['plugins_outdated']}",
-             f"- Themes checked: {len(themes)}", f"- Themes outdated: {result['summary']['themes_outdated']}",
-             f"- Official consultation: {coverage['official']}", "",
-             "| ID | Type | Name | Local | Official | Origin | Active | Parent | Query | State |",
-             "|---|---|---|---|---|---|---|---|---|---|"]
+    lines = ["# Versões e procedência dos componentes", "",
+             f"- WordPress instalado: {core['local_version'] or 'Não identificado'}",
+             f"- WordPress de referência: {core['official_version'] or 'Não determinado'}",
+             f"- Estado do núcleo: {core['state']}", f"- Núcleo desatualizado: {result['summary']['core_outdated']}",
+             f"- Plugins verificados: {len(plugins)}", f"- Plugins desatualizados: {result['summary']['plugins_outdated']}",
+             f"- Temas verificados: {len(themes)}", f"- Temas desatualizados: {result['summary']['themes_outdated']}",
+             f"- Consulta oficial: {coverage['official']}", "",
+             "| ID | Tipo | Nome | Instalada | Oficial | Origem | Ativo | Tema pai | Consulta | Estado |",
+             "|---|---|---|---|---|---|---|---|---|---|---|"]
     for item in records:
         lines.append("| " + " | ".join(str(item.get(k) or "-").replace("|", "\\|").replace("\n", " ") for k in
                                      ("component_id", "type", "name", "local_version", "official_version", "source", "active", "parent_theme", "query_status", "state")) + " |")
     review_items = [r for r in records if r.get("review_guidance")]
     if review_items:
-        lines.extend(["", "## Components requiring manual validation", ""])
+        lines.extend(["", "## Componentes que exigem validação manual", ""])
         for item in review_items:
             lines.append(f"- {item['component_id']} ({item['slug']}): {item['review_guidance']}")
     (case / "component-version-report.md").write_text("\n".join(lines) + "\n")
@@ -360,7 +372,7 @@ def write_skipped(case: Path) -> None:
               "components": [], "summary": {}}
     (case / "component-version-evidence.json").write_text(json.dumps(result, indent=2))
     (case / "component-version-report.md").write_text(
-        "# Component versions and provenance\n\nCoverage: AUDITORIA_COM_COBERTURA_REDUZIDA\n")
+        "# Versões e procedência dos componentes\n\nCobertura: AUDITORIA_COM_COBERTURA_REDUZIDA\n")
     (case / "component-version-report.csv").write_text(
         "component_id,type,slug,name,local_version,official_version,source,active,state,query_status\n")
 
@@ -373,23 +385,27 @@ def append_management_section(case: Path) -> None:
     result = json.loads(source.read_text())
     coverage = result["coverage"]
     summary = result.get("summary", {})
-    body = ["", "## Versions and components", "",
-            f"- Coverage status: {coverage['status']}",
-            f"- Local version inspection: {coverage['local']}",
-            f"- Official consultation: {coverage['official']}",
-            f"- Omission reason: {coverage.get('reason') or 'None'}",
-            f"- Installed WordPress: {summary.get('core_version') or 'Unknown'}",
-            f"- Core verification: {coverage.get('core', 'NOT EXECUTED')}",
-            f"- Core outdated: {summary.get('core_outdated', 0)}",
-            f"- Plugins checked: {summary.get('plugins_checked', 0)}",
-            f"- Outdated plugins: {summary.get('plugins_outdated', 0)}",
-            f"- Premium/custom plugins: {summary.get('plugins_premium_custom', 0)}",
-            f"- Plugins requiring provenance/version review: {summary.get('plugins_requiring_provenance_review', 0)}",
-            f"- Themes checked: {summary.get('themes_checked', 0)}",
-            f"- Outdated themes: {summary.get('themes_outdated', 0)}",
-            f"- Premium/custom themes: {summary.get('themes_premium_custom', 0)}",
-            f"- Components not found in official repository: {summary.get('unlisted', 0)}",
-            "- Component detail: component-version-report.md", ""]
+    def exibir(estado):
+        return {"EXECUTED": "EXECUTADA", "NOT EXECUTED": "NÃO EXECUTADA",
+                "SKIPPED": "IGNORADA", "UNAVAILABLE": "INDISPONÍVEL"}.get(estado, estado)
+
+    body = ["", "## Versões e componentes", "",
+            f"- Cobertura: {exibir(coverage['status'])}",
+            f"- Inspeção das versões locais: {exibir(coverage['local'])}",
+            f"- Consulta oficial: {exibir(coverage['official'])}",
+            f"- Motivo da omissão: {coverage.get('reason') or 'Nenhum'}",
+            f"- WordPress instalado: {summary.get('core_version') or 'Não identificado'}",
+            f"- Verificação do núcleo: {exibir(coverage.get('core', 'NOT EXECUTED'))}",
+            f"- Núcleo desatualizado: {summary.get('core_outdated', 0)}",
+            f"- Plugins verificados: {summary.get('plugins_checked', 0)}",
+            f"- Plugins desatualizados: {summary.get('plugins_outdated', 0)}",
+            f"- Plugins premium/personalizados: {summary.get('plugins_premium_custom', 0)}",
+            f"- Plugins para revisão de origem/versão: {summary.get('plugins_requiring_provenance_review', 0)}",
+            f"- Temas verificados: {summary.get('themes_checked', 0)}",
+            f"- Temas desatualizados: {summary.get('themes_outdated', 0)}",
+            f"- Temas premium/personalizados: {summary.get('themes_premium_custom', 0)}",
+            f"- Componentes não localizados no repositório oficial: {summary.get('unlisted', 0)}",
+            "- Detalhamento: component-version-report.md", ""]
     for path in (case / "report.md", case / "technical-report.md"):
         if path.is_file():
             path.write_text(path.read_text() + "\n".join(body) + "\n")
