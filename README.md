@@ -36,7 +36,7 @@ Após ensaiar, `--apply` permite quarentena privada de um único arquivo com có
 
 ### Persistência Linux
 
-A ferramenta inspeciona o inventário `host-persistence.json` e somente admite arquivos **específicos** previamente sinalizados sob `/etc/cron.d/` ou `/etc/profile.d/`. Exemplo de simulação:
+A ferramenta inspeciona o inventário `host-persistence.json` e somente admite arquivos **específicos** previamente sinalizados sob `/etc/cron.d/`, `/etc/profile.d/` ou unidades `.service`/`.timer` diretamente em `/etc/systemd/system/`. Para unidades systemd, a aplicação exige estado **inactive** e **disabled** verificado por `systemctl`; unidades ativas, habilitadas ou de estado indefinido são recusadas. Após uma quarentena systemd, a revisão de dependências e a necessidade de `systemctl daemon-reload` permanecem tarefas manuais. Exemplo de simulação:
 
 ```bash
 python3 bin/remediar_persistencia_linux.py \
