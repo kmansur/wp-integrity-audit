@@ -164,8 +164,14 @@ def compare_official(record: dict) -> None:
         record["query_status"] = "OFFICIAL_MATCH"
         record["state"] = "PLUGIN_OFICIAL_ATUAL" if kind == "plugin" else "TEMA_OFICIAL_ATUAL"
     else:
-        record["query_status"] = "OFFICIAL_OUTDATED" if version_tuple(record["local_version"]) < version_tuple(official) else "OFFICIAL_MATCH"
-        record["state"] = ("PLUGIN_OFICIAL_DESATUALIZADO" if kind == "plugin" else "TEMA_OFICIAL_DESATUALIZADO") if record["query_status"] == "OFFICIAL_OUTDATED" else ("PLUGIN_REQUER_REVISAO" if kind == "plugin" else "TEMA_REQUER_REVISAO")
+        # Versão local superior ou divergente não equivale a coincidência oficial.
+        if version_tuple(record["local_version"]) < version_tuple(official):
+            record["query_status"] = "OFFICIAL_OUTDATED"
+            record["state"] = "PLUGIN_OFICIAL_DESATUALIZADO" if kind == "plugin" else "TEMA_OFICIAL_DESATUALIZADO"
+        else:
+            record["query_status"] = "OFFICIAL_VERSION_DIFFERENT_UNVERIFIED"
+            record["state"] = "PLUGIN_REQUER_REVISAO" if kind == "plugin" else "TEMA_REQUER_REVISAO"
+            record["review_guidance"] = "A versão local difere da versão divulgada na fonte oficial; confirme a procedência sem assumir correspondência."
 
 def official_plugin_checksums(record: dict, target: Path) -> None:
     """Compare official plugin MD5 manifest; never download executable packages."""
