@@ -51,6 +51,11 @@ OBFUSCATION_PATTERNS = {
     "DYNAMIC_CALL": re.compile(r"(?:call_user_func|create_function|assert|eval)\s*\(", re.I),
     "CHR_ORD_ASSEMBLY": re.compile(r"\b(?:chr|ord)\s*\(\s*(?:0x[0-9a-f]+|[0-9]{2,3})", re.I),
 }
+LICENSE_BYPASS_PATTERNS = (
+    re.compile(r"delete_(?:option|transient)\s*\(\s*['\"]wp_rocket_no_licence['\"]", re.I),
+    re.compile(r"wp-rocket\.me/valid_key\.php", re.I),
+    re.compile(r"activated@wp-rocket\.me", re.I),
+)
 
 SENSITIVE = re.compile(r"(?i)(password|passwd|secret|token|api[_-]?key)\s*[:=]\s*[^\s,;]+")
 LONG_VALUE = re.compile(r"(?<![\w])[A-Za-z0-9_/-]{40,}(?![\w])")
@@ -242,6 +247,7 @@ def file_audit(target: Path, case: Path) -> list[dict]:
         safe_text = ""
         generic_match = False
         obfuscation_hits: list[str] = []
+        license_bypass = False
         if path.suffix.lower() in SCRIPT_EXTENSIONS:
             try:
                 with path.open("rb") as stream:
@@ -261,10 +267,12 @@ def file_audit(target: Path, case: Path) -> list[dict]:
                             snippet = redact(decoded[max(0, match.start() - 40):match.end() + 60])
                             break
                         overlap = sample[-256:]
-                    obfuscation_hits = obfuscation_indicators(bytes(bounded).decode("utf-8", "replace"))
+                    bounded_text = bytes(bounded).decode("utf-8", "replace")
+                    obfuscation_hits = obfuscation_indicators(bounded_text)
+                    license_bypass = sum(bool(pattern.search(bounded_text)) for pattern in LICENSE_BYPASS_PATTERNS) >= 2
             except OSError:
                 continue
-        if not (unusual or upload_php or hidden_php or match or generic_match):
+        if not (unusual or upload_php or hidden_php or match or generic_match or license_bypass):
             continue
         classification, reason = classify_file(relative, name, safe_text, match.group(0) if match else None)
         if upload_php and not match and name == "index.php" and known_upload_guard(path):
@@ -275,6 +283,8 @@ def file_audit(target: Path, case: Path) -> list[dict]:
             classification, reason = "WEB_SHELL_HEURISTIC_REQUIRES_REVIEW", "Potential dynamic execution or obfuscation pattern"
         elif len(obfuscation_hits) >= 3 and not match:
             classification, reason = "PHP_OFUSCACAO_REQUER_QUARENTENA", "Multiple independent PHP obfuscation signals; preserve evidence and quarantine reversibly"
+        elif license_bypass and not match:
+            classification, reason = "PLUGIN_MODIFICACAO_LICENCA_REQUER_QUARENTENA", "Premium plugin contains license-validation bypass logic; preserve evidence and quarantine reversibly"
         if upload_php and not match and not generic_match and reviewed_metform_cache(relative, path):
             classification, reason = "LEGITIMO_VALIDADO", "Exact SHA-256 matches reviewed MetForm cache artifact; not plugin-wide trust"
         if hidden_php and not match and not generic_match and classification == "ARQUIVO_SUSPEITO_REQUER_VALIDACAO":
@@ -288,6 +298,7 @@ def file_audit(target: Path, case: Path) -> list[dict]:
                 "indicator": match.group(0) if match else ("filename" if unusual else "upload PHP"),
                 "snippet": snippet,
                 "obfuscation_indicators": obfuscation_hits,
+                "license_bypass": license_bypass,
             })
         except OSError:
             continue
@@ -651,7 +662,7 @@ def audit_status(files: list[dict], processes: list[str],
         "validated_legitimate_files": sum(x.get("classification") == "LEGITIMO_VALIDADO" for x in files),
         "security_configuration_review": sum(x.get("classification") == "CONFIGURACAO_PLUGIN_SEGURANCA_REQUER_VALIDACAO" for x in files),
         "confirmed_compromised_files": confirmed_files,
-        "file_indicators_requiring_review": sum(x.get("classification") in ("IOC_REQUER_VALIDACAO", "ARQUIVO_SUSPEITO_REQUER_VALIDACAO", "PHP_UPLOAD_REQUER_VALIDACAO", "PHP_DIRETORIO_OCULTO_REQUER_VALIDACAO", "CACHE_PLUGIN_REQUER_VALIDACAO", "WEB_SHELL_HEURISTIC_REQUIRES_REVIEW", "PHP_OFUSCACAO_REQUER_QUARENTENA") for x in files),
+        "file_indicators_requiring_review": sum(x.get("classification") in ("IOC_REQUER_VALIDACAO", "ARQUIVO_SUSPEITO_REQUER_VALIDACAO", "PHP_UPLOAD_REQUER_VALIDACAO", "PHP_DIRETORIO_OCULTO_REQUER_VALIDACAO", "CACHE_PLUGIN_REQUER_VALIDACAO", "WEB_SHELL_HEURISTIC_REQUIRES_REVIEW", "PHP_OFUSCACAO_REQUER_QUARENTENA", "PLUGIN_MODIFICACAO_LICENCA_REQUER_QUARENTENA") for x in files),
         "suspicious_processes": len(processes),
     }
     if database is None:

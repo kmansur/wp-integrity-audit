@@ -658,3 +658,9 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 - Classify files with at least three independent obfuscation indicators as `PHP_OFUSCACAO_REQUER_QUARENTENA`.
 - Preserve the original file and hash in private evidence; no automatic deletion or quarantine is performed by audit mode.
 
+## [0.25.1] - 2026-11-03
+
+### Security
+- Detect high-confidence WP Rocket license-bypass signatures, including deletion of license state and forged `valid_key.php` responses.
+- Mark such files for reversible quarantine; audit mode remains non-mutating.
+

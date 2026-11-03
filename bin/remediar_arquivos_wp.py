@@ -94,6 +94,7 @@ def validar_diretorio(site: Path, caso: Path, relativo: str):
             "IOC_REQUER_VALIDACAO", "ARQUIVO_SUSPEITO_REQUER_VALIDACAO",
             "PHP_DIRETORIO_OCULTO_REQUER_VALIDACAO", "WEB_SHELL_HEURISTIC_REQUIRES_REVIEW",
             "PHP_OFUSCACAO_REQUER_QUARENTENA",
+            "PLUGIN_MODIFICACAO_LICENCA_REQUER_QUARENTENA",
             "PLUGIN_FAMILIA_INCIDENTE_REQUER_QUARENTENA", "WORDPRESS_PERSISTENCE_REQUIRES_CONTEXT",
         }:
             raise RemocaoRecusada(f"Arquivo não classificado para quarentena: {rel}")
