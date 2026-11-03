@@ -33,7 +33,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 
-VERSION = "0.22.0"
+VERSION = "0.22.1"
 IOC = re.compile(r"SC_ADV_BEGIN|--sc-cli|--sc-succ|trace-inspector-pad|cipher-feeder|_sc_fpc|sc_cron_guard|sc_persist_manifest|sc_own_manifest|function ceya")
 PATTERN_NAMES = (".sc_", ".gr_", ".gk_", ".kk_", ".wp-object-cache")
 SCRIPT_EXTENSIONS = {".php", ".phtml", ".phar", ".inc", ".php5", ".php7", ".php8", ".pht", ".phps"}
@@ -648,7 +648,8 @@ def customer_findings(files, database, configs, components):
     for entry in (components or {}).get("components", []):
         state = entry.get("state")
         if state in ("CORE_DESATUALIZADO", "PLUGIN_ORIGEM_NAO_CONFIRMADA_REQUER_REVISAO",
-                     "PLUGIN_VERSAO_NAO_IDENTIFICADA", "TEMA_NAO_ENCONTRADO_NO_REPOSITORIO",
+                     "PLUGIN_VERSAO_NAO_IDENTIFICADA", "PLUGIN_REQUER_REVISAO",
+                     "TEMA_REQUER_REVISAO", "TEMA_NAO_ENCONTRADO_NO_REPOSITORIO",
                      "CORE_MODIFICADO_REQUER_REVISAO", "CORE_AUSENTE_REQUER_REVISAO",
                      "PLUGIN_COM_ARQUIVOS_MODIFICADOS", "TEMA_COM_ARQUIVOS_MODIFICADOS",
                      "PLUGIN_OFICIAL_DESATUALIZADO", "TEMA_OFICIAL_DESATUALIZADO"):
@@ -666,6 +667,24 @@ def customer_findings(files, database, configs, components):
             items.append((entry.get("component_id", "COMPONENT-UNASSIGNED"), "Componente",
                           entry.get("slug"), state, detalhe + explanation, entry.get("main_file_sha256")))
     for identifier, kind, subject, state, explanation, digest in items:
+        # Não misturar manutenção ou referências históricas com indicadores do incidente.
+        if state == "RESIDUO_FAMILIA_REQUER_LIMPEZA":
+            natureza = "INDICADOR RESIDUAL DO INCIDENTE"
+            conclusao = "Compatível com indicador conhecido; exige confirmação e avaliação técnica."
+        elif state == "HISTORICAL_REFERENCE":
+            natureza = "REFERÊNCIA HISTÓRICA"
+            conclusao = "Registro histórico; não comprova execução ativa nem persistência."
+        elif state in ("CORE_DESATUALIZADO", "PLUGIN_OFICIAL_DESATUALIZADO", "TEMA_OFICIAL_DESATUALIZADO"):
+            natureza = "MANUTENÇÃO / ATUALIZAÇÃO"
+            conclusao = "Versão anterior à referência consultada; não comprova comprometimento."
+        elif kind == "Componente" and state in ("PLUGIN_ORIGEM_NAO_CONFIRMADA_REQUER_REVISAO",
+                "TEMA_NAO_ENCONTRADO_NO_REPOSITORIO", "PLUGIN_VERSAO_NAO_IDENTIFICADA",
+                "PLUGIN_REQUER_REVISAO", "TEMA_REQUER_REVISAO"):
+            natureza = "PROCEDÊNCIA / VERSÃO NÃO CONFIRMADA"
+            conclusao = "Informações insuficientes para confirmar procedência ou equivalência de versão."
+        else:
+            natureza = "VERIFICAÇÃO DE SEGURANÇA PENDENTE"
+            conclusao = "Achado técnico sujeito a validação contextual; execução maliciosa não demonstrada."
         risk = ("PRIORIDADE ALTA — indicador residual do incidente" if state == "RESIDUO_FAMILIA_REQUER_LIMPEZA" else
                 "MÉDIA — item executável ou divergência de integridade que exige validação" if kind in ("Arquivos", "Configuração") or state in ("CORE_MODIFICADO_REQUER_REVISAO", "PLUGIN_COM_ARQUIVOS_MODIFICADOS") else
                 "MÉDIA — origem ou manutenção do componente exige revisão" if kind == "Componente" else
@@ -674,6 +693,8 @@ def customer_findings(files, database, configs, components):
         lines.extend(["### " + clean(identifier) + " - " + clean(kind), "",
                       "- Item: " + clean(subject),
                       "- Classificação: " + clean(state),
+                      "- Natureza do achado: " + natureza,
+                      "- Conclusão da evidência: " + conclusao,
                       "- Explicação: " + explanation,
                       "- Prioridade de revisão: " + risk + " (não comprova comprometimento ativo)",
                       "- SHA-256 da evidência: " + clean(digest),
