@@ -14,6 +14,7 @@ import contextlib
 import csv
 import io
 import datetime as dt
+import errno
 import fcntl
 import gzip
 import hashlib
@@ -37,7 +38,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 
-VERSION = "0.27.1"
+VERSION = "0.28.0"
 IOC = re.compile(r"SC_ADV_BEGIN|--sc-cli|--sc-succ|trace-inspector-pad|cipher-feeder|_sc_fpc|sc_cron_guard|sc_cron_recovery|e1v61n2r1im6t7_|sc_persist_manifest|sc_own_manifest|kinetic-relay-live|function ceya|Axiom Sentinel Snap|SCV:[0-9]+")
 PATTERN_NAMES = (".sc_", ".gr_", ".gk_", ".kk_", ".wp-object-cache")
 SCRIPT_EXTENSIONS = {".php", ".phtml", ".phar", ".inc", ".php5", ".php7", ".php8", ".pht", ".phps"}
@@ -248,6 +249,17 @@ def obfuscation_indicators(text: str) -> list[str]:
     return hits
 
 
+def confidence_for_classification(classification: str) -> str:
+    """Map a finding to an explainable confidence level."""
+    if classification in ("IOC_REQUER_VALIDACAO", "PLUGIN_MODIFICACAO_LICENCA_REQUER_QUARENTENA"):
+        return "ALTA"
+    if classification in ("PHP_ANOMALIA_COMPORTAMENTAL_REQUER_REVISAO",
+                          "WEB_SHELL_HEURISTIC_REQUIRES_REVIEW",
+                          "PHP_OFUSCACAO_REQUER_QUARENTENA"):
+        return "MEDIA"
+    return "BAIXA"
+
+
 def behavioral_anomaly_indicators(relative: str, text: str) -> tuple[list[str], int]:
     """Score combined behavior signals without executing PHP.
 
@@ -347,6 +359,7 @@ def file_audit(target: Path, case: Path) -> list[dict]:
                 "obfuscation_indicators": obfuscation_hits,
                 "behavioral_indicators": behavioral_hits,
                 "behavioral_score": behavioral_score,
+                "confidence": confidence_for_classification(classification),
                 "license_bypass": license_bypass,
             })
         except OSError:
@@ -714,10 +727,14 @@ def audit_status(files: list[dict], processes: list[str],
     reversed_review = sum(1 for x in (database or [])
                           if x.get("kind") == "reversed_reference"
                           and x.get("state") == "RESIDUO_COMPONENTE_REFERENCIA_REQUER_REVISAO")
+    cron_hook_review = sum(1 for x in (database or [])
+                          if x.get("kind") == "cron_hook_anomaly"
+                          and x.get("state") == "CRON_HOOK_ANOMALO_REQUER_REVISAO")
     summary = {
         "confirmed_family_residues": count("family_option") + encoded_family,
         "encoded_payloads_requiring_review": encoded_review,
         "reversed_component_references_requiring_review": reversed_review,
+        "cron_hook_anomalies_requiring_review": cron_hook_review,
         "historical_references": count("historical_cache"),
         "informational_records": count("session_rows") + count("application_password_rows"),
         "active_database_markers": sum(count(k) for k in ("marker_option", "cron_marker", "active_plugins_marker")),
@@ -739,7 +756,7 @@ def audit_status(files: list[dict], processes: list[str],
         return "AUDITORIA_INCOMPLETA", 40, summary
     if summary["confirmed_family_residues"]:
         return "RESIDUOS_REQUEREM_LIMPEZA", 10, summary
-    if summary["file_indicators_requiring_review"] or reversed_review:
+    if summary["file_indicators_requiring_review"] or reversed_review or cron_hook_review:
         return "AUDITORIA_INCOMPLETA", 40, summary
     return "SEM_MARCADOR_EXPLICITO", 0, summary
 
@@ -817,6 +834,8 @@ def customer_findings(files, database, configs, components):
                        if kind == "family_option" else
                        "Referência curta reversível a um componente PHP sem procedência confirmada; preserve a evidência e valide a origem antes de qualquer correção."
                        if kind == "reversed_reference" else
+                       "Hook de cron com nome aleatório e estrutura compatível com persistência; os argumentos foram omitidos e exigem revisão contextual."
+                       if kind == "cron_hook_anomaly" else
                        "Indicador relacionado ao incidente no banco de dados que exige investigação.")
         items.append((entry.get("evidence_id", "DB-UNASSIGNED"), "Banco de dados", entry.get("name"),
                       entry.get("state"), description, entry.get("sha256")))
@@ -864,6 +883,9 @@ def customer_findings(files, database, configs, components):
         elif state == "RESIDUO_COMPONENTE_REFERENCIA_REQUER_REVISAO":
             natureza = "REFERÊNCIA REVERSÍVEL DE COMPONENTE"
             conclusao = "A referência invertida aponta para um arquivo PHP de componente não confirmado; isso exige investigação, mas não prova execução isoladamente."
+        elif state == "CRON_HOOK_ANOMALO_REQUER_REVISAO":
+            natureza = "HOOK DE CRON ANÔMALO"
+            conclusao = "Nome aleatório com padrão de persistência; valide o plugin/callback responsável antes de qualquer remoção."
         elif state == "HISTORICAL_REFERENCE":
             natureza = "REFERÊNCIA HISTÓRICA"
             conclusao = "Registro histórico; não comprova execução ativa nem persistência."
@@ -1141,6 +1163,7 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
         f"- Resíduos da família investigada: **{summary['confirmed_family_residues']}**",
         f"- Payloads codificados que exigem revisão: **{summary.get('encoded_payloads_requiring_review', 0)}**",
         f"- Referências reversíveis de componentes que exigem revisão: **{summary.get('reversed_component_references_requiring_review', 0)}**",
+        f"- Hooks de cron anômalos que exigem revisão: **{summary.get('cron_hook_anomalies_requiring_review', 0)}**",
         f"- Referências históricas: **{summary['historical_references']}**",
         f"- Registros informativos: **{summary['informational_records']}**",
         f"- Indicadores ativos no banco de dados: **{summary['active_database_markers']}**",
@@ -1236,6 +1259,7 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
             f"- Payloads codificados com marcadores da família: **{sum(item.get('state') == 'RESIDUO_FAMILIA_REQUER_LIMPEZA' for item in database if item['kind'] == 'encoded_payload')}**.",
             f"- Payloads codificados sem marcador explícito: **{sum(item.get('state') == 'VALOR_CODIFICADO_REQUER_VALIDACAO' for item in database if item['kind'] == 'encoded_payload')}**.",
             f"- Referências reversíveis de componentes: **{sum(item.get('state') == 'RESIDUO_COMPONENTE_REFERENCIA_REQUER_REVISAO' for item in database if item['kind'] == 'reversed_reference')}**.",
+            f"- Hooks de cron anômalos: **{sum(item.get('state') == 'CRON_HOOK_ANOMALO_REQUER_REVISAO' for item in database if item['kind'] == 'cron_hook_anomaly')}**.",
             f"- Referências históricas: **{positive('historical_cache')}**.",
             f"- Registros informativos: **{sum(int(item['length']) for item in database if item['kind'] in ('session_rows', 'application_password_rows'))}**.",
             f"- Indicadores ativos no banco de dados: **{positive('marker_option') + positive('cron_marker') + positive('active_plugins_marker')}**.",
@@ -1257,7 +1281,8 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
         for kind, name in (("cron_marker", "cron"), ("active_plugins_marker", "active_plugins")):
             lines.append(f"- Indicadores conhecidos em `{name}`: **{total(kind)}**.")
         if (family or total("marker_option") or total("cron_marker") or
-                total("active_plugins_marker") or total("reversed_reference")):
+                total("active_plugins_marker") or total("reversed_reference") or
+                total("cron_hook_anomaly")):
             lines.append("- **Persistem indicadores de comprometimento no banco de dados; não declare esta instalação segura.**")
         else:
             lines.append("- Nenhum dos indicadores pesquisados foi encontrado no banco de dados; isso não certifica a integridade do site.")
@@ -1291,6 +1316,7 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
         f"- Resíduos da família investigada: **{summary['confirmed_family_residues']}**",
         f"- Payloads codificados que exigem revisão: **{summary.get('encoded_payloads_requiring_review', 0)}**",
         f"- Referências reversíveis de componentes que exigem revisão: **{summary.get('reversed_component_references_requiring_review', 0)}**",
+        f"- Hooks de cron anômalos que exigem revisão: **{summary.get('cron_hook_anomalies_requiring_review', 0)}**",
         f"- Referências históricas: **{summary['historical_references']}**",
         f"- Registros informativos: **{summary['informational_records']}**",
         f"- Indicadores ativos no banco de dados: **{summary['active_database_markers']}**",
@@ -1547,6 +1573,50 @@ def database_reversed_reference_scan(option_file: str, dbname: str, prefix: str)
         })
     return findings
 
+
+def database_cron_structure_scan(option_file: str, dbname: str, prefix: str) -> list[dict]:
+    """Inspect serialized cron hook names for random persistence patterns.
+
+    This does not deserialize PHP objects and never exports event arguments.
+    Hooks ending in ``_`` with a long mixed alphanumeric prefix and digits are
+    review-only indicators; legitimate WordPress/plugin hooks remain ignored.
+    """
+    table = sql_identifier(prefix + "options")
+    rows = query_db(option_file, dbname,
+                    f"SELECT HEX(option_value), SHA2(option_value,256) FROM {table} WHERE option_name='cron';")
+    if len(rows) != 1 or len(rows[0]) != 2 or not re.fullmatch(r"[0-9A-Fa-f]+", rows[0][0]):
+        raise AuditError("Invalid serialized cron evidence")
+    raw = bytes.fromhex(rows[0][0])
+    try:
+        parsed = serial_wp.LeitorPHP(raw).completo()
+    except (ValueError, UnicodeError, serial_wp.SerializacaoInsegura):
+        return []
+    if not (isinstance(parsed, tuple) and parsed[0] == "array"):
+        return []
+    findings = []
+    for timestamp, events in parsed[1]:
+        if not (isinstance(events, tuple) and events[0] == "array"):
+            continue
+        for hook, _entries in events[1]:
+            hook_name = hook.decode("utf-8", "replace") if isinstance(hook, bytes) else str(hook)
+            if (re.fullmatch(r"[a-z0-9]{10,32}_", hook_name, re.I)
+                    and sum(ch.isdigit() for ch in hook_name) >= 2):
+                findings.append({
+                    "kind": "cron_hook_anomaly",
+                    "name": hook_name[:160],
+                    "length": "1",
+                    "state": "CRON_HOOK_ANOMALO_REQUER_REVISAO",
+                    "sha256": rows[0][1].lower(),
+                    "value_length_bytes": len(raw),
+                    "value_classification": "HOOK_ALEATORIO_COM_SUFIXO_EXECUTAVEL",
+                    "safe_excerpt": hook_name[:160],
+                    "decoded_excerpt": "[ARGUMENTOS_OMITIDOS]",
+                    "source_table_suffix": "options",
+                    "source_column_name": "option_value",
+                    "confidence": "MEDIA",
+                })
+    return findings
+
 def database_audit(option_file: str, dbname: str, prefix: str, case: Path,
                    post: bool = False) -> list[dict]:
     """Collect targeted SQL metadata without exporting option values.
@@ -1664,6 +1734,7 @@ def database_audit(option_file: str, dbname: str, prefix: str, case: Path,
     # Base64/GZIP payloads; inspect them separately without treating all hex
     # option names as malicious.
     findings.extend(database_reversed_reference_scan(option_file, dbname, prefix))
+    findings.extend(database_cron_structure_scan(option_file, dbname, prefix))
     write_private(case / ("database-post-audit.json" if post else "database-evidence.json"),
                   json.dumps(findings, indent=2))
     return findings
@@ -1848,7 +1919,7 @@ def post_recovery_blockers(database: list[dict], files: list[dict],
                            processes: list[str]) -> list[str]:
     """Return active post-recovery indicators; ignore absent and informational rows."""
     blockers = []
-    active_kinds = {"family_option", "marker_option", "cron_marker", "active_plugins_marker"}
+    active_kinds = {"family_option", "marker_option", "cron_marker", "active_plugins_marker", "cron_hook_anomaly"}
     for item in database:
         if item.get("kind") in active_kinds and item.get("state") not in ("NOT_FOUND", "ABSENT"):
             blockers.append("database:" + str(item.get("kind")))
@@ -2359,8 +2430,19 @@ def main() -> int:
         raise AuditError("Forensic case root must be outside the WordPress document root")
     case_root = ensure_private_dir(args.case_root)
     lock = case_root / ".audit.lock"
-    with lock.open("a+") as lockfile:
-        fcntl.flock(lockfile, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    try:
+        lockfile_context = lock.open("a+")
+        fcntl.flock(lockfile_context, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError as error:
+        if error.errno in (errno.EAGAIN, errno.EACCES):
+            write_private(case_root / "lock-status.json", json.dumps({
+                "status": "BUSY",
+                "lock_path": str(lock),
+                "message": "Outra auditoria já mantém o lock; não remova o arquivo sem confirmar o processo proprietário.",
+            }, ensure_ascii=False, indent=2))
+            raise AuditError("Outra auditoria está em execução; aguarde ou identifique o processo proprietário") from None
+        raise
+    with lockfile_context:
         timestamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
         label = re.sub(r"[^A-Za-z0-9._-]", "_", args.domain_label or target.parent.name)
         case = ensure_private_dir(case_root / f"{label}-{timestamp}-{secrets.token_hex(3)}")

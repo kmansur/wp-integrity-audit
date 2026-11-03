@@ -79,6 +79,20 @@ class PythonAuditTests(unittest.TestCase):
         self.assertLess(wordfence_score, 5)
         self.assertLess(core_score, 5)
 
+    def test_database_cron_structure_detects_random_hook_without_arguments(self):
+        cron = ("array", [(123, ("array", [
+            (b"e1v61n2r1im6t7_", ("array", [
+                (b"sig", ("array", [(b"schedule", b"hourly")]))
+            ]))
+        ]))])
+        raw = audit.serial_wp.serializar(cron)
+        with unittest.mock.patch.object(
+                audit, "query_db", return_value=[[raw.hex(), "a" * 64]]):
+            findings = audit.database_cron_structure_scan("cnf", "db", "wp_")
+        self.assertEqual(len(findings), 1)
+        self.assertEqual(findings[0]["kind"], "cron_hook_anomaly")
+        self.assertEqual(findings[0]["name"], "e1v61n2r1im6t7_")
+
     def test_version_and_modules(self):
         self.assertRegex(audit.VERSION, r"^\d+\.\d+\.\d+$")
         self.assertTrue(callable(audit.file_audit))

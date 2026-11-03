@@ -4,6 +4,15 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 
 ## [Não publicado]
 
+## [0.28.0] - 2026-11-03
+
+### Controles emergenciais de auditoria
+- Adicionada inspeção estrutural do cron serializado para identificar hooks aleatórios com padrão de persistência, sem exportar argumentos.
+- Achados passam a carregar nível de confiança explicável (`ALTA`, `MEDIA` ou `BAIXA`) nos artefatos privados.
+- O lock ocupado gera `lock-status.json` e erro operacional claro, sem sugerir remoção manual do lock.
+- Comparação antes/depois já disponível por `--compare` passa a ser parte documentada do fluxo pós-remediação.
+- Incluído teste sintético do detector de hooks aleatórios; nenhuma rotina executa PHP ou callbacks do cron.
+
 ## [0.27.1] - 2026-11-03
 
 ### Contexto de bibliotecas legítimas
