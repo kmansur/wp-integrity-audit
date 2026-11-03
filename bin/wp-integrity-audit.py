@@ -33,7 +33,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 
-VERSION = "0.22.2"
+VERSION = "0.23.0"
 IOC = re.compile(r"SC_ADV_BEGIN|--sc-cli|--sc-succ|trace-inspector-pad|cipher-feeder|_sc_fpc|sc_cron_guard|sc_persist_manifest|sc_own_manifest|function ceya")
 PATTERN_NAMES = (".sc_", ".gr_", ".gk_", ".kk_", ".wp-object-cache")
 SCRIPT_EXTENSIONS = {".php", ".phtml", ".phar", ".inc", ".php5", ".php7", ".php8", ".pht", ".phps"}
@@ -1451,28 +1451,65 @@ def swap_files(target: Path, stage: Path, case: Path) -> Path:
     write_private(case / "quarantine-path.txt", str(quarantine) + "\n")
     return quarantine
 
-def sql_cleanup(option_file: str, dbname: str, prefix: str, case: Path) -> None:
-    """Remove known family option rows and tokens, retaining serialized cron/plugins.
+def database_cleanup_plan(option_file: str, dbname: str, prefix: str,
+                          requested: list[str]) -> list[dict]:
+    """Plano SQL restrito a opções nomeadas, sem ler nem exportar seus valores."""
+    opt = sql_identifier(prefix + "options")
+    if len(requested) > 100 or len(requested) != len(set(requested)):
+        raise AuditError("Informe até 100 nomes de opções distintos")
+    blocked = {"cron", "active_plugins", "siteurl", "home", "wp_user_roles"}
+    for name in requested:
+        if not re.fullmatch(r"[A-Za-z0-9_-]{1,191}", name) or name in blocked or name.startswith("wp_"):
+            raise AuditError("Nome de opção não permitido para remoção assistida")
+    if not requested:
+        return []
+    # Não interpolar valores livres sem validação; nomes limitados a identificadores ASCII.
+    names = ",".join("'" + name + "'" for name in requested)
+    rows = query_db(option_file, dbname,
+                    f"SELECT option_name, SHA2(option_value,256) FROM {opt} "
+                    f"WHERE option_name IN ({names}) ORDER BY option_name;")
+    plan = []
+    for row in rows:
+        if len(row) != 2 or row[0] not in requested or not re.fullmatch(r"[0-9a-fA-F]{64}", row[1]):
+            raise AuditError("Resultado inesperado ao preparar remoção do banco")
+        plan.append({"option_name": row[0], "value_sha256": row[1].lower()})
+    return plan
 
-    For active_plugins/cron with suspicious markers, stop instead of deleting
-    entire serialized options. A targeted parser/remediator is required.
+
+def sql_cleanup(option_file: str, dbname: str, prefix: str, case: Path,
+                requested: list[str] | None = None) -> None:
+    """Excluir exclusivamente opções autorizadas, com verificação otimista do hash.
+
+    Nunca altera cron, active_plugins, sessões ou senhas de aplicação.
     """
-    opt, meta = (sql_identifier(prefix + name) for name in ("options", "usermeta"))
+    requested = requested or []
+    opt = sql_identifier(prefix + "options")
     suspicious = query_db(option_file, dbname,
         f"SELECT option_name FROM {opt} WHERE option_name IN ('active_plugins','cron') "
         "AND (option_value LIKE '%cipher-feeder%' OR option_value LIKE '%trace-inspector-pad%' "
         "OR option_value LIKE '%sc_cron_guard%' OR option_value LIKE '%sc_persist_manifest%' "
         "OR option_value LIKE '%sc_cron_fetch%');")
     if suspicious:
-        write_private(case / "manual-serialized-cleanup.json", json.dumps(suspicious))
-        raise AuditError("Malicious markers in serialized cron/active_plugins; refusing destructive deletion")
-    sql = (f"START TRANSACTION;\n"
-           f"DELETE FROM {meta} WHERE meta_key='session_tokens' OR meta_key LIKE '%application_passwords';\n"
-           f"DELETE FROM {opt} WHERE option_name LIKE 'sc#_%' ESCAPE '#' "
-           f"OR option_name LIKE '_transient_sc#_%' ESCAPE '#' "
-           f"OR option_name LIKE '_transient_timeout_sc#_%' ESCAPE '#';\n"
-           f"COMMIT;\n")
-    query_db(option_file, dbname, sql)
+        write_private(case / "manual-serialized-cleanup.json",
+                      json.dumps({"options_for_manual_review": [x[0] for x in suspicious]}))
+        raise AuditError("Indicadores em opções serializadas: revisão manual obrigatória; nenhuma alteração SQL realizada")
+    plan = database_cleanup_plan(option_file, dbname, prefix, requested)
+    write_private(case / "database-cleanup-plan.json",
+                  json.dumps({"requested": requested, "selected": plan}, ensure_ascii=False, indent=2))
+    if not plan:
+        return
+    # Cada exclusão usa nome exato + hash do valor: modificações simultâneas não são apagadas.
+    # Não afirmar atomicidade global quando houver múltiplas operações.
+    for item in plan:
+        name = item["option_name"]
+        digest = item["value_sha256"]
+        rows = query_db(option_file, dbname,
+            f"DELETE FROM {opt} WHERE option_name='{name}' "
+            f"AND SHA2(option_value,256)='{digest}'; SELECT ROW_COUNT();")
+        if rows != [["1"]]:
+            raise AuditError("Opção alterada durante a recuperação; interrompido para revisão do banco")
+    write_private(case / "database-cleanup-result.json",
+                  json.dumps({"removed": [x["option_name"] for x in plan]}, ensure_ascii=False, indent=2))
 
 def rotate_salts(path: Path) -> None:
     """Atomically rewrite literal auth keys without executing wp-config.php."""
@@ -1711,6 +1748,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--domain-label")
     parser.add_argument("--db-host")
     parser.add_argument("--replace-plugins-themes", action="store_true")
+    parser.add_argument("--remove-db-option", action="append", default=[], metavar="NOME",
+                        help="Opção exata do WordPress autorizada para exclusão; repetível, sem curingas")
+    parser.add_argument("--recovery-approve", action="store_true",
+                        help="Confirma intenção de recuperar após ensaio em ambiente isolado (ainda requer confirmação interativa)")
+    parser.add_argument("--dry-run", action="store_true",
+                        help="Simula o plano de recuperação sem alterar arquivos ou banco")
     parser.add_argument("--official-sync", action="store_true")
     parser.add_argument("--case-root", type=Path, default=Path("/var/lib/wp-integrity-audit/cases"),
                         help="Diretório das evidências (padrão: /var/lib/wp-integrity-audit/cases)")
@@ -1764,8 +1807,16 @@ def parse_args() -> argparse.Namespace:
         parser.error("--source is required for file replacement")
     if args.core_source and args.mode != "recover":
         parser.error("--core-source is only valid with --recover")
-    if args.official_sync and args.mode not in ("apply-files", "recover"):
-        parser.error("--official-sync requires file replacement")
+    if args.official_sync:
+        parser.error("--official-sync permanece desabilitado até validar downloads e assinaturas")
+    if args.remove_db_option and args.mode not in ("apply-db", "recover"):
+        parser.error("--remove-db-option exige --apply-db ou --recover")
+    if (args.dry_run or args.recovery_approve) and args.mode not in ("apply-files", "apply-db", "recover"):
+        parser.error("--dry-run e --recovery-approve exigem modo de recuperação")
+    if args.mode in ("apply-files", "apply-db", "recover") and not (args.dry_run or args.recovery_approve):
+        parser.error("Use --dry-run para simular ou --recovery-approve para execução assistida")
+    if args.mode in ("apply-files", "recover") and not args.replace_plugins_themes:
+        parser.error("A substituição de wp-content exige --replace-plugins-themes")
     return args
 
 def present_management_report(case: Path, *, show: bool = False,
@@ -1797,8 +1848,6 @@ def main() -> int:
         compare_cases(args.compare[0], args.compare[1], output)
         print(f"Comparison created at {output}")
         return 0
-    if args.mode in ("apply-files", "apply-db", "recover"):
-        raise AuditError("Mutating modes are disabled pending verified upload, ownership and rollback safety")
     target = validate_site(args.target)
     proposed_case_root = args.case_root.resolve()
     if proposed_case_root == target or target in proposed_case_root.parents:
@@ -1890,23 +1939,53 @@ def main() -> int:
                 print("Auditoria concluída: status=" + outcome["status"] + "; código de saída=" + str(outcome["exit_code"]))
                 present_management_report(case, show=args.show_report, no_show=args.no_show_report)
                 return outcome["exit_code"]
-            if os.geteuid() != 0:
-                raise AuditError("Recovery requires root; audit does not")
+            if not args.dry_run and os.geteuid() != 0:
+                raise AuditError("Recuperação exige root; simulação não exige")
+            if args.dry_run and args.recovery_approve:
+                raise AuditError("Não combine --dry-run com --recovery-approve")
             if args.mode == "recover" and processes:
                 raise AuditError("Matching suspicious processes are still active; isolate the host first")
             if args.mode == "recover":
                 preflight_recovery_sources(target, args.core_source)
+            if args.core_source is not None:
+                raise AuditError("Substituição do núcleo ainda não homologada; --core-source bloqueado")
             if (target / "wp-content").is_symlink():
                 raise AuditError("Cannot safely replace symlinked wp-content")
-            print("Recovery modifies files and/or database; independent verified backup is required.")
-            ask("Confirm site isolation and independent backup")
+            if args.mode in ("apply-files", "recover"):
+                source = validate_source(args.source, target)
+                if not all((source / nome).is_dir() for nome in ("plugins", "themes", "uploads")):
+                    raise AuditError("Fonte limpa deve conter plugins, themes e uploads: cópia completa de wp-content")
+            else:
+                source = None
+            # Verifique opções serializadas antes de qualquer mutação e de qualquer troca.
+            if args.mode in ("apply-db", "recover"):
+                options = sql_identifier(prefix + "options")
+                precheck = query_db(cnf, dbname,
+                    f"SELECT option_name FROM {options} WHERE option_name IN ('active_plugins','cron') "
+                    "AND (option_value LIKE '%cipher-feeder%' OR option_value LIKE '%trace-inspector-pad%' "
+                    "OR option_value LIKE '%sc_cron_guard%' OR option_value LIKE '%sc_persist_manifest%' "
+                    "OR option_value LIKE '%sc_cron_fetch%');")
+                if precheck:
+                    raise AuditError("Persistência serializada detectada; recuperação automática bloqueada")
+            plan = database_cleanup_plan(cnf, dbname, prefix, args.remove_db_option) if args.mode in ("apply-db", "recover") else []
+            write_private(case / "recovery-plan.json", json.dumps({
+                "mode": args.mode, "dry_run": args.dry_run,
+                "clean_source": str(source) if source else None,
+                "database_options": plan,
+                "core_changes": False,
+                "sessions_changed": False,
+            }, ensure_ascii=False, indent=2))
+            if args.dry_run:
+                print("SIMULAÇÃO: nenhuma alteração realizada; plano em " + str(case / "recovery-plan.json"))
+                create_evidence_manifest(case)
+                return 0
+            print("RECUPERAÇÃO: uso assistido com snapshot obrigatório; isole o site e valide cópia externa.")
+            ask("Confirme que o site está isolado e o backup externo foi validado")
             snapshot(target, case, cnf, dbname)
             stage = None
             if args.mode in ("apply-files", "recover"):
-                source = validate_source(args.source, target)
                 compare_components(target, source, case)
-                stage = stage_files(target, source, case,
-                                    args.replace_plugins_themes or args.official_sync, args.official_sync)
+                stage = stage_files(target, source, case, True, False)
             try:
                 if args.mode in ("apply-db", "recover"):
                     # Preflight serialized database options before changing files.
@@ -1916,7 +1995,7 @@ def main() -> int:
                            "OR option_value LIKE '%sc_cron_guard%' OR option_value LIKE '%sc_persist_manifest%' "
                            "OR option_value LIKE '%sc_cron_fetch%');")
                     if query_db(cnf, dbname, sql):
-                        raise AuditError("Serialized WordPress options require manual, targeted remediation")
+                        raise AuditError("Opções serializadas suspeitas exigem limpeza manual")
                 ask("Confirm all planned site/database modifications")
             except BaseException:
                 # Staging may already exist when operator declines or SQL
@@ -1933,11 +2012,9 @@ def main() -> int:
                 if args.mode in ("apply-db", "recover"):
                     # A failed SQL client may have committed before raising.
                     database_started = True
-                    sql_cleanup(cnf, dbname, prefix, case)
-                if args.mode == "recover":
-                    if args.core_source:
-                        sync_core(args.core_source, target)
-                    rotate_salts(target / "wp-config.php")
+                    sql_cleanup(cnf, dbname, prefix, case, requested=args.remove_db_option)
+                # Credenciais e salts são alterados somente em operação separada;
+                # sem rotação implícita que possa quebrar autenticações ou integrações.
                 upload_permissions_audit(target, case)
                 # Perform an independent post-operation collection. Preserve
                 # pre-change evidence before file_audit replaces the JSON.
@@ -1946,11 +2023,11 @@ def main() -> int:
                 post_processes = process_audit(case)
                 database = database_audit(cnf, dbname, prefix, case, post=True)
                 make_report(case, args.mode, post_files, post_processes, database, dbname, prefix)
-                if args.mode == "recover":
-                    # Findings remain findings, not proof; require manual
-                    # containment review before declaring recovery complete.
-                    if post_recovery_blockers(database, post_files, post_processes):
-                        raise AuditError("Post-recovery indicators remain; keep the site isolated")
+                blockers = post_recovery_blockers(database, post_files, post_processes)
+                if blockers:
+                    write_private(case / "recovery-pending.json",
+                                  json.dumps({"pending": blockers}, indent=2))
+                    raise AuditError("Persistem indicadores após recuperação; mantenha o site isolado")
             except BaseException:
                 # File rollback is safe only before any database modification.
                 # Once the DB was changed, retain evidence and require an
@@ -1965,7 +2042,8 @@ def main() -> int:
             finally:
                 if stage is not None:
                     shutil.rmtree(stage, ignore_errors=True)
-            print("Operação concluída. Revise os achados e valide o site antes de reativá-lo.")
+            create_evidence_manifest(case)
+            print("Recuperação assistida concluída; revise o relatório e valide o site antes de reativá-lo.")
             return 0
 
 if __name__ == "__main__":
