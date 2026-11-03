@@ -5,6 +5,49 @@ Ferramenta para auditoria de integridade e investigação de comprometimento em 
 > **Estado de segurança:** versão de pré-lançamento. Os procedimentos de recuperação ainda não foram validados integralmente em cenários reais de WordPress/MySQL. Não utilize os modos de alteração em produção sem ensaios independentes de recuperação.
 
 
+
+## Remediação seletiva — 0.24.0 (homologação controlada)
+
+A remediação é **assistida** e deve começar em um clone descartável com backup externo restaurado e testado. O mecanismo não executa PHP para ler ou alterar opções serializadas.
+
+### WP-Cron e ativação de plugins
+
+Para simular a remoção de um **hook exato** do WP-Cron e a desativação de um plugin exato em `active_plugins`:
+
+```bash
+python3 bin/wp-integrity-audit.py /var/www/exemplo/public_html --apply-db \
+  --remove-cron-hook sc_cron_guard \
+  --deactivate-plugin trace-inspector-pad/trace-inspector-pad.php --dry-run
+```
+
+Após revisar `recovery-plan.json`, aprovar o isolamento e testar o backup, substitua `--dry-run` por `--recovery-approve`, **apenas no clone homologado**. A ferramenta exige confirmações interativas. Opções SQL são atualizadas com comparação de hash, preservando hooks e plugins não selecionados. Estruturas com objetos ou referências são recusadas e devem ser tratadas manualmente; não altere serialização PHP com SQL `REPLACE()` indiscriminado.
+
+### Quarentena de malware WordPress
+
+Use somente um caminho exato identificado como `IOC_REQUER_VALIDACAO` em `file-evidence.json`. O arquivo de evidência deve pertencer ao mesmo estado do site e ter SHA-256 idêntico:
+
+```bash
+python3 bin/remediar_arquivos_wp.py \
+  --site /var/www/exemplo/public_html --case /var/lib/wp-integrity-audit/cases/CASO \
+  --file wp-content/mu-plugins/trace-inspector-pad.php --dry-run
+```
+
+Após ensaiar, `--apply` permite quarentena privada de um único arquivo com cópia integral e hash. Não é uma limpeza em massa de pastas de plugins, nem um atestado de desinfecção.
+
+### Persistência Linux
+
+A ferramenta inspeciona o inventário `host-persistence.json` e somente admite arquivos **específicos** previamente sinalizados sob `/etc/cron.d/` ou `/etc/profile.d/`. Exemplo de simulação:
+
+```bash
+python3 bin/remediar_persistencia_linux.py \
+  --case /var/lib/wp-integrity-audit/cases/CASO \
+  --file /etc/cron.d/ARQUIVO_CONFIRMADO --dry-run
+```
+
+A aplicação real é explícita por `--apply`, exige root e confirmação interativa, preserva cópia em `quarentena-linux` e não substitui investigação de systemd, cron de usuários, processos PHP, SSH e demais mecanismos de persistência. O serviço afetado deve ser avaliado fora da ferramenta. Sem uma evidência anterior com SHA-256 coincidente, a operação é recusada.
+
+**Não interrompa nem exclua processos antes de preservar PID, comando, árvore de processos, hashes e evidências.** O bloqueio por processos suspeitos ativos na recuperação integral permanece inalterado. Depois da remediação, execute outra auditoria e somente libere o domínio após validação de integridade, funcionalidade, credenciais, backups e parecer técnico.
+
 ## Recuperação assistida — 0.23.0 (uso controlado)
 
 A recuperação é **uma operação que modifica o site e/ou o banco**, diferente da auditoria padrão. Deve ser testada primeiro em um clone descartável, com isolamento prévio, janela de manutenção, autorização do responsável e backup externo **testado por restauração**. A ferramenta não considera limpeza completa sinônimo de reativação.
