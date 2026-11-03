@@ -25,6 +25,9 @@ O arquivo de configuração e o arquivo separado com a senha SMTP devem permanec
 
 ## Relatórios em português
 
+Na versão `0.22.1`, cada achado do relatório gerencial diferencia explicitamente **indicadores residuais do incidente**, **referências históricas**, **manutenção/atualização**, **procedência/versão não confirmada** e **verificações de segurança pendentes**. O texto informa o que a evidência permite concluir sem alegar comprometimento ativo por uma atualização pendente. Componentes com versão local divergente também são apresentados ao cliente para validação. Os estados do JSON e os códigos de saída permanecem preservados.
+
+
 A versão `0.22.0` reforça as rotinas de exportação e envio: o arquivo `report.md` tem limite de **8 MiB** para geração PDF e o anexo PDF tem limite de **20 MiB** para envio SMTP. A configuração SMTP é limitada a **64 KiB** e deve permanecer privada. A senha SMTP deve estar em arquivo privado de caminho absoluto e tamanho máximo de **4 KiB**. As permissões dos arquivos confidenciais são verificadas também no descritor aberto. A abertura dos arquivos de entrada protegidos impede seguir links simbólicos. Falhas de validação cancelam a operação, sem enviar um documento inválido.
 
 O CI dispõe de um job específico para testar ReportLab e PyMuPDF em Python 3.12, incluindo acentos e paginação. O modo de auditoria permanece somente leitura no WordPress; não utilize recuperação automatizada em produção. Antes de qualquer uso de e-mail com dados de clientes, valide o transporte SMTP em ambiente controlado e autorize o destinatário.
