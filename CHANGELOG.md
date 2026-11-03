@@ -664,3 +664,8 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 - Detect high-confidence WP Rocket license-bypass signatures, including deletion of license state and forged `valid_key.php` responses.
 - Mark such files for reversible quarantine; audit mode remains non-mutating.
 
+## [0.25.2] - 2026-11-03
+
+### Fixed
+- Permit the reversible quarantine helper to act on the new explicit PHP-obfuscation and premium-license-bypass classifications, still requiring exact evidence and hash equality.
+

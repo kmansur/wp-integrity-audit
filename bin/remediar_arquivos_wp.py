@@ -44,8 +44,12 @@ def validar(site: Path, caso: Path, relativo: str):
     if evidencia.is_symlink() or not evidencia.is_file():
         raise RemocaoRecusada("Evidência de arquivos ausente")
     registros = json.loads(evidencia.read_text(encoding="utf-8"))
+    classificacoes_quarentena = {
+        "IOC_REQUER_VALIDACAO", "PHP_OFUSCACAO_REQUER_QUARENTENA",
+        "PLUGIN_MODIFICACAO_LICENCA_REQUER_QUARENTENA",
+    }
     candidatos = [v for v in registros if v.get("path") == relativo and
-                  v.get("classification") == "IOC_REQUER_VALIDACAO"]
+                  v.get("classification") in classificacoes_quarentena]
     if len(candidatos) != 1:
         raise RemocaoRecusada("Arquivo não tem indicador explícito na auditoria")
     dados, st = leitura_segura(path)
