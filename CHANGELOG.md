@@ -10,7 +10,8 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 - Reabilitados modos de recuperação assistida `--apply-files`, `--apply-db` e `--recover`, com `--dry-run` para simular e `--recovery-approve` mais duas confirmações interativas para operações efetivas.
 - `--apply-files` e `--recover` exigem `--source` com um `wp-content` completo e previamente verificado, incluindo diretórios `plugins`, `themes` e `uploads`, e a opção explícita `--replace-plugins-themes`.
 - A cópia limpa não pode ficar dentro do site nem abranger o diretório do site. Rejeitam-se arquivos especiais, symlinks, indicadores conhecidos e padrões genéricos de webshell.
-- O estágio restaura UID/GID conforme o destino original quando possível e remove permissão de escrita para outros usuários; troca o `wp-content` por renomeação mantendo a versão antiga em quarentena fora do document root.
+- O estágio restaura UID/GID e permissões dos caminhos existentes; arquivos novos recebem modo 0644 e diretórios novos modo 0755. Escrita pública é removida. A troca de `wp-content` usa renomeação e mantém o conteúdo anterior em quarentena fora do document root.
+- A fonte limpa rejeita nomes indicativos de incidente também em diretórios e bloqueia padrões conhecidos de webshell genérica.
 - `--apply-db` e `--recover` utilizam somente `--remove-db-option NOME` (repetível), com nome exato, SHA-256 do valor no momento do planejamento e verificação antes de cada exclusão; nenhuma limpeza indiscriminada por prefixo `sc_*`.
 - Nunca se apagam automaticamente sessões, senhas de aplicação, `cron`, `active_plugins`, opções centrais ou registros serializados, e não ocorre rotação implícita de salts.
 - Operação real exige snapshot do site em TAR.GZ com leitura de validação e dump SQL com hash SHA-256 antes da primeira alteração, além de confirmação de isolamento e backup externo.
