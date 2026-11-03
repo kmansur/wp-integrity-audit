@@ -285,6 +285,18 @@ class MySQLFixtureTests(unittest.TestCase):
         ativos = rs.LeitorPHP(bytes.fromhex(originais["active_plugins"])).completo()
         self.assertEqual(ativos, ("array", [(0, b"akismet/akismet.php")]))
 
+    def test_remediacao_serializada_recusa_marcador_que_permaneceria(self):
+        import remediacao_serializada as rs
+        evento = ("array", [(b"hash", ("array", [(b"args", ("array", []))]))])
+        dados = rs.serializar(("array", [(1700000000, ("array", [
+            (b"sc_cron_guard", evento), (b"sc_cron_fetch", evento)])), (b"version", 2)]))
+        self.query("UPDATE wp_options SET option_value=CONVERT(UNHEX('" + dados.hex() +
+                   "') USING utf8mb4) WHERE option_name='cron'")
+        with self.assertRaises(audit.AuditError):
+            audit.planejar_serializados(self.cnf, self.dbname, "wp_", ["sc_cron_guard"], [])
+        atual = self.query("SELECT HEX(option_value) FROM wp_options WHERE option_name='cron'")
+        self.assertEqual(atual, [[dados.hex().upper()]])
+
     def test_remediacao_serializada_recusa_hash_desatualizado(self):
         import remediacao_serializada as rs
         origem = rs.serializar(("array", [(0, b"akismet/akismet.php"),
