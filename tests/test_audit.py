@@ -1296,9 +1296,9 @@ $table_prefix = 'wp_';
         with tempfile.TemporaryDirectory() as pasta:
             caso = Path(pasta)
             cfg = caso / "smtp.cfg"
-            cfg.write_text("[smtp]\\nhost = smtp.example.com\\nport = 587\\nsecurity = starttls\\n"
-                           "from_address = auditor@example.com\\nusername = auditor@example.com\\n"
-                           "password_file = senha-relativa\\n", encoding="utf-8")
+            cfg.write_text("[smtp]\nhost = smtp.example.com\nport = 587\nsecurity = starttls\n"
+                           "from_address = auditor@example.com\nusername = auditor@example.com\n"
+                           "password_file = senha-relativa\n", encoding="utf-8")
             cfg.chmod(0o600)
             with unittest.mock.patch.object(mail_delivery.smtplib, "SMTP") as envio:
                 with self.assertRaises(mail_delivery.MailDeliveryError):
