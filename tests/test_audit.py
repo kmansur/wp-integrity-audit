@@ -1362,6 +1362,92 @@ $table_prefix = 'wp_';
             with self.assertRaises(mail_delivery.MailDeliveryError):
                 mail_delivery.send_management_report(case, "recipient@example.com", config)
 
+    def test_smtp_envio_aceito_com_starttls_verificado(self):
+        import mail_delivery
+        with tempfile.TemporaryDirectory() as pasta:
+            caso = Path(pasta)
+            senha = caso / "smtp-secret"
+            senha.write_text("senha-de-teste\n", encoding="utf-8")
+            senha.chmod(0o600)
+            cfg = caso / "smtp.cfg"
+            cfg.write_text("[smtp]\nhost = smtp.example.com\nport = 587\nsecurity = starttls\n"
+                           "from_address = auditor@example.com\nusername = auditor@example.com\n"
+                           f"password_file = {senha}\n", encoding="utf-8")
+            cfg.chmod(0o600)
+            (caso / "management-report.pdf").write_bytes(b"%PDF-1.4\nconteudo-de-teste")
+            with unittest.mock.patch.object(mail_delivery.smtplib, "SMTP") as classe:
+                instancia = classe.return_value.__enter__.return_value
+                instancia.has_extn.return_value = True
+                instancia.send_message.return_value = {}
+                mail_delivery.send_management_report(caso, "cliente@example.com", cfg)
+                instancia.starttls.assert_called_once()
+                instancia.login.assert_called_once_with("auditor@example.com", "senha-de-teste")
+                instancia.send_message.assert_called_once()
+                mensagem = instancia.send_message.call_args.args[0]
+                self.assertEqual(mensagem["To"], "cliente@example.com")
+                self.assertEqual(len(list(mensagem.iter_attachments())), 1)
+
+    def test_smtp_nao_envia_sem_starttls(self):
+        import mail_delivery
+        with tempfile.TemporaryDirectory() as pasta:
+            caso = Path(pasta)
+            senha = caso / "smtp-secret"
+            senha.write_text("senha-de-teste", encoding="utf-8")
+            senha.chmod(0o600)
+            cfg = caso / "smtp.cfg"
+            cfg.write_text("[smtp]\nhost = smtp.example.com\nport = 587\nsecurity = starttls\n"
+                           "from_address = auditor@example.com\nusername = auditor@example.com\n"
+                           f"password_file = {senha}\n", encoding="utf-8")
+            cfg.chmod(0o600)
+            (caso / "management-report.pdf").write_bytes(b"%PDF-1.4\nconteudo")
+            with unittest.mock.patch.object(mail_delivery.smtplib, "SMTP") as classe:
+                instancia = classe.return_value.__enter__.return_value
+                instancia.has_extn.return_value = False
+                with self.assertRaisesRegex(mail_delivery.MailDeliveryError, "STARTTLS"):
+                    mail_delivery.send_management_report(caso, "cliente@example.com", cfg)
+                instancia.login.assert_not_called()
+                instancia.send_message.assert_not_called()
+
+    def test_smtp_erros_seguros_sem_vazamento_de_credenciais(self):
+        import mail_delivery
+        import smtplib
+        import socket
+        import ssl
+        credencial = b"senha-super-secreta"
+        casos = (
+            (smtplib.SMTPAuthenticationError(535, credencial), "Autenticação SMTP recusada"),
+            (socket.gaierror(8, "hostname-confidencial"), "DNS"),
+            (ConnectionRefusedError("servidor-confidencial"), "Conexão SMTP recusada"),
+            (ssl.SSLCertVerificationError("certificado interno"), "certificado TLS"),
+            (smtplib.SMTPRecipientsRefused({"cliente@example.com": (550, credencial)}),
+             "recusou o destinatário"),
+        )
+        for erro, trecho in casos:
+            mensagem = mail_delivery._erro_smtp(erro)
+            self.assertIn(trecho, mensagem)
+            self.assertNotIn("senha-super-secreta", mensagem)
+            self.assertNotIn("hostname-confidencial", mensagem)
+            self.assertNotIn("servidor-confidencial", mensagem)
+
+    def test_smtp_recusa_parcial_nao_e_sucesso(self):
+        import mail_delivery
+        with tempfile.TemporaryDirectory() as pasta:
+            caso = Path(pasta)
+            senha = caso / "smtp-secret"
+            senha.write_text("senha-de-teste", encoding="utf-8")
+            senha.chmod(0o600)
+            cfg = caso / "smtp.cfg"
+            cfg.write_text("[smtp]\nhost = smtp.example.com\nport = 465\nsecurity = ssl\n"
+                           "from_address = auditor@example.com\nusername = auditor@example.com\n"
+                           f"password_file = {senha}\n", encoding="utf-8")
+            cfg.chmod(0o600)
+            (caso / "management-report.pdf").write_bytes(b"%PDF-1.4\nconteudo")
+            with unittest.mock.patch.object(mail_delivery.smtplib, "SMTP_SSL") as classe:
+                instancia = classe.return_value.__enter__.return_value
+                instancia.send_message.return_value = {"cliente@example.com": (550, b"recusado")}
+                with self.assertRaisesRegex(mail_delivery.MailDeliveryError, "recusou"):
+                    mail_delivery.send_management_report(caso, "cliente@example.com", cfg)
+
     def test_mail_delivery_rejects_header_injection(self):
         import mail_delivery
         with self.assertRaises(mail_delivery.MailDeliveryError):
