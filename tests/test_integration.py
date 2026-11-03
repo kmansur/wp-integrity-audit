@@ -259,6 +259,46 @@ class MySQLFixtureTests(unittest.TestCase):
         finally:
             subprocess.run(command + ["-e", f"DROP DATABASE IF EXISTS {restore_db}"], check=True)
 
+    def test_remediacao_serializada_cron_plugins_no_mysql_real(self):
+        import remediacao_serializada as rs
+        evento = ("array", [(b"evento", ("array", [(b"schedule", False), (b"args", ("array", []))]))])
+        cron = rs.serializar(("array", [(1700000000, ("array", [
+            (b"sc_cron_guard", evento), (b"evento_legitimo", evento)])), (b"version", 2)]))
+        plugins = rs.serializar(("array", [
+            (0, b"akismet/akismet.php"), (1, b"trace-inspector-pad/trace-inspector-pad.php")]))
+        self.query("UPDATE wp_options SET option_value=CONVERT(UNHEX('" + cron.hex() +
+                   "') USING utf8mb4) WHERE option_name='cron'")
+        self.query("UPDATE wp_options SET option_value=CONVERT(UNHEX('" + plugins.hex() +
+                   "') USING utf8mb4) WHERE option_name='active_plugins'")
+        plano = audit.planejar_serializados(self.cnf, self.dbname, "wp_",
+                                          ["sc_cron_guard"], ["trace-inspector-pad/trace-inspector-pad.php"])
+        self.assertEqual(len(plano), 2)
+        self.assertEqual([x["removed"] for x in plano], [1, 1])
+        audit.aplicar_serializados(self.cnf, self.dbname, "wp_", plano)
+        originais = dict(self.query("SELECT option_name, HEX(option_value) FROM wp_options "
+                                    "WHERE option_name IN ('cron','active_plugins')"))
+        cron_apos = rs.LeitorPHP(bytes.fromhex(originais["cron"])).completo()
+        hooks = [chave for _, eventos in cron_apos[1] if isinstance(eventos, tuple)
+                 for chave, _ in eventos[1]]
+        self.assertIn(b"evento_legitimo", hooks)
+        self.assertNotIn(b"sc_cron_guard", hooks)
+        ativos = rs.LeitorPHP(bytes.fromhex(originais["active_plugins"])).completo()
+        self.assertEqual(ativos, ("array", [(0, b"akismet/akismet.php")]))
+
+    def test_remediacao_serializada_recusa_hash_desatualizado(self):
+        import remediacao_serializada as rs
+        origem = rs.serializar(("array", [(0, b"akismet/akismet.php"),
+                                          (1, b"trace-inspector-pad/trace-inspector-pad.php")]))
+        self.query("UPDATE wp_options SET option_value=CONVERT(UNHEX('" + origem.hex() +
+                   "') USING utf8mb4) WHERE option_name='active_plugins'")
+        plano = audit.planejar_serializados(self.cnf, self.dbname, "wp_", [],
+                                          ["trace-inspector-pad/trace-inspector-pad.php"])
+        self.query("UPDATE wp_options SET option_value='a:0:{}' WHERE option_name='active_plugins'")
+        with self.assertRaises(audit.AuditError):
+            audit.aplicar_serializados(self.cnf, self.dbname, "wp_", plano)
+        self.assertEqual(self.query("SELECT option_value FROM wp_options WHERE option_name='active_plugins'"),
+                         [["a:0:{}"]])
+
     def test_refuses_to_delete_malicious_serialized_option(self):
         self.query("UPDATE wp_options SET option_value='cipher-feeder' WHERE option_name='cron'")
         with self.assertRaises(audit.AuditError):
