@@ -1571,7 +1571,11 @@ def planejar_serializados(option_file: str, dbname: str, prefix: str,
                 if n == 0:
                     raise AuditError(f"Seletor não encontrado na opção {nome}: {seletor}")
                 contagem += n
-        except (ValueError, UnicodeError, serial_wp.SerializacaoInsegura) as error:
+            marcadores = (b"cipher-feeder", b"trace-inspector-pad", b"sc_cron_guard",
+                         b"sc_persist_manifest", b"sc_cron_fetch")
+            if any(marcador in novo for marcador in marcadores):
+                raise AuditError(f"A opção {nome} ainda contém marcadores do incidente; refine a seleção")
+        except (ValueError, UnicodeError, serial_wp.SerializacaoInsegura):
             raise AuditError(f"Estrutura de {nome} não pode ser alterada com segurança") from None
         plano.append({"option_name": nome, "selectors": list(seletores), "removed": contagem,
                       "old_sha256": rows[0][1].lower(), "new_sha256": serial_wp.sha256_bytes(novo),
