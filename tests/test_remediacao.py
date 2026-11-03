@@ -60,6 +60,23 @@ class PersistenciaLinuxTests(unittest.TestCase):
                 modulo.executar(caso, arquivo, aplicar=False, raizes=(scripts,))
             self.assertTrue(arquivo.exists())
 
+    def test_systemd_recusa_servico_ativo_ou_habilitado(self):
+        from types import SimpleNamespace
+        for ativo, habilitado in (("active", "disabled"), ("inactive", "enabled"), ("unknown", "disabled")):
+            with self.subTest(ativo=ativo, habilitado=habilitado), \
+                 mock.patch.object(modulo.subprocess, "run",
+                     side_effect=[SimpleNamespace(stdout=ativo), SimpleNamespace(stdout=habilitado)]):
+                with self.assertRaises(modulo.QuarentenaRecusada):
+                    modulo.validar_unidade_systemd("suspeito.service")
+
+    def test_systemd_aceita_arquivo_inativo_e_desabilitado(self):
+        from types import SimpleNamespace
+        with mock.patch.object(modulo.subprocess, "run",
+                side_effect=[SimpleNamespace(stdout="inactive\n"),
+                             SimpleNamespace(stdout="disabled\n")]) as executor:
+            modulo.validar_unidade_systemd("suspeito.service")
+        self.assertEqual(executor.call_count, 2)
+
     def test_evidencia_ausente_e_link_simbolico_sao_recusados(self):
         with tempfile.TemporaryDirectory() as pasta:
             caso, scripts, arquivo = self.preparar(pasta)
