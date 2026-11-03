@@ -837,6 +837,18 @@ $table_prefix = 'wp_';
             cv.compare_official(item)
         self.assertEqual(item["state"], "PLUGIN_OFICIAL_DESATUALIZADO")
 
+    def test_versao_local_maior_nao_e_correspondencia_oficial(self):
+        import component_versions as cv
+        item = {"type": "plugin", "slug": "exemplo", "local_version": "9.0.1",
+                "official_version": None, "source": "unknown",
+                "state": "PLUGIN_REQUER_REVISAO", "query_status": "SKIPPED"}
+        with unittest.mock.patch.object(cv, "api_json", return_value=(
+                "SUCCESS", {"version": "8.9.9"}, "https://api.wordpress.org/plugins/info/1.2/")):
+            cv.compare_official(item)
+        self.assertEqual(item["query_status"], "OFFICIAL_VERSION_DIFFERENT_UNVERIFIED")
+        self.assertEqual(item["state"], "PLUGIN_REQUER_REVISAO")
+        self.assertIn("procedência", item["review_guidance"])
+
     def test_official_plugin_without_checksum_not_assumed_modified(self):
         import component_versions as cv
         import urllib.error
@@ -1243,6 +1255,55 @@ $table_prefix = 'wp_';
                 report_export.export_management_pdf(case)
             self.assertFalse((case / "management-report.pdf").exists())
             self.assertEqual(list(case.glob(".management-report-*")), [])
+
+    def test_pdf_rejeita_relatorio_grande_ou_link_simbolico(self):
+        import report_export
+        with tempfile.TemporaryDirectory() as pasta:
+            caso = Path(pasta)
+            origem = caso / "report.md"
+            externo = caso / "origem-real.md"
+            externo.write_text("# Relatório original", encoding="utf-8")
+            origem.symlink_to(externo)
+            with self.assertRaises(report_export.PDFExportError):
+                report_export.export_management_pdf(caso)
+            origem.unlink()
+            with origem.open("wb") as arquivo:
+                arquivo.truncate(8 * 1024 * 1024 + 1)
+            with self.assertRaises(report_export.PDFExportError):
+                report_export.export_management_pdf(caso)
+            self.assertFalse((caso / "management-report.pdf").exists())
+
+    def test_smtp_rejeita_pdf_grande_e_link_simbolico(self):
+        import mail_delivery
+        with tempfile.TemporaryDirectory() as pasta:
+            raiz = Path(pasta)
+            pdf = raiz / "management-report.pdf"
+            original = raiz / "original.pdf"
+            original.write_bytes(b"%PDF-1.4")
+            pdf.symlink_to(original)
+            with self.assertRaises(mail_delivery.MailDeliveryError):
+                mail_delivery._ler_regular_limitado(pdf, 20 * 1024 * 1024)
+            pdf.unlink()
+            with pdf.open("wb") as arquivo:
+                arquivo.truncate(20 * 1024 * 1024 + 1)
+            with self.assertRaises(mail_delivery.MailDeliveryError):
+                mail_delivery._ler_regular_limitado(pdf, 20 * 1024 * 1024)
+            self.assertEqual(mail_delivery._ler_regular_limitado(original, 4096), b"%PDF-1.4")
+
+    def test_smtp_rejeita_senha_com_caminho_relativo(self):
+        import mail_delivery
+        import unittest.mock
+        with tempfile.TemporaryDirectory() as pasta:
+            caso = Path(pasta)
+            cfg = caso / "smtp.cfg"
+            cfg.write_text("[smtp]\\nhost = smtp.example.com\\nport = 587\\nsecurity = starttls\\n"
+                           "from_address = auditor@example.com\\nusername = auditor@example.com\\n"
+                           "password_file = senha-relativa\\n", encoding="utf-8")
+            cfg.chmod(0o600)
+            with unittest.mock.patch.object(mail_delivery.smtplib, "SMTP") as envio:
+                with self.assertRaises(mail_delivery.MailDeliveryError):
+                    mail_delivery.send_management_report(caso, "cliente@example.com", cfg)
+                envio.assert_not_called()
 
     def test_mail_delivery_requires_private_config(self):
         import mail_delivery
