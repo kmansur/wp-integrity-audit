@@ -4,6 +4,14 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 
 ## [Não publicado]
 
+## [0.26.2] - 2026-11-03
+
+### Detecção de persistência Kinetic Relay
+- `kinetic-relay-live` passa a ser indicador explícito em `active_plugins` e em valores de opções.
+- `sc_cron_recovery` e `e1v61n2r1im6t7_` passam a ser detectados como hooks de cron associados à família observada.
+- Auditorias de `cron`, `active_plugins`, limpeza assistida e pré-validação de serialização usam os mesmos marcadores, evitando que a execução seja liberada após remover apenas uma opção auxiliar.
+- Incluído teste de regressão para os três marcadores; nenhuma rotina executa o plugin ou o cron.
+
 ## [0.26.1] - 2026-11-03
 
 ### Referências reversíveis em opções do banco

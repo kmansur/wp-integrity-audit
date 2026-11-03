@@ -37,8 +37,8 @@ import urllib.parse
 import urllib.request
 import zipfile
 
-VERSION = "0.26.1"
-IOC = re.compile(r"SC_ADV_BEGIN|--sc-cli|--sc-succ|trace-inspector-pad|cipher-feeder|_sc_fpc|sc_cron_guard|sc_persist_manifest|sc_own_manifest|function ceya|Axiom Sentinel Snap|SCV:[0-9]+")
+VERSION = "0.26.2"
+IOC = re.compile(r"SC_ADV_BEGIN|--sc-cli|--sc-succ|trace-inspector-pad|cipher-feeder|_sc_fpc|sc_cron_guard|sc_cron_recovery|e1v61n2r1im6t7_|sc_persist_manifest|sc_own_manifest|kinetic-relay-live|function ceya|Axiom Sentinel Snap|SCV:[0-9]+")
 PATTERN_NAMES = (".sc_", ".gr_", ".gk_", ".kk_", ".wp-object-cache")
 SCRIPT_EXTENSIONS = {".php", ".phtml", ".phar", ".inc", ".php5", ".php7", ".php8", ".pht", ".phps"}
 GENERIC_WEB_SHELL = re.compile(
@@ -1520,10 +1520,10 @@ def database_audit(option_file: str, dbname: str, prefix: str, case: Path,
     statements = [
         ("suspicious_users", f"SELECT user_login, LENGTH(user_login) FROM {users} WHERE user_login REGEXP '^(admin|administrator|backup)_[0-9a-f]{{6}}$'"),
         ("family_option", f"SELECT option_name, LENGTH(option_value) FROM {options} WHERE option_name LIKE 'sc#_%' ESCAPE '#' OR option_name LIKE '_transient_sc#_%' ESCAPE '#' OR option_name LIKE '_transient_timeout_sc#_%' ESCAPE '#'"),
-        ("marker_option", f"SELECT option_name, LENGTH(option_value) FROM {options} WHERE option_name NOT IN ('cron','active_plugins','SimplePluginLogger_plugin_info_before_update') AND (option_value LIKE '%cipher-feeder%' OR option_value LIKE '%sc_cron_guard%' OR option_value LIKE '%sc_persist_manifest%' OR option_value LIKE '%trace-inspector-pad%')"),
+        ("marker_option", f"SELECT option_name, LENGTH(option_value) FROM {options} WHERE option_name NOT IN ('cron','active_plugins','SimplePluginLogger_plugin_info_before_update') AND (option_value LIKE '%cipher-feeder%' OR option_value LIKE '%sc_cron_guard%' OR option_value LIKE '%sc_cron_recovery%' OR option_value LIKE '%e1v61n2r1im6t7_%' OR option_value LIKE '%sc_persist_manifest%' OR option_value LIKE '%trace-inspector-pad%' OR option_value LIKE '%kinetic-relay-live%')"),
         ("historical_cache", f"SELECT option_name, LENGTH(option_value) FROM {options} WHERE option_name='SimplePluginLogger_plugin_info_before_update' AND option_value LIKE '%trace-inspector-pad%'"),
-        ("cron_marker", f"SELECT option_name, LENGTH(option_value) FROM {options} WHERE option_name='cron' AND (option_value LIKE '%cipher-feeder%' OR option_value LIKE '%sc_cron_guard%' OR option_value LIKE '%sc_cron_fetch%' OR option_value LIKE '%sc_persist_manifest%')"),
-        ("active_plugins_marker", f"SELECT option_name, LENGTH(option_value) FROM {options} WHERE option_name='active_plugins' AND (option_value LIKE '%trace-inspector-pad%' OR option_value LIKE '%cipher-feeder%' OR option_value LIKE '%sc_cron_guard%')"),
+        ("cron_marker", f"SELECT option_name, LENGTH(option_value) FROM {options} WHERE option_name='cron' AND (option_value LIKE '%cipher-feeder%' OR option_value LIKE '%sc_cron_guard%' OR option_value LIKE '%sc_cron_recovery%' OR option_value LIKE '%e1v61n2r1im6t7_%' OR option_value LIKE '%sc_cron_fetch%' OR option_value LIKE '%sc_persist_manifest%')"),
+        ("active_plugins_marker", f"SELECT option_name, LENGTH(option_value) FROM {options} WHERE option_name='active_plugins' AND (option_value LIKE '%trace-inspector-pad%' OR option_value LIKE '%cipher-feeder%' OR option_value LIKE '%sc_cron_guard%' OR option_value LIKE '%kinetic-relay-live%')"),
         ("session_rows", f"SELECT 'session_tokens', COUNT(*) FROM {meta} WHERE meta_key='session_tokens'"),
         ("application_password_rows", f"SELECT 'application_passwords', COUNT(*) FROM {meta} WHERE meta_key LIKE '%application_passwords'"),
     ]
@@ -1537,7 +1537,9 @@ def database_audit(option_file: str, dbname: str, prefix: str, case: Path,
                     f"OR option_name LIKE '_transient_timeout_sc#_%' ESCAPE '#' "
                     f"OR option_name IN ('SimplePluginLogger_plugin_info_before_update','cron','active_plugins') "
                     f"OR option_value LIKE '%cipher-feeder%' OR option_value LIKE '%sc_cron_guard%' "
-                    f"OR option_value LIKE '%sc_persist_manifest%' OR option_value LIKE '%trace-inspector-pad%';")
+                    f"OR option_value LIKE '%sc_cron_recovery%' OR option_value LIKE '%e1v61n2r1im6t7_%' "
+                    f"OR option_value LIKE '%sc_persist_manifest%' OR option_value LIKE '%trace-inspector-pad%' "
+                    f"OR option_value LIKE '%kinetic-relay-live%';")
     details = {}
     for row in query_db(option_file, dbname, detail_query):
         if len(row) != 4 or not re.fullmatch(r"[0-9a-fA-F]{64}", row[2]):
@@ -1584,8 +1586,9 @@ def database_audit(option_file: str, dbname: str, prefix: str, case: Path,
                     classification = "ESCALAR_TEXTO_NUMERO_NAO_CODIFICADO"
                 # Only approved IOC tokens or explicitly allowlisted numeric
                 # values may be displayed; do not print arbitrary DB data.
-                known_tokens = ("cipher-feeder", "sc_cron_guard", "sc_cron_fetch",
-                                "sc_persist_manifest", "trace-inspector-pad")
+                known_tokens = ("cipher-feeder", "sc_cron_guard", "sc_cron_recovery",
+                                "e1v61n2r1im6t7_", "sc_cron_fetch", "sc_persist_manifest",
+                                "trace-inspector-pad", "kinetic-relay-live")
                 safe_tokens = [token for token in known_tokens if token in prefix_value]
                 findings.append({
                     "kind": kind, "name": safe_option_name(name), "length": row[1],
@@ -1868,8 +1871,9 @@ def sql_cleanup(option_file: str, dbname: str, prefix: str, case: Path,
     suspicious = query_db(option_file, dbname,
         f"SELECT option_name FROM {opt} WHERE option_name IN ('active_plugins','cron') "
         "AND (option_value LIKE '%cipher-feeder%' OR option_value LIKE '%trace-inspector-pad%' "
-        "OR option_value LIKE '%sc_cron_guard%' OR option_value LIKE '%sc_persist_manifest%' "
-        "OR option_value LIKE '%sc_cron_fetch%');")
+        "OR option_value LIKE '%sc_cron_guard%' OR option_value LIKE '%sc_cron_recovery%' "
+        "OR option_value LIKE '%e1v61n2r1im6t7_%' OR option_value LIKE '%kinetic-relay-live%' "
+        "OR option_value LIKE '%sc_persist_manifest%' OR option_value LIKE '%sc_cron_fetch%');")
     if suspicious:
         write_private(case / "manual-serialized-cleanup.json",
                       json.dumps({"options_for_manual_review": [x[0] for x in suspicious]}))
@@ -1927,7 +1931,8 @@ def planejar_serializados(option_file: str, dbname: str, prefix: str,
                     raise AuditError(f"Seletor não encontrado na opção {nome}: {seletor}")
                 contagem += n
             marcadores = (b"cipher-feeder", b"trace-inspector-pad", b"sc_cron_guard",
-                         b"sc_persist_manifest", b"sc_cron_fetch")
+                          b"sc_cron_recovery", b"e1v61n2r1im6t7_", b"kinetic-relay-live",
+                          b"sc_persist_manifest", b"sc_cron_fetch")
             if any(marcador in novo for marcador in marcadores):
                 raise AuditError(f"A opção {nome} ainda contém marcadores do incidente; refine a seleção")
         except (ValueError, UnicodeError, serial_wp.SerializacaoInsegura):
@@ -2431,8 +2436,9 @@ def main() -> int:
                 precheck = query_db(cnf, dbname,
                     f"SELECT option_name FROM {options} WHERE option_name IN ('active_plugins','cron') "
                     "AND (option_value LIKE '%cipher-feeder%' OR option_value LIKE '%trace-inspector-pad%' "
-                    "OR option_value LIKE '%sc_cron_guard%' OR option_value LIKE '%sc_persist_manifest%' "
-                    "OR option_value LIKE '%sc_cron_fetch%');")
+                    "OR option_value LIKE '%sc_cron_guard%' OR option_value LIKE '%sc_cron_recovery%' "
+                    "OR option_value LIKE '%e1v61n2r1im6t7_%' OR option_value LIKE '%kinetic-relay-live%' "
+                    "OR option_value LIKE '%sc_persist_manifest%' OR option_value LIKE '%sc_cron_fetch%');")
                 selected = {item["option_name"] for item in serial_plan}
                 if any(row[0] not in selected for row in precheck):
                     raise AuditError("Persistência serializada não selecionada; correção bloqueada")

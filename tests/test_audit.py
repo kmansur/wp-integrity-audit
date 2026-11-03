@@ -54,6 +54,10 @@ class PythonAuditTests(unittest.TestCase):
         self.assertEqual((status, code), ("AUDITORIA_INCOMPLETA", 40))
         self.assertEqual(summary["reversed_component_references_requiring_review"], 1)
 
+    def test_known_kinetic_and_cron_family_markers_are_detected(self):
+        for marker in ("kinetic-relay-live", "sc_cron_recovery", "e1v61n2r1im6t7_"):
+            self.assertRegex(marker, audit.IOC)
+
     def test_version_and_modules(self):
         self.assertRegex(audit.VERSION, r"^\d+\.\d+\.\d+$")
         self.assertTrue(callable(audit.file_audit))
