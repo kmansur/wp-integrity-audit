@@ -1390,7 +1390,9 @@ def validate_source(source: Path, target: Path) -> Path:
             member = Path(directory) / name
             mode = member.lstat().st_mode
             if not (stat.S_ISREG(mode) or stat.S_ISDIR(mode)):
-                raise AuditError(f"Clean source has symlink or special file: {member}")
+                raise AuditError(f"Fonte limpa contém link ou arquivo especial: {member}")
+            if name.startswith(PATTERN_NAMES) or name == "trace-inspector-pad.php" or "cipher-feeder" in name:
+                raise AuditError(f"Fonte limpa contém nome associado a indicador de incidente: {member}")
     for path in iter_files(source):
         if path.name.startswith(PATTERN_NAMES) or "cipher-feeder" in path.name or path.name == "trace-inspector-pad.php":
             raise AuditError(f"Known IOC filename in clean source: {path}")
