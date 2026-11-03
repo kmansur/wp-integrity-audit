@@ -33,7 +33,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 
-VERSION = "0.22.1"
+VERSION = "0.22.2"
 IOC = re.compile(r"SC_ADV_BEGIN|--sc-cli|--sc-succ|trace-inspector-pad|cipher-feeder|_sc_fpc|sc_cron_guard|sc_persist_manifest|sc_own_manifest|function ceya")
 PATTERN_NAMES = (".sc_", ".gr_", ".gk_", ".kk_", ".wp-object-cache")
 SCRIPT_EXTENSIONS = {".php", ".phtml", ".phar", ".inc", ".php5", ".php7", ".php8", ".pht", ".phps"}
@@ -1842,8 +1842,10 @@ def main() -> int:
             incident_containment_note(case, label)
             if args.pdf_report or args.email_to:
                 report_export.export_management_pdf(case)
+                print("PDF gerencial gerado: " + str(case / "management-report.pdf"))
             if args.email_to:
                 mail_delivery.send_management_report(case, args.email_to, args.smtp_config)
+                print("SMTP: mensagem aceita pelo servidor para " + args.email_to + " (entrega final não confirmada)")
             create_evidence_manifest(case)
             if args.bundle_evidence:
                 bundle_case_evidence(case)
@@ -1876,8 +1878,10 @@ def main() -> int:
                     incident_containment_note(case, label)
                     if args.pdf_report or args.email_to:
                         report_export.export_management_pdf(case)
+                        print("PDF gerencial gerado: " + str(case / "management-report.pdf"))
                     if args.email_to:
                         mail_delivery.send_management_report(case, args.email_to, args.smtp_config)
+                        print("SMTP: mensagem aceita pelo servidor para " + args.email_to + " (entrega final não confirmada)")
                     create_evidence_manifest(case)
                     if args.bundle_evidence:
                         bundle_case_evidence(case)
