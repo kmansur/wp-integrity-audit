@@ -25,6 +25,11 @@ O arquivo de configuração e o arquivo separado com a senha SMTP devem permanec
 
 ## Relatórios em português
 
+A versão `0.21.12` automatiza a inspeção dos cabeçalhos de plugins e temas, inclusive a versão declarada e o arquivo principal, sem executar PHP. O parser considera apenas o bloco de metadados e não confunde anotações posteriores, como `version: string,`, com a versão do plugin. O inventário `component-version-evidence.json` e o CSV registram `header_status`. Quando a versão local não pode ser verificada, a consulta oficial não a classifica como correspondente. A evidência informativa de cron continua no registro técnico, sem ser apresentada ao cliente como indicador de incidente sem confirmação.
+
+A seção de componentes do relatório é produzida em português e os achados de versões mostram a instalada e a referência consultada. O SHA-256 apresentado para componentes representa o arquivo principal quando disponível, **não** uma verificação do pacote completo. Os identificadores estruturados permanecem inalterados; a auditoria continua somente leitura por padrão. Não é necessário executar manualmente `grep`, `find` ou o parser para identificar a versão de um plugin.
+
+
 A versão `0.21.11` atualiza as asserções dos testes de integração MySQL para os relatórios em português, preservando os identificadores técnicos e as regras de auditoria. A liberação da próxima fase depende da aprovação integral do pipeline, incluindo a integração MySQL. Os modos de recuperação continuam experimentais e não homologados para produção.
 
 
