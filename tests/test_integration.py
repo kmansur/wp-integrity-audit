@@ -118,9 +118,9 @@ class MySQLFixtureTests(unittest.TestCase):
         self.assertEqual(by_kind["session_rows"][0]["length"], "1")
         audit.make_report(self.case, "audit", [], [], result)
         report = (self.case / "technical-report.md").read_text()
-        self.assertIn("Database audit: **EXECUTED**", report)
-        self.assertIn("Family-specific option/transient residues: **2**", report)
-        self.assertIn("not evidence of active execution", report)
+        self.assertIn("Auditoria do banco de dados: **EXECUTADA**", report)
+        self.assertIn("Resíduos em opções e transientes: **2**", report)
+        self.assertIn("isso não comprova execução ativa", report)
 
     def test_detailed_evidence_preserves_history_and_value_hashes(self):
         self.query("""
@@ -140,11 +140,11 @@ class MySQLFixtureTests(unittest.TestCase):
         report = (self.case / "technical-report.md").read_text()
         self.assertIn("wp_options", report)
         self.assertIn("wp_usermeta", report)
-        self.assertIn("Confirmed family residues:", report)
-        self.assertIn("Historical references:", report)
-        self.assertIn("Classification legend", report)
-        self.assertIn("Tool SHA-256:", report)
-        self.assertIn("Active database markers:", report)
+        self.assertIn("Resíduos da família investigada:", report)
+        self.assertIn("Referências históricas:", report)
+        self.assertIn("Legenda das classificações", report)
+        self.assertIn("SHA-256 da ferramenta:", report)
+        self.assertIn("Indicadores ativos no banco de dados:", report)
 
     def test_numeric_transient_excerpts_and_markdown_layout(self):
         """Only allowlisted scalar transient values are shown in reports."""
@@ -164,15 +164,15 @@ class MySQLFixtureTests(unittest.TestCase):
         audit.make_report(self.case, "audit", [], [], evidence, self.dbname, "wp_")
         report = (self.case / "technical-report.md").read_text()
         self.assertIn("#### `_transient_sc_spread_interval`", report)
-        self.assertIn("- Safe evidence: `1`", report)
-        self.assertIn("- Interpreted value: `1`", report)
-        self.assertIn("- Interpreted value: `1793545906`", report)
-        self.assertIn("WordPress modifies cron automatically", report)
-        self.assertIn("Known cron marker matches: 0", report)
+        self.assertIn("- Evidência sem dados sigilosos: `1`", report)
+        self.assertIn("- Valor interpretado: `1`", report)
+        self.assertIn("- Valor interpretado: `1793545906`", report)
+        self.assertIn("O WordPress modifica o agendamento cron automaticamente", report)
+        self.assertIn("Indicadores conhecidos no cron: 0", report)
         cron = next(x for x in evidence if x["kind"] == "cron_metadata")
         self.assertEqual(len(cron["sha256"]), 64)
         self.assertIn("collected_at_utc", cron)
-        self.assertIn("### Evidence details", report)
+        self.assertIn("### Detalhes das evidências", report)
         self.assertNotIn("super-secret-value", report)
         self.assertIn("|---|---|---|---|\n", report)
 
