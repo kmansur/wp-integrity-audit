@@ -34,7 +34,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 
-VERSION = "0.24.3"
+VERSION = "0.24.4"
 IOC = re.compile(r"SC_ADV_BEGIN|--sc-cli|--sc-succ|trace-inspector-pad|cipher-feeder|_sc_fpc|sc_cron_guard|sc_persist_manifest|sc_own_manifest|function ceya")
 PATTERN_NAMES = (".sc_", ".gr_", ".gk_", ".kk_", ".wp-object-cache")
 SCRIPT_EXTENSIONS = {".php", ".phtml", ".phar", ".inc", ".php5", ".php7", ".php8", ".pht", ".phps"}
@@ -356,6 +356,21 @@ def deny_only_security_guard(relative: str, content: str) -> bool:
     return True
 
 
+def wordfence_deny_guard(relative: str, content: str) -> bool:
+    """Recognize Wordfence's standard PHP deny-only protection template."""
+    if not relative.startswith("wp-content/plugins/wordfence/"):
+        return False
+    compact = re.sub(r"\s+", " ", content).strip().lower()
+    return bool(
+        "<ifmodule mod_rewrite.c>" in compact and "rewriteengine on" in compact
+        and "rewritecond" in compact and "rewriterule .* - [f,l,nc]" in compact
+        and "<ifmodule !mod_rewrite.c>" in compact and "<filesmatch \"\\.php$\">" in compact
+        and "require all denied" in compact and "deny from all" in compact
+        and "sethandler" not in compact and "addhandler" not in compact
+        and "auto_prepend_file" not in compact and "auto_append_file" not in compact
+    )
+
+
 def configuration_audit(target: Path, case: Path) -> list[dict]:
     """Read-only configuration inventory. Never export configuration contents.
 
@@ -392,6 +407,9 @@ def configuration_audit(target: Path, case: Path) -> list[dict]:
                 classification = "CONFIGURACAO_LEGITIMA_VALIDADA"
                 indicators = []
             elif info.st_size <= 1048576 and deny_only_security_guard(relative, content):
+                classification = "CONFIGURACAO_LEGITIMA_VALIDADA"
+                indicators = []
+            elif info.st_size <= 1048576 and wordfence_deny_guard(relative, content):
                 classification = "CONFIGURACAO_LEGITIMA_VALIDADA"
                 indicators = []
             findings.append({

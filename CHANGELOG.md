@@ -641,3 +641,8 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 - Preserve the explicit incident-family quarantine classification for `kinetic-relay-live` even when the official repository API returns not-found or incomplete metadata.
 - Recognize narrowly scoped deny-only protection files under `wp-content/updraft` and WP Rocket cache paths without treating them as compromise indicators.
 
+## [0.24.4] - 2026-11-03
+
+### Fixed
+- Recognize the standard Wordfence deny-only rewrite/fallback template as a legitimate security guard, while retaining review for handlers, grants and auto-prepend directives.
+
