@@ -4,6 +4,24 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 
 ## [Não publicado]
 
+## [0.24.0] - 2026-11-03
+
+### Remediação seletiva de WordPress e Linux
+- Criado leitor e serializador restrito para opções PHP `cron` e `active_plugins`, sem executar PHP e sem usar `unserialize`; arrays e escalares canônicos são aceitos, objetos, referências e estruturas inesperadas são recusados.
+- Adicionadas opções de linha de comando `--remove-cron-hook NOME` e `--deactivate-plugin PASTA/ARQUIVO.php` aos modos `--apply-db` e `--recover`. Seletores devem ser exatos, sem curingas, e a opção `--dry-run` gera plano sem expor valores completos.
+- Alterações de opções serializadas usam verificação de SHA-256 anterior e posterior, com atualização SQL condicionada ao hash antigo; outras entradas de cron e plugins são preservadas.
+- Criada quarentena pontual `bin/remediar_arquivos_wp.py` para um arquivo `wp-content` classificado como `IOC_REQUER_VALIDACAO` em evidência anterior, com conferência de SHA-256, cópia privada e exclusão do arquivo somente após validação; não remove diretórios ou plugins inteiros por heurística.
+- Criada quarentena Linux `bin/remediar_persistencia_linux.py` para arquivos exatos de `/etc/cron.d` e `/etc/profile.d` já classificados como `HOST_INDICATOR_REQUIRES_INVESTIGATION`, com hash conferido e cópia preservada.
+- Operações de quarentena são opt-in, exigem root e confirmação interativa; não matam processos nem executam arquivos suspeitos.
+- Testes sintéticos e integração MySQL descartável verificam preservação de hooks legítimos, reindexação de plugins, recusas de serialização insegura, concorrência, hashes e quarentena.
+
+### Limites e segurança
+- Pré-lançamento para homologação em clone; **não executar alterações diretamente em produção sem backup restaurável e validação independente**.
+- `cron`/plugins com objetos ou estruturas PHP não suportadas continuam bloqueados. Atualizações de duas opções não são transação atômica global; eventual falha exige recuperação supervisionada.
+- Persistência em serviços systemd, tarefas do usuário, shell global, processos ativos, configuração PHP e banco não é removida automaticamente por heurística. A quarentena de cron.d/profile.d não assegura que processos já em memória foram encerrados.
+- A remoção de um arquivo identificado como IOC não garante a desinfecção total de um plugin, do WordPress ou do host. É necessária auditoria pós-correção.
+
+
 ## [0.23.0] - 2026-11-03
 
 ### Recuperação assistida de arquivos e banco
