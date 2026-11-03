@@ -27,6 +27,8 @@ Para combinar substituição de `wp-content` e remoção exata de opções, use 
 
 `--dry-run` gera `recovery-plan.json` privado sem modificar o WordPress ou o banco. A aplicação real exige `--recovery-approve` e confirmações interativas, inclusive backup externo e isolamento. Antes de qualquer alteração a ferramenta grava `site-before.tar.gz`, `site-before.sha256`, `database-before.sql` e `database-before.sha256` no diretório do caso. A cópia anterior de `wp-content` permanece em quarentena fora da raiz pública. **Não apague a quarentena nem os backups** antes de validação.
 
+O retorno de uma recuperação aplicada permanece **40 (revisão pendente)**: ele registra que alterações foram executadas, mas não garante remediação completa. Execute nova auditoria em separado e valide o funcionamento antes de reativar.
+
 Restrições deliberadas: não há limpeza genérica de registros serializados, exclusão automática de sessões, rotação de salts, sincronização automática do núcleo ou restauração automática de banco. Exclusões SQL por nomes múltiplos não são atômicas em conjunto. Ocorrendo falha após a primeira alteração, mantenha o site isolado e restaure os dados a partir dos backups validados sob supervisão. É indispensável verificar o estado dos arquivos, a execução do WordPress, a persistência no host e o banco antes de autorizar a reativação.
 
 ## Uso rápido
