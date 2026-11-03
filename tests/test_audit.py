@@ -1052,6 +1052,35 @@ $table_prefix = 'wp_';
         self.assertNotIn("do-not-show-secret", text)
         self.assertIn("indisponibilidade do site", text.lower())
 
+    def test_relatorio_separa_incidente_historico_manutencao_e_procedencia(self):
+        entradas = [
+            {"evidence_id": "DB-001", "kind": "family_option", "name": "sc_test",
+             "state": "RESIDUO_FAMILIA_REQUER_LIMPEZA", "sha256": "a" * 64},
+            {"evidence_id": "DB-002", "kind": "historical_cache", "name": "cache_anterior",
+             "state": "HISTORICAL_REFERENCE", "sha256": "b" * 64}
+        ]
+        componentes = {"components": [
+            {"component_id": "CORE-001", "slug": "wordpress", "state": "CORE_DESATUALIZADO",
+             "local_version": "7.1.3", "official_version": "7.1.4"},
+            {"component_id": "PLUGIN-002", "slug": "outro", "state": "PLUGIN_REQUER_REVISAO",
+             "local_version": "9.0.1", "official_version": "8.9.9"}
+        ]}
+        texto = "\n".join(audit.customer_findings([], entradas, [], componentes))
+        self.assertIn("Natureza do achado: INDICADOR RESIDUAL DO INCIDENTE", texto)
+        self.assertIn("Natureza do achado: REFERÊNCIA HISTÓRICA", texto)
+        self.assertIn("Natureza do achado: MANUTENÇÃO / ATUALIZAÇÃO", texto)
+        self.assertIn("Natureza do achado: PROCEDÊNCIA / VERSÃO NÃO CONFIRMADA", texto)
+        self.assertIn("Versão instalada: 9.0.1; versão de referência: 8.9.9", texto)
+        self.assertIn("não comprova comprometimento", texto)
+        self.assertNotIn("password=", texto)
+
+    def test_relatorio_cron_informativo_continua_fora_dos_alertas(self):
+        entrada = [{"evidence_id": "DB-009", "name": "cron", "kind": "cron_metadata",
+                    "state": "INFORMATIONAL", "sha256": "c" * 64}]
+        texto = "\n".join(audit.customer_findings([], entrada, [], None))
+        self.assertNotIn("DB-009 - Banco de dados", texto)
+        self.assertIn("Nenhuma ocorrência individual", texto)
+
     def test_customer_configuration_priority_in_portuguese(self):
         texto = "\n".join(audit.customer_findings(
             [], [], [{"evidence_id": "CONFIG-001", "path": ".htaccess",
