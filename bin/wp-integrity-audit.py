@@ -37,7 +37,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 
-VERSION = "0.27.0"
+VERSION = "0.27.1"
 IOC = re.compile(r"SC_ADV_BEGIN|--sc-cli|--sc-succ|trace-inspector-pad|cipher-feeder|_sc_fpc|sc_cron_guard|sc_cron_recovery|e1v61n2r1im6t7_|sc_persist_manifest|sc_own_manifest|kinetic-relay-live|function ceya|Axiom Sentinel Snap|SCV:[0-9]+")
 PATTERN_NAMES = (".sc_", ".gr_", ".gk_", ".kk_", ".wp-object-cache")
 SCRIPT_EXTENSIONS = {".php", ".phtml", ".phar", ".inc", ".php5", ".php7", ".php8", ".pht", ".phps"}
@@ -262,6 +262,13 @@ def behavioral_anomaly_indicators(relative: str, text: str) -> tuple[list[str], 
                       any(part.startswith(".") for part in Path(relative).parts[:-1]))
     if sensitive_path and len(hits) >= 2:
         score += 2
+    # Wordfence and the bundled getID3 library legitimately combine parsing,
+    # network/file helpers and long function names.  Keep IOC/generic-shell
+    # checks active, but require stronger independent evidence before a
+    # behavior-only finding in these known vendor/core contexts.
+    if (relative.startswith("wp-content/plugins/wordfence/") or
+            relative.startswith("wp-includes/ID3/")):
+        score = max(0, score - 3)
     return hits, score
 
 

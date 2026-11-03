@@ -4,6 +4,13 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 
 ## [Não publicado]
 
+## [0.27.1] - 2026-11-03
+
+### Contexto de bibliotecas legítimas
+- Reduzido o peso da heurística comportamental em arquivos do Wordfence e na biblioteca oficial `wp-includes/ID3`, que legitimamente usam funções de rede, arquivos e parsing.
+- IOC explícito, webshell genérico e divergência de checksum continuam prevalecendo nesses caminhos.
+- Incluídos testes para impedir que a heurística genérica transforme bibliotecas conhecidas em falso positivo.
+
 ## [0.27.0] - 2026-11-03
 
 ### Detecção comportamental de variantes

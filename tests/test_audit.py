@@ -69,6 +69,16 @@ class PythonAuditTests(unittest.TestCase):
         self.assertIn("REMOTE_COMMUNICATION", hits)
         self.assertIn("DYNAMIC_EXECUTION", hits)
 
+    def test_behavioral_context_does_not_flag_known_wordfence_or_core_library(self):
+        text = "<?php file_put_contents('/tmp/x','x'); curl_exec($c); eval($x); " \
+               "$s='\\x41\\x42'; function qwertyuiop(){}"
+        _, wordfence_score = audit.behavioral_anomaly_indicators(
+            "wp-content/plugins/wordfence/lib/wfUtils.php", text)
+        _, core_score = audit.behavioral_anomaly_indicators(
+            "wp-includes/ID3/getid3.lib.php", text)
+        self.assertLess(wordfence_score, 5)
+        self.assertLess(core_score, 5)
+
     def test_version_and_modules(self):
         self.assertRegex(audit.VERSION, r"^\d+\.\d+\.\d+$")
         self.assertTrue(callable(audit.file_audit))
