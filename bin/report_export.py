@@ -2,6 +2,7 @@
 from __future__ import annotations
 from pathlib import Path
 import os
+import stat
 import tempfile
 
 
@@ -15,6 +16,19 @@ def export_management_pdf(case: Path) -> Path:
     output = case / "management-report.pdf"
     if source.is_symlink() or not source.is_file() or output.is_symlink():
         raise PDFExportError("Origem ou destino do relatório gerencial ausente ou inseguro")
+    # A leitura por descritor com O_NOFOLLOW evita troca por link simbólico
+    # entre a validação do caminho e a abertura do relatório.
+    try:
+        fd = os.open(source, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+        with os.fdopen(fd, "rb") as entrada:
+            info = os.fstat(entrada.fileno())
+            if not stat.S_ISREG(info.st_mode) or info.st_size > 8 * 1024 * 1024:
+                raise PDFExportError("Relatório gerencial inválido ou maior que 8 MiB")
+            conteudo = entrada.read(8 * 1024 * 1024 + 1)
+            if len(conteudo) > 8 * 1024 * 1024:
+                raise PDFExportError("Relatório gerencial excede o limite de 8 MiB")
+    except OSError as error:
+        raise PDFExportError("Não foi possível ler o relatório gerencial com segurança") from error
     try:
         from reportlab.lib.pagesizes import A4
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -52,7 +66,7 @@ def export_management_pdf(case: Path) -> Path:
                               fontSize=8, leading=11, spaceAfter=4, wordWrap="CJK"))
     elements = []
     import re
-    for line in source.read_text(encoding="utf-8", errors="replace").splitlines():
+    for line in conteudo.decode("utf-8", errors="replace").splitlines():
         line = line.strip()
         if not line:
             elements.append(Spacer(1, 5))
