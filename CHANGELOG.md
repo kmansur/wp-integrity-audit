@@ -4,6 +4,16 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 
 ## [Não publicado]
 
+## [0.26.0] - 2026-11-03
+
+### Detecção de payloads codificados no banco
+- A auditoria somente leitura examina colunas textuais comuns do WordPress em busca de valores Base64 válidos.
+- Valores Base64/GZIP são decodificados apenas em memória, sem desserialização ou execução, e registrados por tamanho, SHA-256, cadeia de codificação e marcadores técnicos.
+- Payloads decodificados que contêm PHP ou indicadores da família passam a ser classificados como resíduos que exigem limpeza; valores codificados sem marcador explícito permanecem como revisão manual.
+- O conteúdo bruto e o conteúdo decodificado não são gravados nos relatórios.
+- O modo assistido aceita `--remove-confirmed-encoded-db-payload`, que seleciona somente opções da tabela de opções cujo payload decodificado contém marcadores confirmados; candidatos sem marcador continuam exigindo seleção nominal e revisão manual.
+- Incluídos testes unitários para Base64, GZIP e rejeição de falsos candidatos.
+
 ## [0.24.1] - 2026-11-03
 
 ### Classificação de incidente e evidências de processo

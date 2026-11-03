@@ -8,11 +8,14 @@ No WordPress PHP code or WP-CLI commands are executed.
 from __future__ import annotations
 
 import argparse
+import base64
+import binascii
 import contextlib
 import csv
 import io
 import datetime as dt
 import fcntl
+import gzip
 import hashlib
 import json
 import os
@@ -34,7 +37,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 
-VERSION = "0.25.2"
+VERSION = "0.26.0"
 IOC = re.compile(r"SC_ADV_BEGIN|--sc-cli|--sc-succ|trace-inspector-pad|cipher-feeder|_sc_fpc|sc_cron_guard|sc_persist_manifest|sc_own_manifest|function ceya|Axiom Sentinel Snap|SCV:[0-9]+")
 PATTERN_NAMES = (".sc_", ".gr_", ".gk_", ".kk_", ".wp-object-cache")
 SCRIPT_EXTENSIONS = {".php", ".phtml", ".phar", ".inc", ".php5", ".php7", ".php8", ".pht", ".phps"}
@@ -59,6 +62,7 @@ LICENSE_BYPASS_PATTERNS = (
 
 SENSITIVE = re.compile(r"(?i)(password|passwd|secret|token|api[_-]?key)\s*[:=]\s*[^\s,;]+")
 LONG_VALUE = re.compile(r"(?<![\w])[A-Za-z0-9_/-]{40,}(?![\w])")
+BASE64_CANDIDATE = re.compile(r"^[A-Za-z0-9+/]{64,}={0,2}$")
 # Never apply arbitrary high-entropy redaction to filesystem paths: it
 # destroys evidentiary context and makes file identification impossible.
 DB_KEY = re.compile(r"""define\s*\(\s*['"](?P<name>DB_NAME|DB_USER|DB_PASSWORD|DB_HOST)['"]\s*,\s*(?P<quote>['"])(?P<value>(?:\\.|(?!(?P=quote)).)*)(?P=quote)\s*\)""", re.S)
@@ -635,10 +639,12 @@ def attach_evidence_ids(files: list[dict], database: list[dict] | None,
         entry["source"] = "database"
         entry["database"] = db_name
         kind = entry.get("kind", "")
-        suffix = ("users" if kind == "suspicious_users" else
+        suffix = (entry.get("source_table_suffix") if kind == "encoded_payload" else
+                  "users" if kind == "suspicious_users" else
                   "usermeta" if kind in ("session_rows", "application_password_rows") else "options")
         entry["source_table"] = (db_prefix or "") + suffix
-        entry["source_column"] = ("user_login" if suffix == "users" else
+        entry["source_column"] = (entry.get("source_column_name") if kind == "encoded_payload" else
+                                  "user_login" if suffix == "users" else
                                   "meta_key" if suffix == "usermeta" else "option_value")
 
 
@@ -654,8 +660,15 @@ def audit_status(files: list[dict], processes: list[str],
     # correlated as confirmed compromised files for the management summary.
     direct_file_iocs = sum(x.get("classification") == "IOC_REQUER_VALIDACAO" for x in files)
     confirmed_files = direct_file_iocs if processes else 0
+    encoded_family = sum(1 for x in (database or [])
+                         if x.get("kind") == "encoded_payload"
+                         and x.get("state") == "RESIDUO_FAMILIA_REQUER_LIMPEZA")
+    encoded_review = sum(1 for x in (database or [])
+                        if x.get("kind") == "encoded_payload"
+                        and x.get("state") == "VALOR_CODIFICADO_REQUER_VALIDACAO")
     summary = {
-        "confirmed_family_residues": count("family_option"),
+        "confirmed_family_residues": count("family_option") + encoded_family,
+        "encoded_payloads_requiring_review": encoded_review,
         "historical_references": count("historical_cache"),
         "informational_records": count("session_rows") + count("application_password_rows"),
         "active_database_markers": sum(count(k) for k in ("marker_option", "cron_marker", "active_plugins_marker")),
@@ -1072,6 +1085,7 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
         f"- Situação detalhada: **{status_detail}**",
         f"- Código de saída: **{exit_code}**",
         f"- Resíduos da família investigada: **{summary['confirmed_family_residues']}**",
+        f"- Payloads codificados que exigem revisão: **{summary.get('encoded_payloads_requiring_review', 0)}**",
         f"- Referências históricas: **{summary['historical_references']}**",
         f"- Registros informativos: **{summary['informational_records']}**",
         f"- Indicadores ativos no banco de dados: **{summary['active_database_markers']}**",
@@ -1126,6 +1140,10 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
                 f"- Evidência sem dados sigilosos: `{item['safe_excerpt']}`",
                 f"- Valor interpretado: `{item['safe_excerpt'] if item.get('value_classification') == 'ESCALAR_TEXTO_NUMERO_NAO_CODIFICADO' else '[NOT_EXPOSED]'}`",
                 f"- Trecho decodificado: `{item['decoded_excerpt']}`",
+                *([f"- Tamanho após decodificação: {item['decoded_length_bytes']} bytes",
+                   f"- SHA-256 após decodificação: `{item['decoded_sha256']}`",
+                   f"- Marcadores no conteúdo decodificado: {', '.join(item.get('decoded_markers', [])) or 'nenhum'}"]
+                  if item.get('kind') == 'encoded_payload' else []),
                 *([f"- Coleta (UTC): `{item['collected_at_utc']}`",
                    f"- Indicadores conhecidos no cron: {len(item['indicator_matches'])}"]
                   if item.get("kind") == "cron_metadata" else []), "",
@@ -1157,6 +1175,8 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
                        for item in database if item["kind"] == kind)
         lines.extend([
             f"- Resíduos da família investigada: **{positive('family_option')}**.",
+            f"- Payloads codificados com marcadores da família: **{sum(item.get('state') == 'RESIDUO_FAMILIA_REQUER_LIMPEZA' for item in database if item['kind'] == 'encoded_payload')}**.",
+            f"- Payloads codificados sem marcador explícito: **{sum(item.get('state') == 'VALOR_CODIFICADO_REQUER_VALIDACAO' for item in database if item['kind'] == 'encoded_payload')}**.",
             f"- Referências históricas: **{positive('historical_cache')}**.",
             f"- Registros informativos: **{sum(int(item['length']) for item in database if item['kind'] in ('session_rows', 'application_password_rows'))}**.",
             f"- Indicadores ativos no banco de dados: **{positive('marker_option') + positive('cron_marker') + positive('active_plugins_marker')}**.",
@@ -1195,6 +1215,8 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
                   "- `LEGITIMO_VALIDADO`: padrão reconhecido de proteção de plugin, sem validação criptográfica.",
                   "- `CONFIGURACAO_PLUGIN_SEGURANCA_REQUER_VALIDACAO`: configuração de segurança que exige análise contextual.",
                   "- `PRESENT`: registro informativo presente.",
+                  "- `RESIDUO_FAMILIA_REQUER_LIMPEZA` em payload codificado: conteúdo Base64/GZIP decodificado em memória contém marcadores da família investigada; o payload nunca é executado.",
+                  "- `VALOR_CODIFICADO_REQUER_VALIDACAO`: Base64 válido sem marcador explícito; exige revisão, pois codificação isolada não prova malware.",
                   "- `NOT_FOUND`: verificação executada sem registros correspondentes.",
                   "", "## Limitações", "",
                   "A classificação de arquivos de proteção de plugins utiliza padrões conhecidos e não comprova a integridade dos pacotes.",
@@ -1207,6 +1229,7 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
         f"- Situação final: **{status}**",
         f"- Código de saída: **{exit_code}**",
         f"- Resíduos da família investigada: **{summary['confirmed_family_residues']}**",
+        f"- Payloads codificados que exigem revisão: **{summary.get('encoded_payloads_requiring_review', 0)}**",
         f"- Referências históricas: **{summary['historical_references']}**",
         f"- Registros informativos: **{summary['informational_records']}**",
         f"- Indicadores ativos no banco de dados: **{summary['active_database_markers']}**",
@@ -1307,6 +1330,98 @@ def sql_identifier(value: str) -> str:
     if not re.fullmatch(r"[A-Za-z0-9_]+", value):
         raise AuditError("Invalid SQL identifier")
     return "`" + value + "`"
+
+
+def decode_database_encoded_value(value: str) -> dict | None:
+    """Classify Base64/GZIP values without executing or persisting payloads.
+
+    WordPress options can legitimately contain long strings, so a candidate is
+    reported only when the complete value is valid Base64 (after whitespace is
+    removed).  GZIP is decoded in memory with a strict expansion limit.  Only
+    hashes, sizes and known markers leave this function.
+    """
+    compact = re.sub(r"\s+", "", value).encode("ascii", "ignore")
+    if len(compact) < 64 or not BASE64_CANDIDATE.fullmatch(compact.decode("ascii", "ignore")):
+        return None
+    try:
+        decoded = base64.b64decode(compact, validate=True)
+    except (ValueError, binascii.Error):
+        return None
+    if not decoded:
+        return None
+    stages = [("BASE64", decoded)]
+    if decoded.startswith(b"\x1f\x8b"):
+        try:
+            expanded = gzip.decompress(decoded)
+        except (OSError, EOFError):
+            expanded = b""
+        if expanded and len(expanded) <= 8_000_000:
+            stages.append(("BASE64_GZIP", expanded))
+    final_label, final = stages[-1]
+    lower = final.lower()
+    marker_names = (
+        b"<?php", b"base64_decode", b"gzinflate", b"gzuncompress",
+        b"eval(", b"file_put_contents", b"curl_exec", b"wp_insert_user",
+        b"sc_", b"--sc-cli", b"trace-inspector-pad", b"cipher-feeder",
+    )
+    markers = [marker.decode("ascii") for marker in marker_names if marker in lower]
+    return {
+        "encoding": final_label,
+        "encoded_length_bytes": len(value.encode("utf-8", "replace")),
+        "encoded_sha256": hashlib.sha256(value.encode("utf-8", "replace")).hexdigest(),
+        "decoded_length_bytes": len(final),
+        "decoded_sha256": hashlib.sha256(final).hexdigest(),
+        "decoded_markers": markers,
+        "decoded_php": b"<?php" in lower,
+    }
+
+
+def database_encoded_scan(option_file: str, dbname: str, prefix: str) -> list[dict]:
+    """Find Base64/GZIP payloads in common WordPress text columns.
+
+    The SQL prefilter is intentionally broad; strict Base64 validation and
+    marker classification happen locally. Values are never written to reports.
+    """
+    tables = {
+        "options": ("option_name", "option_value"),
+        "postmeta": ("meta_id", "meta_value"),
+        "posts": ("ID", "post_content"),
+        "usermeta": ("umeta_id", "meta_value"),
+        "comments": ("comment_ID", "comment_content"),
+        "commentmeta": ("meta_id", "meta_value"),
+    }
+    findings: list[dict] = []
+    for suffix, (identity, value_column) in tables.items():
+        table = sql_identifier(prefix + suffix)
+        ident = sql_identifier(identity)
+        value = sql_identifier(value_column)
+        sql = (f"SELECT {ident}, {value} FROM {table} "
+               f"WHERE OCTET_LENGTH({value}) >= 64 AND {value} REGEXP '[A-Za-z0-9+/]{{64}}' LIMIT 200;")
+        for row in query_db(option_file, dbname, sql):
+            if len(row) != 2:
+                raise AuditError("Malformed encoded database scan row")
+            decoded = decode_database_encoded_value(row[1])
+            if decoded is None:
+                continue
+            markers = decoded["decoded_markers"]
+            state = "RESIDUO_FAMILIA_REQUER_LIMPEZA" if markers else "VALOR_CODIFICADO_REQUER_VALIDACAO"
+            findings.append({
+                "kind": "encoded_payload",
+                "name": safe_option_name(str(row[0])),
+                "length": str(decoded["encoded_length_bytes"]),
+                "state": state,
+                "sha256": decoded["encoded_sha256"],
+                "value_length_bytes": decoded["encoded_length_bytes"],
+                "value_classification": decoded["encoding"],
+                "safe_excerpt": "[CONTEÚDO CODIFICADO OMITIDO]",
+                "decoded_excerpt": "[CONTEÚDO DECODIFICADO OMITIDO]",
+                "decoded_length_bytes": decoded["decoded_length_bytes"],
+                "decoded_sha256": decoded["decoded_sha256"],
+                "decoded_markers": markers,
+                "source_table_suffix": suffix,
+                "source_column_name": value_column,
+            })
+    return findings
 
 def database_audit(option_file: str, dbname: str, prefix: str, case: Path,
                    post: bool = False) -> list[dict]:
@@ -1415,6 +1530,9 @@ def database_audit(option_file: str, dbname: str, prefix: str, case: Path,
             "collected_at_utc": dt.datetime.now(dt.timezone.utc).isoformat(),
             "indicator_matches": [x["name"] for x in findings if x["kind"] == "cron_marker" and x.get("state") != "NOT_FOUND"],
         })
+    # Scan for encoded payloads after the targeted family checks. This is
+    # read-only and deliberately does not deserialize or execute any value.
+    findings.extend(database_encoded_scan(option_file, dbname, prefix))
     write_private(case / ("database-post-audit.json" if post else "database-evidence.json"),
                   json.dumps(findings, indent=2))
     return findings
@@ -1994,6 +2112,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--replace-plugins-themes", action="store_true")
     parser.add_argument("--remove-db-option", action="append", default=[], metavar="NOME",
                         help="Opção exata do WordPress autorizada para exclusão; repetível, sem curingas")
+    parser.add_argument("--remove-confirmed-encoded-db-payload", action="store_true",
+                        help="Seleciona para remoção apenas payloads Base64/GZIP que contenham marcadores confirmados; não remove candidatos sem marcador")
     parser.add_argument("--remove-cron-hook", action="append", default=[], metavar="HOOK",
                         help="Remove apenas eventos de hook exato do cron serializado")
     parser.add_argument("--deactivate-plugin", action="append", default=[], metavar="CAMINHO",
@@ -2057,7 +2177,7 @@ def parse_args() -> argparse.Namespace:
         parser.error("--core-source is only valid with --recover")
     if args.official_sync:
         parser.error("--official-sync permanece desabilitado até validar downloads e assinaturas")
-    if (args.remove_db_option or args.remove_cron_hook or args.deactivate_plugin) and args.mode not in ("apply-db", "recover"):
+    if (args.remove_db_option or args.remove_confirmed_encoded_db_payload or args.remove_cron_hook or args.deactivate_plugin) and args.mode not in ("apply-db", "recover"):
         parser.error("Seletores de banco exigem --apply-db ou --recover")
     if (args.dry_run or args.recovery_approve) and args.mode not in ("apply-files", "apply-db", "recover"):
         parser.error("--dry-run e --recovery-approve exigem modo de recuperação")
@@ -2065,7 +2185,7 @@ def parse_args() -> argparse.Namespace:
         parser.error("Use --dry-run para simular ou --recovery-approve para execução assistida")
     if args.mode in ("apply-files", "recover") and not args.replace_plugins_themes:
         parser.error("A substituição de wp-content exige --replace-plugins-themes")
-    if args.mode == "apply-db" and not (args.remove_db_option or args.remove_cron_hook or args.deactivate_plugin):
+    if args.mode == "apply-db" and not (args.remove_db_option or args.remove_confirmed_encoded_db_payload or args.remove_cron_hook or args.deactivate_plugin):
         parser.error("--apply-db exige --remove-db-option, --remove-cron-hook ou --deactivate-plugin")
     if args.mode in ("apply-db", "apply-files", "recover") and (args.email_to or args.pdf_report or args.bundle_evidence):
         parser.error("Recuperação não pode combinar envio, PDF ou pacote de evidências na mesma execução")
@@ -2207,6 +2327,12 @@ def main() -> int:
                     raise AuditError("Fonte limpa deve conter plugins, themes e uploads: cópia completa de wp-content")
             else:
                 source = None
+            encoded_option_names = []
+            if args.remove_confirmed_encoded_db_payload:
+                encoded_option_names = [item["name"] for item in database_encoded_scan(cnf, dbname, prefix)
+                                        if item.get("source_table_suffix") == "options"
+                                        and item.get("state") == "RESIDUO_FAMILIA_REQUER_LIMPEZA"]
+            requested_db_options = list(dict.fromkeys(args.remove_db_option + encoded_option_names))
             serial_plan = (planejar_serializados(cnf, dbname, prefix,
                             args.remove_cron_hook, args.deactivate_plugin)
                            if args.mode in ("apply-db", "recover") else [])
@@ -2221,11 +2347,12 @@ def main() -> int:
                 selected = {item["option_name"] for item in serial_plan}
                 if any(row[0] not in selected for row in precheck):
                     raise AuditError("Persistência serializada não selecionada; correção bloqueada")
-            plan = database_cleanup_plan(cnf, dbname, prefix, args.remove_db_option) if args.mode in ("apply-db", "recover") else []
+            plan = database_cleanup_plan(cnf, dbname, prefix, requested_db_options) if args.mode in ("apply-db", "recover") else []
             write_private(case / "recovery-plan.json", json.dumps({
                 "mode": args.mode, "dry_run": args.dry_run,
                 "clean_source": str(source) if source else None,
                 "database_options": plan,
+                "encoded_database_options_selected": encoded_option_names,
                 "serialized_updates": [{k: v for k, v in item.items() if not k.startswith("_")}
                                        for item in serial_plan],
                 "core_changes": False,
@@ -2265,7 +2392,7 @@ def main() -> int:
                         write_private(case / "serialized-remediation-result.json",
                                       json.dumps([{k: v for k, v in item.items() if not k.startswith("_")}
                                                   for item in serial_plan], ensure_ascii=False, indent=2))
-                    sql_cleanup(cnf, dbname, prefix, case, requested=args.remove_db_option)
+                    sql_cleanup(cnf, dbname, prefix, case, requested=requested_db_options)
                 # Credenciais e salts são alterados somente em operação separada;
                 # sem rotação implícita que possa quebrar autenticações ou integrações.
                 upload_permissions_audit(target, case)

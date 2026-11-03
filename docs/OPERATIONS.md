@@ -9,6 +9,8 @@ python3 bin/wp-integrity-audit.py --audit-db /path/to/wordpress --case-root /sec
 
 Use authorized sites or offline forensic copies. Case files are created with restrictive permissions. A DB audit reads `wp-config.php` to obtain literal database configuration values; dynamic PHP configuration is rejected.
 
+The 0.26.0 database audit also scans common WordPress text columns for complete Base64 candidates. Base64 and Base64/GZIP values are decoded only in memory and are never executed, unserialized or written in clear text to reports. Evidence contains only encoding type, sizes, SHA-256 values and known marker names. `--remove-confirmed-encoded-db-payload` is an explicit recovery selector and removes only encoded options whose decoded content contains confirmed incident markers; candidates without markers require a separately reviewed `--remove-db-option` selection.
+
 ## File and database recovery
 
 Recovery is a development feature and must only be exercised on disposable WordPress fixtures until end-to-end tests exist. Provide an independent, tested backup before running. The tool creates its own archive and SQL dump, but **these have not been proven restorable**. Quarantine paths are outside the document root and recorded in the private case folder. Successful recovery requires a post-operation file/process/DB scan, though this is not proof of a clean site. Reopening an incident site requires operator review of process persistence, users, permissions, plugin provenance, core integrity, and external credentials.

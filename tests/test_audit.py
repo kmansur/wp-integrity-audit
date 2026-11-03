@@ -1,6 +1,8 @@
 """Isolated regression tests for the Python CLI; no production data required."""
 import importlib.util
 import io
+import base64
+import gzip
 from pathlib import Path
 import stat
 import tempfile
@@ -15,6 +17,20 @@ spec.loader.exec_module(audit)
 
 
 class PythonAuditTests(unittest.TestCase):
+    def test_database_encoded_value_decodes_gzip_without_exposing_payload(self):
+        payload = b"<?php /* sc_persist_manifest */ file_put_contents('/tmp/x', 'x');"
+        encoded = base64.b64encode(gzip.compress(payload)).decode()
+        result = audit.decode_database_encoded_value(encoded)
+        self.assertIsNotNone(result)
+        self.assertEqual(result["encoding"], "BASE64_GZIP")
+        self.assertEqual(result["decoded_length_bytes"], len(payload))
+        self.assertIn("<?php", result["decoded_markers"])
+        self.assertIn("sc_", result["decoded_markers"])
+        self.assertNotIn("payload", result)
+
+    def test_database_encoded_value_rejects_long_non_base64_text(self):
+        self.assertIsNone(audit.decode_database_encoded_value("A" * 200 + "!"))
+
     def test_version_and_modules(self):
         self.assertRegex(audit.VERSION, r"^\d+\.\d+\.\d+$")
         self.assertTrue(callable(audit.file_audit))

@@ -4,6 +4,25 @@ Ferramenta para auditoria de integridade e investigação de comprometimento em 
 
 > **Estado de segurança:** versão de pré-lançamento. Os procedimentos de recuperação ainda não foram validados integralmente em cenários reais de WordPress/MySQL. Não utilize os modos de alteração em produção sem ensaios independentes de recuperação.
 
+## Versão 0.26.0 — auditoria de payloads codificados
+
+A auditoria de banco examina colunas textuais comuns em busca de valores Base64 válidos. Valores Base64 e Base64/GZIP são decodificados somente em memória, sem executar PHP, desserializar objetos ou gravar o conteúdo nos relatórios. O relatório registra a tabela, o registro, a cadeia de codificação, os tamanhos, os hashes e os marcadores identificados.
+
+Payloads decodificados com marcadores confirmados podem ser selecionados explicitamente em uma recuperação assistida com `--remove-confirmed-encoded-db-payload`. Valores codificados sem marcador explícito permanecem em revisão manual; a ferramenta não os remove automaticamente.
+
+Exemplo de auditoria somente leitura:
+
+```bash
+python3 bin/wp-integrity-audit.py /var/www/exemplo/public_html --audit-db
+```
+
+Exemplo de plano de remoção assistida, após backup externo validado e homologação:
+
+```bash
+python3 bin/wp-integrity-audit.py /var/www/exemplo/public_html --apply-db \
+  --remove-confirmed-encoded-db-payload --dry-run
+```
+
 
 
 ## Remediação seletiva — 0.24.0 (homologação controlada)
