@@ -4,6 +4,16 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 
 ## [Não publicado]
 
+## [0.21.11] - 2026-11-03
+
+### Correção de testes de integração
+- Alinhadas 14 asserções dos testes MySQL aos rótulos existentes em português brasileiro, preservando verificações de dados estruturados, SHA-256 e classificações técnicas.
+- Nenhuma regra de detecção, recuperação, exportação PDF, envio SMTP ou código de retorno foi alterado.
+- Versão da ferramenta atualizada para `0.21.11`.
+
+### Homologação
+- A correção exige confirmação de todos os jobs do GitHub Actions, especialmente o de integração MySQL, antes de liberar a próxima fase.
+
 ## [0.21.10] - 2026-10-31
 
 ### Registro de incidente
