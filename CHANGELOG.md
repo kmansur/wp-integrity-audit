@@ -4,6 +4,20 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 
 ## [Não publicado]
 
+## [0.21.12] - 2026-11-03
+
+### Correção do inventário de componentes
+- O parser de cabeçalhos agora lê somente o bloco de metadados do plugin ou tema, evitando que anotações PHP posteriores substituam a versão declarada (caso real do Popup Maker).
+- A leitura é limitada aos primeiros 8 KiB e não executa PHP. Versões inválidas ou ausentes recebem diagnóstico explícito `header_status` no JSON e no CSV.
+- A consulta oficial identifica separadamente o componente encontrado cuja versão local não pôde ser validada (`OFFICIAL_COMPONENT_FOUND_VERSION_UNVERIFIED`), sem declarar correspondência de versões.
+- Os relatórios de componentes e sua seção gerencial foram traduzidos para português; os identificadores JSON continuam estáveis.
+- A evidência informativa de cron permanece nos dados técnicos, mas deixa de aparecer como suspeita individual no relatório gerencial quando não há indicadores.
+- O relatório gerencial indica versões instalada e oficial e esclarece que o hash informado se refere apenas ao arquivo principal.
+- Corrigido o fechamento do arquivo CSV em teste unitário e adicionadas quatro verificações de regressão.
+
+### Validação pendente
+- Confirmar aprovação do GitHub Actions e repetir a auditoria de leitura no ambiente Linux; não homologar recuperação em produção.
+
 ## [0.21.11] - 2026-11-03
 
 ### Correção de testes de integração
