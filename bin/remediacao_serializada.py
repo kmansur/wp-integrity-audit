@@ -110,7 +110,7 @@ def remover_hook_cron(dados: bytes, hook: str) -> tuple[bytes, int]:
     if not re.fullmatch(r"[A-Za-z0-9_.:-]{1,160}", hook):
         raise SerializacaoInsegura("Hook inválido")
     obj = LeitorPHP(dados).completo()
-    if obj[0] != "array":
+    if not isinstance(obj, tuple) or obj[0] != "array":
         raise SerializacaoInsegura("Cron não é um array")
     novo = []
     total = 0
@@ -135,7 +135,7 @@ def desativar_plugin(dados: bytes, plugin: str) -> tuple[bytes, int]:
     if not re.fullmatch(r"[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_./-]{1,150}\.php", plugin) or ".." in plugin.split("/"):
         raise SerializacaoInsegura("Identificador do plugin inválido")
     obj = LeitorPHP(dados).completo()
-    if obj[0] != "array" or any(type(k) is not int or type(v) is not bytes for k, v in obj[1]):
+    if not isinstance(obj, tuple) or obj[0] != "array" or any(type(k) is not int or type(v) is not bytes for k, v in obj[1]):
         raise SerializacaoInsegura("Lista de plugins não é uma lista serializada simples")
     restante = [v for _, v in obj[1] if v != plugin.encode("utf-8")]
     return serializar(("array", list(enumerate(restante)))), len(obj[1]) - len(restante)
