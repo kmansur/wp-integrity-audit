@@ -12,8 +12,8 @@ import urllib.request
 
 API = "https://api.wordpress.org"
 VERSION_RE = re.compile(r"^[0-9]+(?:\.[0-9]+){1,4}(?:[-+._][A-Za-z0-9.-]+)?$")
-HEADERS = re.compile(r"(?im)^\\s*\\*?\\s*(Plugin Name|Theme Name|Version|Template|Update URI|Plugin URI|Theme URI)\\s*:\\s*([^\\r\\n]{0,250})")
-HEADER_BLOCK = re.compile(r"/\\*.*?\\*/", re.S)
+HEADERS = re.compile(r"(?im)^\s*(?:/\*)?\s*\*?\s*(Plugin Name|Theme Name|Version|Template|Update URI|Plugin URI|Theme URI)\s*:\s*([^\r\n]{0,250})")
+HEADER_BLOCK = re.compile(r"/\*.*?\*/", re.S)
 STATIC_ROOT = {"index.php", "wp-activate.php", "wp-blog-header.php", "wp-comments-post.php", "wp-config-sample.php",
                "wp-cron.php", "wp-links-opml.php", "wp-load.php", "wp-login.php", "wp-mail.php",
                "wp-settings.php", "wp-signup.php", "wp-trackback.php", "xmlrpc.php"}
@@ -38,7 +38,7 @@ def headers(path: Path) -> dict:
     for match in HEADER_BLOCK.finditer(data):
         campos = {}
         for key, value in HEADERS.findall(match.group()):
-            campos.setdefault(key.lower().replace(" ", "_"), value.strip())
+            campos.setdefault(key.lower().replace(" ", "_"), re.sub(r"\s*\*/\s*$", "", value).strip())
         if campos.get("plugin_name") or campos.get("theme_name"):
             return campos
     return {}
