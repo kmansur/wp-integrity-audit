@@ -37,7 +37,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 
-VERSION = "0.26.2"
+VERSION = "0.27.0"
 IOC = re.compile(r"SC_ADV_BEGIN|--sc-cli|--sc-succ|trace-inspector-pad|cipher-feeder|_sc_fpc|sc_cron_guard|sc_cron_recovery|e1v61n2r1im6t7_|sc_persist_manifest|sc_own_manifest|kinetic-relay-live|function ceya|Axiom Sentinel Snap|SCV:[0-9]+")
 PATTERN_NAMES = (".sc_", ".gr_", ".gk_", ".kk_", ".wp-object-cache")
 SCRIPT_EXTENSIONS = {".php", ".phtml", ".phar", ".inc", ".php5", ".php7", ".php8", ".pht", ".phps"}
@@ -53,6 +53,13 @@ OBFUSCATION_PATTERNS = {
     "ENCODING_OR_COMPRESSION": re.compile(r"\b(?:base64_decode|gzinflate|gzuncompress|str_rot13|convert_uudecode|pack|hex2bin)\s*\(", re.I),
     "DYNAMIC_CALL": re.compile(r"(?:call_user_func|create_function|assert|eval)\s*\(", re.I),
     "CHR_ORD_ASSEMBLY": re.compile(r"\b(?:chr|ord)\s*\(\s*(?:0x[0-9a-f]+|[0-9]{2,3})", re.I),
+}
+BEHAVIOR_PATTERNS = {
+    "FILE_MUTATION": re.compile(r"\b(?:file_put_contents|unlink|rename|mkdir|chmod|copy)\s*\(", re.I),
+    "REMOTE_COMMUNICATION": re.compile(r"\b(?:curl_init|curl_exec|wp_remote_(?:get|post|request)|fsockopen)\s*\(|https?://", re.I),
+    "DYNAMIC_EXECUTION": re.compile(r"\b(?:eval|assert|create_function|include|require)(?:_once)?\s*\(\s*\$", re.I),
+    "ESCAPED_STRING_ASSEMBLY": re.compile(r"(?:\\x[0-9a-f]{2}|\\[0-7]{3})", re.I),
+    "RANDOM_FUNCTION_NAMES": re.compile(r"function\s+[A-Za-z_][A-Za-z0-9_]{8,}\s*\(", re.I),
 }
 LICENSE_BYPASS_PATTERNS = (
     re.compile(r"delete_(?:option|transient)\s*\(\s*['\"]wp_rocket_no_licence['\"]", re.I),
@@ -241,6 +248,23 @@ def obfuscation_indicators(text: str) -> list[str]:
     return hits
 
 
+def behavioral_anomaly_indicators(relative: str, text: str) -> tuple[list[str], int]:
+    """Score combined behavior signals without executing PHP.
+
+    A single network call or file write is normal in WordPress.  Escalation
+    requires multiple independent capabilities, with extra weight for hidden,
+    uploads or mu-plugin locations commonly abused for persistence.
+    """
+    hits = [name for name, pattern in BEHAVIOR_PATTERNS.items() if pattern.search(text)]
+    score = len(hits)
+    sensitive_path = ("/wp-content/uploads/" in "/" + relative or
+                      "/wp-content/mu-plugins/" in "/" + relative or
+                      any(part.startswith(".") for part in Path(relative).parts[:-1]))
+    if sensitive_path and len(hits) >= 2:
+        score += 2
+    return hits, score
+
+
 def file_audit(target: Path, case: Path) -> list[dict]:
     """Inspect known IOC filenames and all script content in bounded chunks."""
     findings: list[dict] = []
@@ -257,6 +281,8 @@ def file_audit(target: Path, case: Path) -> list[dict]:
         safe_text = ""
         generic_match = False
         obfuscation_hits: list[str] = []
+        behavioral_hits: list[str] = []
+        behavioral_score = 0
         license_bypass = False
         if path.suffix.lower() in SCRIPT_EXTENSIONS:
             try:
@@ -279,10 +305,12 @@ def file_audit(target: Path, case: Path) -> list[dict]:
                         overlap = sample[-256:]
                     bounded_text = bytes(bounded).decode("utf-8", "replace")
                     obfuscation_hits = obfuscation_indicators(bounded_text)
+                    behavioral_hits, behavioral_score = behavioral_anomaly_indicators(relative, bounded_text)
                     license_bypass = sum(bool(pattern.search(bounded_text)) for pattern in LICENSE_BYPASS_PATTERNS) >= 2
             except OSError:
                 continue
-        if not (unusual or upload_php or hidden_php or match or generic_match or license_bypass):
+        behavioral_review = behavioral_score >= 5
+        if not (unusual or upload_php or hidden_php or match or generic_match or license_bypass or behavioral_review):
             continue
         classification, reason = classify_file(relative, name, safe_text, match.group(0) if match else None)
         if upload_php and not match and name == "index.php" and known_upload_guard(path):
@@ -295,6 +323,8 @@ def file_audit(target: Path, case: Path) -> list[dict]:
             classification, reason = "PHP_OFUSCACAO_REQUER_QUARENTENA", "Multiple independent PHP obfuscation signals; preserve evidence and quarantine reversibly"
         elif license_bypass and not match:
             classification, reason = "PLUGIN_MODIFICACAO_LICENCA_REQUER_QUARENTENA", "Premium plugin contains license-validation bypass logic; preserve evidence and quarantine reversibly"
+        elif behavioral_review and not match and not generic_match:
+            classification, reason = "PHP_ANOMALIA_COMPORTAMENTAL_REQUER_REVISAO", "Multiple combined file, network, dynamic-execution or obfuscation signals; review context before quarantine"
         if upload_php and not match and not generic_match and reviewed_metform_cache(relative, path):
             classification, reason = "LEGITIMO_VALIDADO", "Exact SHA-256 matches reviewed MetForm cache artifact; not plugin-wide trust"
         if hidden_php and not match and not generic_match and classification == "ARQUIVO_SUSPEITO_REQUER_VALIDACAO":
@@ -308,6 +338,8 @@ def file_audit(target: Path, case: Path) -> list[dict]:
                 "indicator": match.group(0) if match else ("filename" if unusual else "upload PHP"),
                 "snippet": snippet,
                 "obfuscation_indicators": obfuscation_hits,
+                "behavioral_indicators": behavioral_hits,
+                "behavioral_score": behavioral_score,
                 "license_bypass": license_bypass,
             })
         except OSError:
@@ -685,7 +717,7 @@ def audit_status(files: list[dict], processes: list[str],
         "validated_legitimate_files": sum(x.get("classification") == "LEGITIMO_VALIDADO" for x in files),
         "security_configuration_review": sum(x.get("classification") == "CONFIGURACAO_PLUGIN_SEGURANCA_REQUER_VALIDACAO" for x in files),
         "confirmed_compromised_files": confirmed_files,
-        "file_indicators_requiring_review": sum(x.get("classification") in ("IOC_REQUER_VALIDACAO", "ARQUIVO_SUSPEITO_REQUER_VALIDACAO", "PHP_UPLOAD_REQUER_VALIDACAO", "PHP_DIRETORIO_OCULTO_REQUER_VALIDACAO", "CACHE_PLUGIN_REQUER_VALIDACAO", "WEB_SHELL_HEURISTIC_REQUIRES_REVIEW", "PHP_OFUSCACAO_REQUER_QUARENTENA", "PLUGIN_MODIFICACAO_LICENCA_REQUER_QUARENTENA") for x in files),
+        "file_indicators_requiring_review": sum(x.get("classification") in ("IOC_REQUER_VALIDACAO", "ARQUIVO_SUSPEITO_REQUER_VALIDACAO", "PHP_UPLOAD_REQUER_VALIDACAO", "PHP_DIRETORIO_OCULTO_REQUER_VALIDACAO", "CACHE_PLUGIN_REQUER_VALIDACAO", "WEB_SHELL_HEURISTIC_REQUIRES_REVIEW", "PHP_OFUSCACAO_REQUER_QUARENTENA", "PHP_ANOMALIA_COMPORTAMENTAL_REQUER_REVISAO", "PLUGIN_MODIFICACAO_LICENCA_REQUER_QUARENTENA") for x in files),
         "suspicious_processes": len(processes),
     }
     if database is None:

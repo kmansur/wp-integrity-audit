@@ -58,6 +58,17 @@ class PythonAuditTests(unittest.TestCase):
         for marker in ("kinetic-relay-live", "sc_cron_recovery", "e1v61n2r1im6t7_"):
             self.assertRegex(marker, audit.IOC)
 
+    def test_behavioral_anomaly_requires_combined_signals(self):
+        hits, score = audit.behavioral_anomaly_indicators(
+            "wp-content/.hidden/loader.php",
+            "<?php file_put_contents('/tmp/x','x'); curl_exec($c); "
+            "eval($x); $s='\\x41\\x42'; function qwertyuiop(){}"
+        )
+        self.assertGreaterEqual(score, 5)
+        self.assertIn("FILE_MUTATION", hits)
+        self.assertIn("REMOTE_COMMUNICATION", hits)
+        self.assertIn("DYNAMIC_EXECUTION", hits)
+
     def test_version_and_modules(self):
         self.assertRegex(audit.VERSION, r"^\d+\.\d+\.\d+$")
         self.assertTrue(callable(audit.file_audit))

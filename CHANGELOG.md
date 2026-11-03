@@ -4,6 +4,15 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 
 ## [Não publicado]
 
+## [0.27.0] - 2026-11-03
+
+### Detecção comportamental de variantes
+- Adicionada análise combinada de mutação de arquivos, comunicação remota, execução dinâmica, montagem de strings escapadas e nomes de funções anômalos.
+- A classificação exige múltiplos sinais independentes e aumenta o peso em `uploads`, `mu-plugins` e diretórios ocultos; um único padrão legítimo não gera quarentena.
+- O resultado é `PHP_ANOMALIA_COMPORTAMENTAL_REQUER_REVISAO`, sem remoção automática e sem execução do conteúdo.
+- Indicadores conhecidos continuam sendo correlacionados, mas a auditoria passa a detectar variantes que alteram nomes, strings e caminhos.
+- Incluído teste de regressão para combinação de sinais e controle de limiar.
+
 ## [0.26.2] - 2026-11-03
 
 ### Detecção de persistência Kinetic Relay
