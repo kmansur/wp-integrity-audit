@@ -1,0 +1,41 @@
+"""Valida que o plano de recuperação SC não executa ações nem aprova liberação."""
+import json
+from pathlib import Path
+import sys
+import tempfile
+import unittest
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "bin"))
+import sc403_plano
+
+
+class TestPlanoSC(unittest.TestCase):
+    def test_gera_plano_bloqueado_e_nao_executavel(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            caso = Path(tmp)
+            (caso / "file-evidence.json").write_text(json.dumps([
+                {"path": "wp-content/arquivo.php", "classification": "IOC_REQUER_VALIDACAO"}
+            ]))
+            (caso / "database-evidence.json").write_text(json.dumps([
+                {"kind": "sc403_derived_option", "name": "aabbccddeeff", "state": "REVISAO_NECESSARIA"}
+            ]))
+            (caso / "sc403-forense.json").write_text(json.dumps({
+                "proc": {"status": "COMPLETA", "resultados": []},
+                "zip": {"status": "COMPLETA", "resultados": []},
+            }))
+            plano = sc403_plano.gerar_plano(caso)
+            self.assertFalse(plano["execucao_automatica_autorizada"])
+            self.assertFalse(plano["liberacao_do_site_autorizada"])
+            self.assertIn("INDICADORES_REQUEREM_VALIDACAO", plano["bloqueios"])
+            self.assertIn("wp-content/arquivo.php", plano["indicadores"]["arquivos"])
+            self.assertIn("aabbccddeeff", plano["indicadores"]["opcoes_sql"])
+
+    def test_evidencia_incompleta_bloqueia(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            plano = sc403_plano.gerar_plano(Path(tmp))
+            self.assertIn("BANCO_NAO_AUDITADO", plano["bloqueios"])
+            self.assertIn("RUNTIME_NAO_AUDITADO", plano["bloqueios"])
+
+
+if __name__ == "__main__":
+    unittest.main()
