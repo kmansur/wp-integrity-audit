@@ -9,6 +9,7 @@ Esta implementação não copia rotinas destrutivas nem executa PHP.
 """
 from __future__ import annotations
 
+import errno
 import hashlib
 import os
 from pathlib import Path
@@ -190,8 +191,9 @@ def inspecionar_proc(raiz: Path, proc_root: Path = Path("/proc"),
                                   "arquivo_removido_aberto": arquivo_removido,
                                   "state": "PROC_SC_REQUER_INVESTIGACAO" if indicador or arquivo_removido
                                   else "PROCESSO_ASSOCIADO_INVENTARIADO"})
-        except (OSError, PermissionError):
-            falhas_acesso += 1
+        except OSError as erro:
+            if erro.errno not in (errno.ENOENT, errno.ESRCH):
+                falhas_acesso += 1
             continue
     return {"status": "PARCIAL" if falhas_acesso else "COMPLETA",
             "resultados": resultado, "erros": erros,
