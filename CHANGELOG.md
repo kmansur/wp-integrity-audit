@@ -15,6 +15,7 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 - A recuperação assistida consulta novamente `/proc` e arquivos ZIP após as alterações; o resultado restrito é registrado em `sc403-recovery-postcheck.json`.
 - Persistências encontradas ou falta de cobertura após a recuperação causam bloqueio/revisão no parecer, sem autorizar reativação.
 - Incluídos testes sintéticos de relatórios sem hash, opções SC e pendências pós-recuperação.
+- Inventário SQL de triggers, eventos e rotinas passa a reconhecer quando mais de 1.000 objetos são retornados, registrando `fontes_com_limite_atingido` e cobertura `INCOMPLETA`; adicionado teste de regressão.
 
 ### Testes
 - Adicionado job de regressão completa em Python 3.11 ao workflow de segurança SC; mantidos testes SC em Python 3.10, 3.11 e 3.12.
