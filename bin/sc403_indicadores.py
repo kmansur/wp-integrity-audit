@@ -122,9 +122,16 @@ def investigar_arquivos(raiz: Path, limite_por_arquivo: int = 8_388_608) -> list
     """Inspeção exata dos caminhos derivados; não segue symlinks nem modifica arquivos."""
     dados = identificadores(raiz)
     encontrados = []
+    raiz_real = raiz.resolve(strict=True)
     for papel, relativo in dados["arquivos"].items():
         caminho = raiz / relativo
         try:
+            # Rejeita links simbólicos em qualquer componente do caminho relativo.
+            cursor = raiz
+            if any((cursor := cursor / parte).is_symlink() for parte in Path(relativo).parts):
+                continue
+            if not caminho.resolve(strict=False).is_relative_to(raiz_real):
+                continue
             if caminho.is_symlink() or not caminho.exists():
                 continue
             if not (caminho.is_file() or caminho.is_dir()):
