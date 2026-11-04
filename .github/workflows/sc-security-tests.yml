@@ -7,12 +7,14 @@ on:
       - "bin/**"
       - "tests/test_sc403_*.py"
       - "rules/**"
+      - "tools/sc403-browser-admin.js"
       - ".github/workflows/sc-security-tests.yml"
   pull_request:
     paths:
       - "bin/**"
       - "tests/test_sc403_*.py"
       - "rules/**"
+      - "tools/sc403-browser-admin.js"
       - ".github/workflows/sc-security-tests.yml"
 
 permissions:
@@ -39,3 +41,5 @@ jobs:
         run: python -m unittest discover -s tests -p 'test_sc403_*.py' -v
       - name: Conferir versão publicada
         run: python bin/wp-integrity-audit.py --version
+      - name: Validar sintaxe JavaScript da revogação manual
+        run: node --check tools/sc403-browser-admin.js
