@@ -4,6 +4,22 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 
 ## [Não publicado]
 
+## [0.29.0] - 2026-11-04
+
+### Detecção estática SCV:4.3.24 e atribuição
+- Adicionado `bin/sc403_indicadores.py`, implementação independente baseada no estudo aberto de ux2dev/wordpress-sc403-cleaner (GPL-2.0-or-later), com crédito no código e README.
+- Derivação, a partir do ABSPATH, de caminhos de arquivos, chaves privadas SQL e identificadores de endpoints da variante SCV:4.3.24.
+- Inspeção somente leitura dos caminhos derivados, registro de SHA-256 e metadados de watermark quando possível; nenhum caminho derivado isolado autoriza remediação.
+- Consulta SQL limitada aos identificadores derivados, sem exportar conteúdo bruto; decodificação Base64/XOR em memória, com limites e hashes de saída. Valores truncados são marcados para revisão.
+- Adicionados `sc403-file-evidence.json` e `sc403-database-evidence.json`, integração dos achados ao inventário e à decisão conservadora de liberação.
+- Incluídos testes sintéticos de derivação, limites, indicadores em arquivos e não exposição de valores SQL.
+- Mantidas as operações de recuperação existentes e sem incorporar comandos destrutivos de projetos externos.
+
+### Limitações e homologação
+- A detecção determinística atende à variante documentada SCV:4.3.24; não dispensa inspeção das demais persistências.
+- Execução da suíte completa e ensaios reais de recuperação em Debian/Ubuntu ainda pendentes antes de homologação em produção.
+
+
 ## [0.28.0] - 2026-11-03
 
 ### Controles emergenciais de auditoria
