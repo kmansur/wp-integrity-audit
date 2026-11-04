@@ -824,6 +824,11 @@ def optional_probe_review(case: Path) -> list[str]:
             issues.append("Correlação dos logs HTTP com endpoints SC incompleta")
         if logs_sc.get("total_service_worker") or logs_sc.get("total_instalador"):
             issues.append("Acessos aos endpoints derivados SC encontrados nos logs HTTP")
+    postcheck_path = case / "sc403-recovery-postcheck.json"
+    if postcheck_path.is_file() and not postcheck_path.is_symlink():
+        pos = json.loads(postcheck_path.read_text(encoding="utf-8"))
+        if pos.get("bloqueios"):
+            issues.append("Recuperação assistida: persistências SC ou verificações pós-alteração pendentes")
     yara_path = case / "sc403-yara.json"
     if yara_path.is_file() and not yara_path.is_symlink():
         yara = json.loads(yara_path.read_text(encoding="utf-8"))
@@ -2875,8 +2880,20 @@ def main() -> int:
                 post_files = file_audit(target, case)
                 post_processes = process_audit(case)
                 database = database_audit(cnf, dbname, prefix, case, post=True, site_root=target)
-                make_report(case, args.mode, post_files, post_processes, database, dbname, prefix)
+                # Persistências podem ser recriadas durante o cutover. A
+                # verificação de runtime e ZIPs deve ocorrer TAMBÉM após
+                # qualquer alteração, não apenas no pré-check.
+                runtime_pos = sc403_forense.inspecionar_proc(target)
+                zip_pos = sc403_forense.inspecionar_zips(target)
                 blockers = post_recovery_blockers(database, post_files, post_processes)
+                blockers.extend(sc403_forense.bloqueios_recuperacao(runtime_pos, zip_pos))
+                blockers = sorted(set(blockers))
+                write_private(case / "sc403-recovery-postcheck.json",
+                              json.dumps({"proc": runtime_pos, "zip": zip_pos,
+                                          "bloqueios": blockers,
+                                          "liberacao_autorizada": False},
+                                         indent=2, ensure_ascii=False))
+                make_report(case, args.mode, post_files, post_processes, database, dbname, prefix)
                 if blockers:
                     write_private(case / "recovery-pending.json",
                                   json.dumps({"pending": blockers}, indent=2))
