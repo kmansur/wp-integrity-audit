@@ -55,6 +55,29 @@ class TestForenseSC(unittest.TestCase):
             self.assertTrue(resultado["resultados"][0]["indicador_comando"])
             self.assertNotIn("--sc-cli", str(resultado))
 
+    def test_bloqueio_recuperacao_inventario_livre(self):
+        proc = {"status": "COMPLETA", "resultados": []}
+        zips = {"status": "COMPLETA", "resultados": []}
+        self.assertEqual(sc.bloqueios_recuperacao(proc, zips), [])
+
+    def test_bloqueio_recuperacao_processo_suspeito(self):
+        proc = {"status": "COMPLETA", "resultados": [
+            {"pid": 123, "state": "PROC_SC_REQUER_INVESTIGACAO"}]}
+        zips = {"status": "COMPLETA", "resultados": []}
+        self.assertIn("PROCESSOS_SC_ATIVOS", sc.bloqueios_recuperacao(proc, zips))
+
+    def test_bloqueio_recuperacao_zip_suspeito(self):
+        proc = {"status": "COMPLETA", "resultados": []}
+        zips = {"status": "COMPLETA", "resultados": [
+            {"path": "wp-content/malware.zip", "state": "ZIP_PAYLOAD_REQUER_REVISAO"}]}
+        self.assertIn("ZIP_SC_REQUER_REVISAO", sc.bloqueios_recuperacao(proc, zips))
+
+    def test_bloqueio_recuperacao_cobertura_parcial(self):
+        proc = {"status": "PARCIAL", "resultados": []}
+        zips = {"status": "INCOMPLETA", "resultados": []}
+        self.assertEqual(sc.bloqueios_recuperacao(proc, zips),
+                         ["PROC_COBERTURA_INCOMPLETA", "ZIP_COBERTURA_INCOMPLETA"])
+
     def test_php_em_blocos_late_payload(self):
         with tempfile.TemporaryDirectory() as nome:
             caminho = Path(nome) / "grande.php"
