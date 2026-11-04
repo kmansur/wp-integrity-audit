@@ -26,6 +26,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import component_versions
 import sc403_indicadores
 import sc403_forense
+import sc403_yara
 import report_export
 import mail_delivery
 import remediacao_serializada as serial_wp
@@ -814,6 +815,13 @@ def optional_probe_review(case: Path) -> list[str]:
             issues.append("Inventário de triggers, eventos e rotinas SQL incompleto")
         if sql_data.get("objetos"):
             issues.append("Objetos programáveis do banco SQL exigem revisão de procedência")
+    yara_path = case / "sc403-yara.json"
+    if yara_path.is_file() and not yara_path.is_symlink():
+        yara = json.loads(yara_path.read_text(encoding="utf-8"))
+        if yara.get("status") != "COMPLETA":
+            issues.append("Varredura YARA solicitada não foi concluída")
+        if yara.get("achados"):
+            issues.append("Correspondências de regras YARA exigem validação")
     sc_forense = case / "sc403-forense.json"
     if sc_forense.is_file() and not sc_forense.is_symlink():
         pacote = json.loads(sc_forense.read_text(encoding="utf-8"))
@@ -823,7 +831,9 @@ def optional_probe_review(case: Path) -> list[str]:
         if zip_result.get("resultados"):
             issues.append("Arquivos ZIP com indicadores SC ou inspeção limitada exigem revisão")
         configs = pacote.get("php_config", {}).get("resultados", [])
-        if any(x.get("ioc") or x.get("state") in ("CONFIG_GRANDE_REQUER_REVISAO", "CONFIG_LEITURA_INCOMPLETA") for x in configs):
+        if any(x.get("ioc") or x.get("state") in ("CONFIG_GRANDE_REQUER_REVISAO", "CONFIG_LEITURA_INCOMPLETA")
+               or any(d.lower() in ("auto_prepend_file", "auto_append_file", "allow_url_include") for d in x.get("directives", []))
+               for x in configs):
             issues.append("Configuração PHP com indicador explícito ou cobertura incompleta")
         proc_result = pacote.get("proc", {})
         if proc_result.get("status") != "COMPLETA":
@@ -2512,6 +2522,8 @@ def parse_args() -> argparse.Namespace:
     # Mutating operations always require separate explicit mode and confirmation.
     parser.add_argument("--skip-version-check", action="store_true", help="Desativa a verificação de versões do núcleo, dos plugins e dos temas")
     parser.add_argument("--offline", action="store_true", help="Desativa consultas externas ao WordPress.org")
+    parser.add_argument("--sc-yara-rules", type=Path,
+                        help="Regras YARA locais opcionais sob /etc/wp-integrity-audit (somente auditoria)")
     parser.add_argument("--bundle-evidence", action="store_true", help="Cria arquivo TAR privado com evidências forenses (dados sensíveis)")
     parser.add_argument("--verify-case", type=Path, help="Verifica o manifesto de um caso existente sem analisar o WordPress")
     parser.add_argument("--email-to", help="Envia o PDF gerencial ao destinatário informado")
@@ -2570,6 +2582,8 @@ def parse_args() -> argparse.Namespace:
         parser.error("A substituição de wp-content exige --replace-plugins-themes")
     if args.mode == "apply-db" and not (args.remove_db_option or args.remove_confirmed_encoded_db_payload or args.remove_cron_hook or args.deactivate_plugin):
         parser.error("--apply-db exige --remove-db-option, --remove-cron-hook ou --deactivate-plugin")
+    if args.mode in ("apply-db", "apply-files", "recover") and args.sc_yara_rules:
+        parser.error("Varredura YARA opcional somente no modo de auditoria")
     if args.mode in ("apply-db", "apply-files", "recover") and (args.email_to or args.pdf_report or args.bundle_evidence):
         parser.error("Recuperação não pode combinar envio, PDF ou pacote de evidências na mesma execução")
     return args
@@ -2644,6 +2658,10 @@ def main() -> int:
             }
             write_private(case / "sc403-forense.json",
                           json.dumps(forense_sc, indent=2, ensure_ascii=False))
+            if args.sc_yara_rules:
+                yara_result = sc403_yara.scanner_yara(target, args.sc_yara_rules)
+                write_private(case / "sc403-yara.json",
+                              json.dumps(yara_result, indent=2, ensure_ascii=False))
         if not (is_audit and args.skip_config):
             configuration_audit(target, case)
         if is_audit and not args.skip_host_persistence:
