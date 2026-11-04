@@ -4,6 +4,24 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 
 ## [Não publicado]
 
+## [0.30.0] - 2026-11-04
+
+### Investigação SC complementar
+- Adicionado `bin/sc403_forense.py` com inspeção de conteúdo PHP em ZIPs sem extração, com limites de quantidade, tamanho e descompressão.
+- Inventário estático de diretivas de configuração PHP, sem divulgar valores completos.
+- Inventário de processos Linux por `/proc`, com pesquisa de indicadores da família e arquivos removidos ainda abertos; nenhuma leitura de conteúdo de memória ou encerramento de processos.
+- Inventário de memória System V via `ipcs -m`, sem atribuir automaticamente os segmentos ao malware.
+- Inventário de triggers, eventos e rotinas visíveis no MySQL/MariaDB, sem extrair corpos SQL.
+- Integrados achados e problemas de cobertura à política conservadora de liberação; gerado `sc403-forense.json` e `sc403-sql-objects.json` em diretório privado.
+- Incluídos testes de regressão com amostras PHP inertes, ZIP e processos simulados.
+- Créditos e limitações documentados, preservando somente leitura e remediação assistida.
+
+### Pendências de homologação
+- Executar suíte completa e testes de integração em Debian/Ubuntu com MySQL/MariaDB.
+- Confirmar tolerância a limites em grandes instalações WordPress e revisar classificação de falsos positivos.
+- Inspeção YARA e neutralização coordenada de persistências permanecem fora do escopo desta versão.
+
+
 ## [0.29.0] - 2026-11-04
 
 ### Detecção estática SCV:4.3.24 e atribuição
