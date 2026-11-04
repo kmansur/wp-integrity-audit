@@ -1,5 +1,24 @@
 # Auditoria de Integridade WordPress — branch Python
 
+## Versão 0.29.0 — indicadores SC 4.x derivados do ABSPATH
+
+A auditoria padrão integra o módulo Python `bin/sc403_indicadores.py`, que calcula, **sem executar PHP**, caminhos, chaves de opções e endpoints associados à variante documentada SCV:4.3.24. A checagem de arquivos derivados é somente leitura; opções derivadas são consultadas por nome exato e suas estruturas Base64/XOR são decodificadas **somente em memória**, com limites de tamanho, sem desserializar nem executar conteúdo.
+
+Novas evidências privadas: `sc403-file-evidence.json` e `sc403-database-evidence.json`. Esses achados também integram o inventário principal, a contagem de revisão e os bloqueios pós-recuperação. Um caminho ou nome derivado isolado é um indicador que requer validação, **não comprovação suficiente de infecção nem autorização de exclusão**. A derivação depende do caminho `ABSPATH` exato; após migrações, também pode ser necessário investigar os caminhos históricos. Um valor SQL truncado recebe indicação explícita de revisão e nunca é considerado limpo.
+
+Esta implementação é original e foi orientada pelo estudo técnico aberto de **ux2dev**, [wordpress-sc403-cleaner](https://github.com/ux2dev/wordpress-sc403-cleaner), disponibilizado sob **GPL-2.0-or-later**. Agradecemos ao autor pela publicação dos algoritmos e detalhes da família SC. Não foram incorporados os scripts de remoção em massa, encerramento genérico de processos, exclusão abrangente de opções ou limpeza indiscriminada de memória do projeto de referência.
+
+A detecção matemática documentada refere-se à SCV:4.3.24, **não a todas as variantes SC**. A recuperação permanece experimental, assistida e sujeita a validação em clone. Próximas extensões previstas: investigação System V, service workers, motor YARA e monitoramento de reinfecção; **não estão implementadas nesta versão**.
+
+Validação sugerida em Debian/Ubuntu:
+
+```bash
+python3 -m unittest discover -s tests -v
+python3 bin/wp-integrity-audit.py --version
+python3 bin/wp-integrity-audit.py /var/www/site/public_html --domain-label exemplo.com
+```
+
+
 ## Diagnóstico de codificação — 0.24.1
 
 Quando um comando externo devolve bytes não UTF-8 (por exemplo, `0xE1`), a ferramenta representa o octeto como `\\xe1` em vez de encerrar a auditoria com `UnicodeDecodeError`. As consultas ao MySQL solicitam `utf8mb4` explicitamente. O escape de bytes é uma representação técnica, **não** a recuperação definitiva da codificação original; ainda é necessário avaliar dados legados antes de concluir que não existem indicadores.
