@@ -11,7 +11,7 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 - Derivação, a partir do ABSPATH, de caminhos de arquivos, chaves privadas SQL e identificadores de endpoints da variante SCV:4.3.24.
 - Inspeção somente leitura dos caminhos derivados, registro de SHA-256 e metadados de watermark quando possível; nenhum caminho derivado isolado autoriza remediação.
 - Consulta SQL limitada aos identificadores derivados, sem exportar conteúdo bruto; decodificação Base64/XOR em memória, com limites e hashes de saída. Valores truncados são marcados para revisão.
-- Adicionados `sc403-file-evidence.json` e `sc403-database-evidence.json`, integração dos achados ao inventário e à decisão conservadora de liberação.
+- Adicionados `sc403-identifiers.json`, `sc403-file-evidence.json` e `sc403-database-evidence.json`, integração dos achados ao inventário e à decisão conservadora de liberação.
 - Incluídos testes sintéticos de derivação, limites, indicadores em arquivos e não exposição de valores SQL.
 - Mantidas as operações de recuperação existentes e sem incorporar comandos destrutivos de projetos externos.
 
