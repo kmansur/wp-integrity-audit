@@ -15,6 +15,7 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 - Integrados achados e problemas de cobertura à política conservadora de liberação; gerado `sc403-forense.json` e `sc403-sql-objects.json` em diretório privado.
 - Incluídos testes de regressão com amostras PHP inertes, ZIP e processos simulados.
 - Adicionada integração YARA opt-in (`--sc-yara-rules`) com regras locais confiáveis, execução limitada, sem expor conteúdo, e registro `sc403-yara.json`.
+- Adicionado conjunto inicial de regras estáticas de triagem `rules/sc403_triagem.yar`, não ativado automaticamente e sujeito à avaliação de falsos positivos.
 - Corrigida distinção entre PID encerrado durante a varredura e erro de permissão de `/proc`; diretivas de carregamento PHP passam a exigir revisão.
 - Créditos e limitações documentados, preservando somente leitura e remediação assistida.
 
