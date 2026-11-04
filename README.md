@@ -1,5 +1,34 @@
 # Auditoria de Integridade WordPress — branch Python
 
+## Versão 0.30.0 — investigação forense complementar do SC
+
+A versão 0.30.0 estende a análise estática do incidente em Debian/Ubuntu sem executar arquivos PHP do WordPress, remover registros SQL, matar processos ou limpar memória compartilhada.
+
+Durante a auditoria completa (sem `--skip-db`), os resultados adicionais são preservados em:
+
+- `sc403-forense.json`: ZIPs contendo marcadores em membros PHP, diretivas de configuração PHP sensíveis, processos associados ao caminho do site ou a indicadores da família, e inventário de segmentos System V;
+- `sc403-sql-objects.json`: inventário limitado a nome, tipo e contexto de triggers, eventos e rotinas visíveis ao usuário SQL, sem copiar corpos SQL.
+
+A análise de ZIP não extrai conteúdo em disco. Há limites de tamanho, número de entradas e orçamento de descompressão para evitar degradação do servidor. ZIPs não verificados e erros são tratados como pendências, nunca como prova de limpeza.
+
+A inspeção de processos utiliza `/proc` e não persiste a linha de comando, pois ela pode conter senhas e tokens. Quando houver falta de permissão, a cobertura é marcada como parcial. A memória System V é **somente inventariada** por `ipcs -m`; a presença de segmentos, por si só, não demonstra infecção.
+
+A consulta ao `information_schema` depende de permissões do usuário MySQL/MariaDB. Ausência de objetos visíveis não significa inexistência de objetos ocultos por permissões. A existência isolada de uma trigger também não é tratada como evidência de malware. A inspeção de ações SQL e sua procedência continua sendo uma etapa manual.
+
+Os novos achados são correlacionados com o relatório JSON e a política conservadora de liberação. `sc403-forense.json` permanece como evidência técnica privada; não é enviado automaticamente ao cliente.
+
+**Créditos:** técnicas e metodologia inspiradas nos estudos abertos de [ux2dev/wordpress-sc403-cleaner](https://github.com/ux2dev/wordpress-sc403-cleaner) (GPL-2.0-or-later), e nas arquiteturas de monitoramento de [rfxn/linux-malware-detect](https://github.com/rfxn/linux-malware-detect) e análise estática de [nbs-system/php-malware-finder](https://github.com/nbs-system/php-malware-finder). Não foram incorporados seus scripts destrutivos ou bibliotecas externas. O código deste módulo é uma implementação independente.
+
+Limitações: não há ainda neutralização de service workers, inspeção do conteúdo de segmentos de memória, YARA integrado, análise profunda de corpos SQL ou limpeza simultânea de persistências. A recuperação em produção continua **não homologada**.
+
+Para validar:
+
+```bash
+python3 -m unittest discover -s tests -v
+python3 bin/wp-integrity-audit.py --version
+```
+
+
 ## Versão 0.29.0 — indicadores SC 4.x derivados do ABSPATH
 
 A auditoria padrão integra o módulo Python `bin/sc403_indicadores.py`, que calcula, **sem executar PHP**, caminhos, chaves de opções e endpoints associados à variante documentada SCV:4.3.24. A checagem de arquivos derivados é somente leitura; opções derivadas são consultadas por nome exato e suas estruturas Base64/XOR são decodificadas **somente em memória**, com limites de tamanho, sem desserializar nem executar conteúdo.
