@@ -28,6 +28,7 @@ import sc403_indicadores
 import sc403_forense
 import sc403_yara
 import sc403_logs
+import sc403_plano
 import report_export
 import mail_delivery
 import remediacao_serializada as serial_wp
@@ -1095,8 +1096,17 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
                 database: list[dict] | None = None, db_name: str | None = None, db_prefix: str | None = None) -> None:
     """Generate a precise coverage statement and evidence-based technical opinion."""
     audited = database is not None
+    if mode == "audit":
+        plano_sc = sc403_plano.gerar_plano(case)
+        write_private(case / "sc403-recovery-plan.json",
+                      json.dumps(plano_sc, indent=2, ensure_ascii=False))
     attach_evidence_ids(findings, database, db_name, db_prefix)
     status, exit_code, summary = audit_status(findings, processes, database)
+    if mode == "audit":
+        summary["sc403_recovery_plan"] = {
+            "blockers": plano_sc["bloqueios"],
+            "automatic_execution": False,
+        }
     optional_issues = optional_probe_review(case)
     core, configurations, host_records = supplementary_evidence(case)
     persistence_path = case / "wordpress-persistence.json"
