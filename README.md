@@ -1,5 +1,50 @@
 # Auditoria de Integridade WordPress — branch Python
 
+## Versão 0.31.0 — pré-validação e recuperação assistida SC
+
+Esta versão acrescenta o comando independente `bin/sc403_preflight.py` para conferir, sem alterar a instalação, um **caso de auditoria completo já encerrado** contra o estado atual do site. A pré-validação:
+
+- Exige caso privado com manifesto SHA-256 válido e caminho WordPress equivalente ao ABSPATH registrado.
+- Revalida os hashes dos arquivos constantes em `file-evidence.json` com orçamento de leitura e proteção contra links simbólicos.
+- Inspeciona processos Linux por `/proc` em busca de indicadores SC ou arquivos removidos ainda abertos.
+- Declara explicitamente pendências de banco SQL, autorização, contenção, backup restaurável, sessões e navegadores. **Jamais autoriza uma recuperação automática**.
+- Não modifica o caso original. É possível salvar o resultado em caminho independente com `--output`; arquivos existentes não são sobrescritos.
+
+Exemplo após uma auditoria completa no WH01:
+
+```bash
+python3 bin/sc403_preflight.py \\
+  --site /usr/local/www/data/mpctelecom/html \\
+  --case /var/lib/wp-integrity-audit/cases/CASO_DA_AUDITORIA \\
+  --output /root/sc403-preflight-mpctelecom.json
+```
+
+O comando retorna **40** quando produz um parecer de revisão (comportamento esperado) e **30** quando falha alguma pré-condição. A execução sem `--output` imprime somente o JSON. Não reutilize um caso antigo sem verificar as diferenças entre os hashes. A presença de backup ou contenção não é verificável por simples inspeção de arquivos: os bloqueios documentais não são considerados resolvidos automaticamente.
+
+### Service workers: procedimento manual específico
+
+`tools/sc403-browser-admin.js` foi adicionado para apoiar a **revogação pontual** do service worker associado à variante documentada. O operador deve executar o código manualmente no console de um navegador autorizado, dentro da origem do WordPress, após preservar evidências e isolar a execução no servidor. Informe o `endpoint_sw` de `sc403-identifiers.json`. O código lista apenas registros cujo `scriptURL` contém o identificador numérico exato `?p=...`, e exige `REVOGAR` e uma segunda confirmação para solicitar `unregister()`. Nenhum registro é revogado ao apenas inventariar.
+
+Essa operação é **opcional, por navegador e por origem**. `unregister()` não encerra imediatamente abas controladas nem limpa automaticamente cache, cookies, senhas, credenciais, sessões ou todos os dispositivos de administradores. Não execute um limpador indiscriminado de armazenamento no WH01. A existência do mecanismo não é homologação de limpeza.
+
+### Limites da recuperação
+
+Os modos antigos de recuperação assistida continuam experimentais, protegidos por validações e confirmações. Esta versão **não incorpora a killchain de terceiros**, não mata processos, não executa `ipcrm`, não elimina opções SQL por prefixo e não implanta o neutralizador PHP no site. A recuperação de produção continua condicionada a clone, backup testado, isolamento e validação do responsável.
+
+Agradecimento e referência de engenharia: **ux2dev**, [wordpress-sc403-cleaner](https://github.com/ux2dev/wordpress-sc403-cleaner), GPL-2.0-or-later. O pré-validador Python e a rotina JS foram desenvolvidos independentemente, usando os comportamentos publicados como referência.
+
+### Testes
+
+```bash
+python3 -m unittest discover -s tests -p 'test_sc403_*.py' -v
+python3 -m unittest discover -s tests -v
+python3 -m compileall -q bin tests
+python3 bin/wp-integrity-audit.py --version
+```
+
+O workflow `.github/workflows/sc-security-tests.yml` executa sintaxe e testes específicos em Python 3.10, 3.11 e 3.12, além de `node --check` na rotina JS. Esses testes não substituem ensaios integrados no WH01 e a recuperação em laboratório.
+
+
 ## Versão 0.30.0 — investigação forense complementar do SC
 
 A versão 0.30.0 estende a análise estática do incidente em Debian/Ubuntu sem executar arquivos PHP do WordPress, remover registros SQL, matar processos ou limpar memória compartilhada.
