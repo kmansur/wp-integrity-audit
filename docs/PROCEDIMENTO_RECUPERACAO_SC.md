@@ -77,6 +77,21 @@ Ela exige o valor `endpoint_sw` do caso forense, mostra registros correspondente
 
 A função `unregister()` não garante que abas já controladas deixem imediatamente de executar código. Encerrar sessões, revalidar a origem, investigar cache/storage, trocar credenciais e confirmar todos os dispositivos administrativos são passos separados. Evite limpar indiscriminadamente armazenamento de outros sistemas da mesma origem.
 
+## Fase 5.1 — comparação formal da reinfecção
+
+Depois de registrar um segundo caso completo e íntegro, é possível comparar os achados antes e depois sem tocar no WordPress:
+
+```bash
+python3 bin/sc403_reinfeccao.py \\
+  --anterior /var/lib/wp-integrity-audit/cases/CASO_ANTES \\
+  --atual /var/lib/wp-integrity-audit/cases/CASO_DEPOIS \\
+  --output /root/reinfeccao-sc403.json
+```
+
+O comparador exige o mesmo ABSPATH, verifica os manifestos e identifica novos arquivos ou opções, persistências, mudanças de hash e indicadores SC em ZIPs. O código de saída 40 significa revisão requerida, inclusive sem novos achados. A decisão de reabrir permanece manual.
+
+A recuperação assistida real também inclui nova verificação de processos e de ZIPs antes das alterações. Processo SC detectado, ZIP suspeito ou cobertura insuficiente causam bloqueio operacional. A existência de resultados limpos nesses testes não equivale à autorização de limpeza ou de liberação.
+
 ## Fase 6 — auditoria pós-remediação
 
 1. Repetir a auditoria completa e guardar o novo caso.
