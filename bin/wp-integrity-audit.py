@@ -43,7 +43,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 
-VERSION = "0.31.0"
+VERSION = "0.32.0"
 IOC = re.compile(r"SC_ADV_BEGIN|--sc-cli|--sc-succ|trace-inspector-pad|trace-librarian-tag|agile-interface-vox|f88225c2|cipher-feeder|_sc_fpc|sc_cron_guard|sc_cron_recovery|e1v61n2r1im6t7_|sc_persist_manifest|sc_own_manifest|kinetic-relay-live|function ceya|Axiom Sentinel Snap|SCV:[0-9]+")
 PATTERN_NAMES = (".sc_", ".gr_", ".gk_", ".kk_", ".wp-object-cache", "f88225c2.zip")
 # Random option names confirmed during this incident. Keep this list explicit;
@@ -2773,6 +2773,24 @@ def main() -> int:
                 raise AuditError("Não combine --dry-run com --recovery-approve")
             if processes:
                 raise AuditError("Processos suspeitos ainda ativos; interrompa-os e isole o site antes de recuperar")
+            # Antes de qualquer alteração real, confirmar /proc e ZIPs que
+            # possam reconstruir a persistência SC. Simulações continuam livres.
+            if not args.dry_run:
+                runtime_sc = sc403_forense.inspecionar_proc(target)
+                zip_sc = sc403_forense.inspecionar_zips(target)
+                write_private(case / "sc403-recovery-precheck.json",
+                              json.dumps({"proc": runtime_sc, "zip": zip_sc,
+                                          "somente_leitura": True},
+                                         indent=2, ensure_ascii=False))
+                if runtime_sc.get("status") != "COMPLETA":
+                    raise AuditError("Inspeção /proc incompleta; recuperação interrompida")
+                if any(item.get("state") == "PROC_SC_REQUER_INVESTIGACAO"
+                       for item in runtime_sc.get("resultados", [])):
+                    raise AuditError("Processo SC suspeito ativo; recuperação coordenada obrigatória")
+                if zip_sc.get("status") != "COMPLETA":
+                    raise AuditError("Inspeção de ZIPs incompleta; recuperação interrompida")
+                if zip_sc.get("resultados"):
+                    raise AuditError("ZIP potencialmente persistente do SC exige análise antes de recuperar")
             if args.core_source is not None:
                 raise AuditError("Substituição do núcleo ainda não homologada; --core-source bloqueado")
             if (target / "wp-content").is_symlink():
