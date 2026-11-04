@@ -1,0 +1,41 @@
+name: Verificação de segurança SC (Python)
+
+on:
+  push:
+    branches: [Python]
+    paths:
+      - "bin/**"
+      - "tests/test_sc403_*.py"
+      - "rules/**"
+      - ".github/workflows/sc-security-tests.yml"
+  pull_request:
+    paths:
+      - "bin/**"
+      - "tests/test_sc403_*.py"
+      - "rules/**"
+      - ".github/workflows/sc-security-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  testes-sc:
+    name: Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    steps:
+      - name: Obter código
+        uses: actions/checkout@v4
+      - name: Preparar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Validar sintaxe do projeto
+        run: python -m compileall -q bin tests
+      - name: Executar testes SC
+        run: python -m unittest discover -s tests -p 'test_sc403_*.py' -v
+      - name: Conferir versão publicada
+        run: python bin/wp-integrity-audit.py --version
