@@ -58,6 +58,37 @@ class TestReinfeccao(unittest.TestCase):
             self.assertEqual(resultado["estado"], "INDICADORES_PERSISTENTES_REQUEREM_REVISAO")
             self.assertFalse(resultado["liberacao_autorizada"])
 
+    def test_mesmo_caso_e_recusado(self):
+        with tempfile.TemporaryDirectory() as temp:
+            a = Path(temp) / "a"
+            caso(a)
+            with self.assertRaises(sc.ComparacaoRecusada):
+                sc.comparar(a, a)
+
+    def test_zip_suspeito_tambem_sinaliza_atividade(self):
+        with tempfile.TemporaryDirectory() as temp:
+            a, b = Path(temp) / "a", Path(temp) / "b"
+            caso(a)
+            caso(b)
+            escrever(b, "sc403-forense.json", {
+                "proc": {"status": "COMPLETA", "resultados": []},
+                "zip": {"status": "COMPLETA", "resultados": [
+                    {"path": "wp-content/replica.zip", "state": "ZIP_PAYLOAD_REQUER_REVISAO"}
+                ]},
+            })
+            arquivos = []
+            for p in b.iterdir():
+                if p.name != "evidence-manifest.json":
+                    dados = p.read_bytes()
+                    arquivos.append({"file": p.name,
+                                     "sha256": hashlib.sha256(dados).hexdigest(),
+                                     "size_bytes": len(dados)})
+            escrever(b, "evidence-manifest.json", {"algorithm": "SHA-256", "files": arquivos})
+            resultado = sc.comparar(a, b)
+            self.assertEqual(resultado["estado"], "INDICIOS_DE_REINFECCAO_OU_NOVA_ATIVIDADE")
+            self.assertEqual(resultado["arquivos_zip_com_indicadores_sc"],
+                             ["wp-content/replica.zip"])
+
     def test_abspath_diferente_recusado(self):
         with tempfile.TemporaryDirectory() as temp:
             a, b = Path(temp) / "a", Path(temp) / "b"
