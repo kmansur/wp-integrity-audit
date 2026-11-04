@@ -1,5 +1,24 @@
 # Auditoria de Integridade WordPress — branch Python
 
+## Versão 0.33.0 — validação pós-recuperação e consistência das evidências SC
+
+Esta versão corrige uma falha de apresentação: diretórios derivados do SC e arquivos grandes podem ser inventariados **sem SHA-256 completo**. A ausência do hash é registrada como **NÃO CALCULADO** no relatório técnico, sem interromper a geração do parecer ou tratar a evidência como limpa.
+
+O relatório gerencial passa a mostrar explicitamente a quantidade de **caminhos de arquivos/diretórios derivados da família SC** e **opções privadas derivadas do ABSPATH** que necessitam de revisão. Uma opção privada SC localizada no banco agora mantém a avaliação desse componente em **REVISÃO NECESSÁRIA**, mesmo sem outros indicadores. Esses nomes matematicamente derivados, isoladamente, não comprovam comprometimento.
+
+### Verificação obrigatória após alterações assistidas
+
+Além da verificação anterior à recuperação, os modos assistidos `--recover`, `--apply-db` e `--apply-files` realizam nova leitura de `/proc` e análise de ZIPs **após as alterações**. O resultado fica em `sc403-recovery-postcheck.json`, com eventuais bloqueios. A confirmação de recuperação não pode se basear apenas na ausência de indicadores anteriores à intervenção; processos e pacotes podem ser recriados durante a troca dos arquivos.
+
+O parecer resultante não é automaticamente aprovado para liberação, e persistências ou cobertura incompleta geram revisão obrigatória. A verificação não encerra processos nem remove segmentos System V.
+
+### Testes e compatibilidade
+
+O arquivo `tests/test_sc403_relatorio_pos.py` acrescenta testes sintéticos para diretórios sem hash, opções privadas SC e indicadores pendentes após a recuperação. O GitHub Actions continua executando os testes SC em Python 3.10, 3.11 e 3.12 e passa a executar também a suíte geral em Python 3.11.
+
+**Limitações:** a suíte automatizada não testa a erradicação real do SC em um clone comprometido; decisões sobre isolamento, backup restaurável, credenciais e navegadores continuam manuais. Não considere o código homologado para execução destrutiva em produção sem ensaios específicos.
+
+
 ## Versão 0.32.0 — detecção de reinfecção e bloqueio de recuperação
 
 A versão 0.32.0 acrescenta um comparador independente de casos de auditoria e uma pré-checagem obrigatória antes de **qualquer operação real** de recuperação assistida pelos modos existentes.
