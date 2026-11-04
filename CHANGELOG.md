@@ -4,6 +4,24 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 
 ## [Não publicado]
 
+## [0.31.0] - 2026-11-04
+
+### Pré-validação conservadora da recuperação SC
+- Criado `bin/sc403_preflight.py` para confrontar caso forense previamente coletado com o estado atual do WordPress, exclusivamente em leitura.
+- Conferência de ABSPATH, manifesto SHA-256, hashes dos arquivos auditados, links simbólicos e indicadores de processos ativos, com limites de tamanho e orçamento de leitura.
+- Saída JSON opcional em caminho externo ao caso e à raiz pública; recusa sobrescrita e caminhos simbólicos de saída.
+- Parecer de recuperação sempre bloqueado para ações automáticas, exigindo validação independente de banco, backup restaurável, isolamento, sessões e navegadores.
+- Adicionados ensaios sintéticos de adulteração de evidências, troca de instalação, arquivos alterados, links simbólicos e PID suspeito.
+- Criado `tools/sc403-browser-admin.js` para listar e revogar manualmente apenas registros de service worker com endpoint SC específico, mediante confirmação explícita, sem limpar armazenamento global.
+- Incluído `sc-security-tests.yml` para validação automatizada de sintaxe e testes específicos em Python 3.10, 3.11 e 3.12, além de sintaxe JavaScript.
+- Atualizados README e créditos ao trabalho público de ux2dev/wordpress-sc403-cleaner (GPL-2.0-or-later), sem incorporar seus procedimentos destrutivos.
+
+### Limitações
+- Nenhuma neutralização automática de processos, memória System V, PHP-FPM, sessões, banco ou service workers.
+- Resultado de pré-validação não constitui autorização de recuperação, limpeza comprovada ou liberação do site.
+- Testes de integração com MySQL/MariaDB e de restauração em clones permanecem pré-condições de homologação de produção.
+
+
 ## [0.30.0] - 2026-11-04
 
 ### Investigação SC complementar
