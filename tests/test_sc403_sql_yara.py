@@ -38,6 +38,18 @@ class TestSQLObjetosSC(unittest.TestCase):
             self.assertEqual(res["status"], "INCOMPLETA")
             self.assertEqual(len(res["fontes_nao_consultadas"]), 3)
 
+    def test_inventario_sql_indica_limite_atingido(self):
+        with tempfile.TemporaryDirectory() as d:
+            def consulta(_, __, sql):
+                if "information_schema.TRIGGERS" in sql:
+                    return [[f"t{i}", "wp_options"] for i in range(1001)]
+                return []
+            with patch.object(auditoria, "query_db", side_effect=consulta):
+                resultado = auditoria.database_sql_objects_audit("cnf", "wordpress", Path(d))
+            self.assertEqual(resultado["status"], "INCOMPLETA")
+            self.assertIn("TRIGGERS", resultado["fontes_com_limite_atingido"])
+            self.assertEqual(len(resultado["objetos"]), 1000)
+
     def test_yara_nao_instalado(self):
         with patch.object(sc403_yara.shutil, "which", return_value=None):
             res = sc403_yara.scanner_yara(Path("/var/www/site"), Path("/etc/wp-integrity-audit/test.yar"))
