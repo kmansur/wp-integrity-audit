@@ -55,7 +55,7 @@ class TestReinfeccao(unittest.TestCase):
             caso(a)
             caso(b)
             resultado = sc.comparar(a, b)
-            self.assertEqual(resultado["estado"], "SEM_NOVO_INDICADOR_NOS_DADOS_COMPARADOS")
+            self.assertEqual(resultado["estado"], "INDICADORES_PERSISTENTES_REQUEREM_REVISAO")
             self.assertFalse(resultado["liberacao_autorizada"])
 
     def test_abspath_diferente_recusado(self):
