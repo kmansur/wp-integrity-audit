@@ -133,7 +133,9 @@ def comparar(anterior: Path, atual: Path) -> dict:
         validar_manifesto(caminho)
     antes = _ler(anterior, "sc403-identifiers.json")
     depois = _ler(atual, "sc403-identifiers.json")
-    if not isinstance(antes, dict) or antes.get("abspath") != depois.get("abspath"):
+    if (not isinstance(antes, dict) or not isinstance(depois, dict)
+            or not isinstance(antes.get("abspath"), str)
+            or antes.get("abspath") != depois.get("abspath")):
         raise ComparacaoRecusada("Não é possível comparar instalações com ABSPATH diferentes")
     pares = {}
     for categoria, seletor, origem in (
@@ -155,7 +157,7 @@ def comparar(anterior: Path, atual: Path) -> dict:
     if not isinstance(procs_antes, list) or not isinstance(procs_agora, list):
         raise ComparacaoRecusada("Evidências de processos inválidas")
     dados_forense = _ler(atual, "sc403-forense.json")
-    if not isinstance(dados_forense, dict):
+    if not isinstance(dados_forense, dict) or not isinstance(dados_forense.get("proc"), dict) or not isinstance(dados_forense.get("zip"), dict) or not isinstance(dados_forense["proc"].get("resultados"), list):
         raise ComparacaoRecusada("Evidência de runtime inválida")
     incompleta = (dados_forense.get("proc", {}).get("status") != "COMPLETA"
                   or dados_forense.get("zip", {}).get("status") != "COMPLETA")
