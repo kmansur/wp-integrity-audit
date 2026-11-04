@@ -17,6 +17,8 @@ A consulta ao `information_schema` depende de permissões do usuário MySQL/Mari
 
 Pode-se acrescentar `--sc-access-log /var/log/apache2/access.log` ou repetir a opção para outros arquivos, inclusive `.gz`. A correlação dos endpoints derivados produz `sc403-http-logs.json`, apenas com contagens, sem linhas originais, IPs, cookies, User-Agent ou URLs completas. Há limites de arquivos, bytes e linhas; falhas produzem cobertura incompleta. Isso não substitui investigação dos navegadores dos administradores.
 
+Além das evidências, a auditoria completa gera `sc403-recovery-plan.json`, um plano **não executável** que correlaciona arquivos, opções SQL, processos, arquivos ZIP, resultados YARA e endpoints derivados. O plano registra pendências e pré-condições para a recuperação coordenada; jamais autoriza liberação ou executa alterações.
+
 Os novos achados são correlacionados com o relatório JSON e a política conservadora de liberação. `sc403-forense.json` permanece como evidência técnica privada; não é enviado automaticamente ao cliente.
 
 **Créditos:** técnicas e metodologia inspiradas nos estudos abertos de [ux2dev/wordpress-sc403-cleaner](https://github.com/ux2dev/wordpress-sc403-cleaner) (GPL-2.0-or-later), e nas arquiteturas de monitoramento de [rfxn/linux-malware-detect](https://github.com/rfxn/linux-malware-detect) e análise estática de [nbs-system/php-malware-finder](https://github.com/nbs-system/php-malware-finder). Não foram incorporados seus scripts destrutivos ou bibliotecas externas. O código deste módulo é uma implementação independente.
