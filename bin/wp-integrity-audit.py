@@ -1803,21 +1803,22 @@ def database_audit(option_file: str, dbname: str, prefix: str, case: Path,
     # option names as malicious.
     findings.extend(database_reversed_reference_scan(option_file, dbname, prefix))
     findings.extend(database_cron_structure_scan(option_file, dbname, prefix))
-    if site_root is None:
-        raise AuditError("Auditoria SC403 exige o caminho real do WordPress")
-    dados_sc = sc403_indicadores.identificadores(site_root)
-    nomes_sc = sorted(set(dados_sc["opcoes"].values()) | {dados_sc["opcao_payload"]})
-    nomes_sql = ",".join("'" + valor + "'" for valor in nomes_sc)
-    encontrados_sc = query_db(option_file, dbname,
-        f"SELECT option_name, OCTET_LENGTH(option_value), SHA2(option_value,256), "
-        f"HEX(LEFT(option_value,65536)) FROM {options} "
-        f"WHERE option_name IN ({nomes_sql}) ORDER BY option_name;")
-    try:
-        achados_sc = sc403_indicadores.linhas_opcoes(encontrados_sc, dados_sc)
-    except ValueError as erro:
-        raise AuditError("Falha na validação de evidência SC403 do banco") from erro
-    write_private(case / "sc403-database-evidence.json", json.dumps(achados_sc, indent=2, ensure_ascii=False))
-    findings.extend(achados_sc)
+    # Chamadas legadas da API sem site_root mantêm o comportamento anterior.
+    # A execução principal informa sempre o ABSPATH validado.
+    dados_sc = sc403_indicadores.identificadores(site_root) if site_root is not None else None
+    if dados_sc is not None:
+        nomes_sc = sorted(set(dados_sc["opcoes"].values()) | {dados_sc["opcao_payload"]})
+        nomes_sql = ",".join("'" + valor + "'" for valor in nomes_sc)
+        encontrados_sc = query_db(option_file, dbname,
+            f"SELECT option_name, OCTET_LENGTH(option_value), SHA2(option_value,256), "
+            f"HEX(LEFT(option_value,65536)) FROM {options} "
+            f"WHERE option_name IN ({nomes_sql}) ORDER BY option_name;")
+        try:
+            achados_sc = sc403_indicadores.linhas_opcoes(encontrados_sc, dados_sc)
+        except ValueError as erro:
+            raise AuditError("Falha na validação de evidência SC403 do banco") from erro
+        write_private(case / "sc403-database-evidence.json", json.dumps(achados_sc, indent=2, ensure_ascii=False))
+        findings.extend(achados_sc)
     write_private(case / ("database-post-audit.json" if post else "database-evidence.json"),
                   json.dumps(findings, indent=2))
     return findings
