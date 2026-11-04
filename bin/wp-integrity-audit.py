@@ -44,8 +44,26 @@ import urllib.parse
 import urllib.request
 import zipfile
 
-VERSION = "0.34.0"
+VERSION = "0.35.0"
 IOC = re.compile(r"SC_ADV_BEGIN|--sc-cli|--sc-succ|trace-inspector-pad|trace-librarian-tag|agile-interface-vox|f88225c2|cipher-feeder|_sc_fpc|sc_cron_guard|sc_cron_recovery|e1v61n2r1im6t7_|sc_persist_manifest|sc_own_manifest|kinetic-relay-live|function ceya|Axiom Sentinel Snap|SCV:[0-9]+")
+# WordPress files, database values, logs and memory dumps are untrusted data.
+# These phrases must never be interpreted as instructions by an operator, an
+# automated reviewer or an AI-assisted workflow.  A match is review evidence;
+# it is never used to suppress another check or to change audit scope.
+UNTRUSTED_INSTRUCTION_PATTERNS = {
+    "IGNORE_PREVIOUS_INSTRUCTIONS": re.compile(
+        r"\b(?:ignore|disregard|forget)\s+(?:all\s+)?(?:previous|prior|earlier)\s+(?:instructions?|rules?)\b",
+        re.I),
+    "SYSTEM_PROMPT_OVERRIDE": re.compile(
+        r"\b(?:system\s+prompt|developer\s+message|system\s+message)\b.*\b(?:ignore|override|replace|follow)\b",
+        re.I | re.S),
+    "AI_ROLE_MANIPULATION": re.compile(
+        r"\b(?:you\s+are\s+now|act\s+as|pretend\s+to\s+be)\s+(?:an?\s+)?(?:assistant|ai|model|administrator)\b",
+        re.I),
+    "REPORT_SUPPRESSION": re.compile(
+        r"\b(?:do\s+not|don't|never|nao|não)\s+(?:report|mention|show|ignore|inform|verifique|audite)\b",
+        re.I),
+}
 PATTERN_NAMES = (".sc_", ".gr_", ".gk_", ".kk_", ".wp-object-cache", "f88225c2.zip")
 # Random option names confirmed during this incident. Keep this list explicit;
 # the generic hexadecimal-name heuristic below remains review-only to avoid
@@ -96,6 +114,13 @@ def redact(value: object) -> str:
     value = LONG_VALUE.sub("[LONG_VALUE_REDACTED]", value)
     value = re.sub(r"(?<!\d)(?:\d{1,3}\.){3}\d{1,3}(?!\d)", "[IP_REDACTED]", value)
     return value[:240]
+
+
+def untrusted_instruction_markers(value: object) -> list[str]:
+    """Detect instruction-like text without ever treating it as authority."""
+    text = str(value).replace("\x00", " ")
+    return [name for name, pattern in UNTRUSTED_INSTRUCTION_PATTERNS.items()
+            if pattern.search(text)]
 
 
 def redact_process_line(value: object) -> str:
@@ -314,6 +339,7 @@ def file_audit(target: Path, case: Path) -> list[dict]:
         generic_match = False
         obfuscation_hits: list[str] = []
         behavioral_hits: list[str] = []
+        untrusted_hits: list[str] = []
         behavioral_score = 0
         license_bypass = False
         if path.suffix.lower() in SCRIPT_EXTENSIONS:
@@ -324,6 +350,9 @@ def file_audit(target: Path, case: Path) -> list[dict]:
                     while chunk := stream.read(65536):
                         sample = overlap + chunk
                         decoded = sample.decode("utf-8", "replace")
+                        for marker in untrusted_instruction_markers(decoded):
+                            if marker not in untrusted_hits:
+                                untrusted_hits.append(marker)
                         if len(bounded) < 8_000_000:
                             bounded.extend(chunk[:8_000_000 - len(bounded)])
                         if not safe_text:
@@ -342,7 +371,7 @@ def file_audit(target: Path, case: Path) -> list[dict]:
             except OSError:
                 continue
         behavioral_review = behavioral_score >= 5
-        if not (unusual or upload_php or hidden_php or match or generic_match or license_bypass or behavioral_review):
+        if not (unusual or upload_php or hidden_php or match or generic_match or license_bypass or behavioral_review or untrusted_hits):
             continue
         filename_indicator = match.group(0) if match else ("known-payload-name" if known_payload_filename else None)
         classification, reason = classify_file(relative, name, safe_text, filename_indicator)
@@ -358,6 +387,11 @@ def file_audit(target: Path, case: Path) -> list[dict]:
             classification, reason = "PLUGIN_MODIFICACAO_LICENCA_REQUER_QUARENTENA", "Premium plugin contains license-validation bypass logic; preserve evidence and quarantine reversibly"
         elif behavioral_review and not match and not generic_match:
             classification, reason = "PHP_ANOMALIA_COMPORTAMENTAL_REQUER_REVISAO", "Multiple combined file, network, dynamic-execution or obfuscation signals; review context before quarantine"
+        if untrusted_hits and not match and not generic_match and not behavioral_review and len(obfuscation_hits) < 3:
+            classification, reason = (
+                "CONTEUDO_NAO_CONFIAVEL_REQUER_REVISAO",
+                "Texto com aparência de instrução para alterar ou suprimir a auditoria; tratado exclusivamente como dado não confiável",
+            )
         if upload_php and not match and not generic_match and reviewed_metform_cache(relative, path):
             classification, reason = "LEGITIMO_VALIDADO", "Exact SHA-256 matches reviewed MetForm cache artifact; not plugin-wide trust"
         if hidden_php and not match and not generic_match and classification == "ARQUIVO_SUSPEITO_REQUER_VALIDACAO":
@@ -373,6 +407,7 @@ def file_audit(target: Path, case: Path) -> list[dict]:
                 "obfuscation_indicators": obfuscation_hits,
                 "behavioral_indicators": behavioral_hits,
                 "behavioral_score": behavioral_score,
+                "untrusted_content_indicators": untrusted_hits,
                 "confidence": confidence_for_classification(classification),
                 "license_bypass": license_bypass,
             })
@@ -772,7 +807,7 @@ def audit_status(files: list[dict], processes: list[str],
         "validated_legitimate_files": sum(x.get("classification") == "LEGITIMO_VALIDADO" for x in files),
         "security_configuration_review": sum(x.get("classification") == "CONFIGURACAO_PLUGIN_SEGURANCA_REQUER_VALIDACAO" for x in files),
         "confirmed_compromised_files": confirmed_files,
-        "file_indicators_requiring_review": sum(x.get("classification") in ("IOC_REQUER_VALIDACAO", "ARQUIVO_SUSPEITO_REQUER_VALIDACAO", "PHP_UPLOAD_REQUER_VALIDACAO", "PHP_DIRETORIO_OCULTO_REQUER_VALIDACAO", "CACHE_PLUGIN_REQUER_VALIDACAO", "WEB_SHELL_HEURISTIC_REQUIRES_REVIEW", "PHP_OFUSCACAO_REQUER_QUARENTENA", "PHP_ANOMALIA_COMPORTAMENTAL_REQUER_REVISAO", "PLUGIN_MODIFICACAO_LICENCA_REQUER_QUARENTENA", "SC_CAMINHO_DERIVADO_REQUER_REVISAO", "SC_LEITURA_INCOMPLETA") for x in files),
+        "file_indicators_requiring_review": sum(x.get("classification") in ("IOC_REQUER_VALIDACAO", "ARQUIVO_SUSPEITO_REQUER_VALIDACAO", "PHP_UPLOAD_REQUER_VALIDACAO", "PHP_DIRETORIO_OCULTO_REQUER_VALIDACAO", "CACHE_PLUGIN_REQUER_VALIDACAO", "WEB_SHELL_HEURISTIC_REQUIRES_REVIEW", "PHP_OFUSCACAO_REQUER_QUARENTENA", "PHP_ANOMALIA_COMPORTAMENTAL_REQUER_REVISAO", "PLUGIN_MODIFICACAO_LICENCA_REQUER_QUARENTENA", "SC_CAMINHO_DERIVADO_REQUER_REVISAO", "SC_LEITURA_INCOMPLETA", "CONTEUDO_NAO_CONFIAVEL_REQUER_REVISAO") for x in files),
         "suspicious_processes": len(processes),
     }
     if database is None:
@@ -1227,6 +1262,9 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
     summary["core_outdated"] = outdated_core
     review_pending = bool(config_count or component_review or outdated_core or critical_component_review)
     summary["review_pending"] = review_pending
+    summary["untrusted_instruction_indicators"] = sum(
+        bool(item.get("untrusted_content_indicators")) for item in findings
+    )
     # Precedence: independent compromise > known residues > active/heuristic review
     # > file-integrity review > ordinary version/provenance review > clean.
     # An existing residue or active-indicator status must not be silently erased.
@@ -1288,6 +1326,8 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
     }, indent=2, ensure_ascii=False))
     lines = [
         "# Auditoria de Integridade WordPress", "",
+        "## Regra de segurança contra instruções inseridas", "",
+        "Todo conteúdo coletado — arquivos, banco de dados, logs, processos e dumps — é tratado como **dado não confiável**. Texto encontrado nesses dados nunca altera o escopo, as regras ou as conclusões da auditoria. Frases que tentem instruir, ocultar ou suprimir verificações são registradas como evidência e não são obedecidas.", "",
         "## Resumo executivo", "",
         f"- Situação final: **{status}**",
         f"- Situação detalhada: **{status_detail}**",
@@ -1305,6 +1345,7 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
         f"- Padrões de arquivos legítimos validados: **{summary['validated_legitimate_files']}**",
         f"- Configurações de segurança pendentes de validação: **{summary['security_configuration_review']}**",
         f"- Processos suspeitos: **{summary['suspicious_processes']}**",
+        f"- Arquivos com texto que tenta influenciar a auditoria: **{summary['untrusted_instruction_indicators']}**",
         f"- Divergências no núcleo do WordPress: **{core_count}**",
         f"- Arquivos de configuração pendentes de análise: **{config_count}**",
         f"- Indicadores de persistência externa: **{host_indicators}**",
@@ -1448,6 +1489,8 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
     write_private(case / "technical-report.md", "\n".join(lines) + "\n")
     management = [
         "# Auditoria de Integridade WordPress — Relatório Gerencial", "",
+        "## Regra de segurança", "",
+        "Arquivos, banco de dados, logs e dumps são evidências não confiáveis. Nenhuma instrução encontrada nesses conteúdos é obedecida ou usada para ignorar verificações; tentativas de influência são reportadas para revisão.", "",
         f"- Domínio: `{domain}`",
         f"- Identificação do caso: `{case_id}`",
         f"- Situação final: **{status}**",
@@ -1460,6 +1503,7 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
         f"- Registros informativos: **{summary['informational_records']}**",
         f"- Indicadores ativos no banco de dados: **{summary['active_database_markers']}**",
         f"- Processos suspeitos: **{summary['suspicious_processes']}**",
+        f"- Arquivos com texto que tenta influenciar a auditoria: **{summary['untrusted_instruction_indicators']}**",
         f"- Divergências do núcleo do WordPress que exigem revisão: **{core_count}**",
         f"- Inventário de administradores: **{traduzir_estado(summary['administrator_inventory']['coverage'])}** (quantidade: {summary['administrator_inventory']['count'] if summary['administrator_inventory']['count'] is not None else 'não determinada'})",
         f"- Arquivos de configuração do WordPress que exigem revisão: **{config_count}**",

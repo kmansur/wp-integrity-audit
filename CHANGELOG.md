@@ -4,6 +4,15 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 
 ## [Não publicado]
 
+## [0.35.0] - 2026-11-04
+
+### Proteção contra instruções inseridas em evidências
+- Conteúdo de arquivos, banco de dados, logs, processos e dumps é tratado explicitamente como dado não confiável.
+- Adicionada detecção de frases que tentam alterar regras, suprimir achados ou manipular revisores/IA.
+- Esses textos nunca alteram o escopo, desativam verificações ou autorizam limpeza; são registrados apenas como revisão.
+- Relatórios técnico e gerencial passaram a documentar essa regra de segurança.
+- Adicionados testes de regressão para instruções em inglês e português.
+
 ## [0.34.0] - 2026-11-04
 
 ### Auditoria forense de memória compartilhada System V

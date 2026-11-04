@@ -1,5 +1,9 @@
 # Auditoria de Integridade WordPress — branch Python
 
+## Versão 0.35.0 — evidências não confiáveis e proteção contra instruções inseridas
+
+Todo conteúdo coletado durante a auditoria é tratado como dado não confiável. Frases encontradas em arquivos, banco de dados, logs ou dumps que tentem instruir um operador, uma IA ou o próprio auditor são registradas para revisão e nunca são obedecidas. Elas não alteram o escopo, não desativam verificações e não autorizam limpeza ou liberação.
+
 ## Versão 0.34.0 — evidências System V SHM com validação isolada
 
 A v0.34.0 incorpora uma implementação independente da inspeção de memória compartilhada desenvolvida inicialmente no WH01, separando **inventário do kernel** de **arquivos forenses de dump**. Nenhum segmento em execução é anexado (`shmat`), lido ou removido; não são executados scripts PHP nem comandos `ipcrm`.
