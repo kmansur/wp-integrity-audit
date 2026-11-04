@@ -1,6 +1,6 @@
 # Procedimento operacional — recuperação assistida de WordPress comprometido pelo SC
 
-**Versão de referência:** WP Integrity Audit 0.31.0  
+**Versão de referência:** WP Integrity Audit 0.34.0  
 **Público:** equipe técnica autorizada, em Debian/Ubuntu  
 **Estado:** procedimento controlado de pré-validação; não é homologação de limpeza automática
 
@@ -27,6 +27,12 @@ python3 bin/wp-integrity-audit.py \\
 
 5. Examinar `report.json`, `technical-report.md`, `file-evidence.json`, `sc403-forense.json`, `sc403-sql-objects.json` e `sc403-recovery-plan.json`.
 6. Guardar o manifesto de evidências fora do site. Não mover nem editar o caso antes de validar sua integridade.
+
+## Evidências de memória compartilhada System V
+
+Caso exista dump de memória já preservado por procedimento autorizado, sua análise é feita com o parâmetro opcional `--sc-shm-dump-dir`. Separe os dumps em um diretório `0700`, mantenha os hashes originais da coleta e documente a origem. O auditor não coleta segmentos ativos, não lê conteúdo SHM diretamente do kernel e não executa `ipcrm`.
+
+Diferencie registros de `kernel.segmentos` (metadados do host) de `dumps.registros` (arquivos apresentados). Um `shmid` coincidente não prova que o dump foi obtido daquele segmento. Um cabeçalho `SCSHM1` com SHA-256 coerente e `SCV` também não prova autenticidade ou compromisso. A classificação `SHM_PAYLOAD_SCV_COMPATIVEL_REQUER_VALIDACAO` exige investigação humana e não autoriza indisponibilidade ou limpeza.
 
 ## Fase 2 — pré-validação atual
 
