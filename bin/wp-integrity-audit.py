@@ -26,6 +26,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import component_versions
 import sc403_indicadores
 import sc403_forense
+import sc403_shm
 import sc403_yara
 import sc403_logs
 import sc403_plano
@@ -43,7 +44,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 
-VERSION = "0.33.0"
+VERSION = "0.34.0"
 IOC = re.compile(r"SC_ADV_BEGIN|--sc-cli|--sc-succ|trace-inspector-pad|trace-librarian-tag|agile-interface-vox|f88225c2|cipher-feeder|_sc_fpc|sc_cron_guard|sc_cron_recovery|e1v61n2r1im6t7_|sc_persist_manifest|sc_own_manifest|kinetic-relay-live|function ceya|Axiom Sentinel Snap|SCV:[0-9]+")
 PATTERN_NAMES = (".sc_", ".gr_", ".gk_", ".kk_", ".wp-object-cache", "f88225c2.zip")
 # Random option names confirmed during this incident. Keep this list explicit;
@@ -836,6 +837,14 @@ def optional_probe_review(case: Path) -> list[str]:
             issues.append("Varredura YARA solicitada não foi concluída")
         if yara.get("achados"):
             issues.append("Correspondências de regras YARA exigem validação")
+    shm_forense = case / "sc403-systemv-shm.json"
+    if shm_forense.is_file() and not shm_forense.is_symlink():
+        shm_info = json.loads(shm_forense.read_text(encoding="utf-8"))
+        dumps = shm_info.get("dumps", {})
+        if dumps.get("status") != "COMPLETA" or shm_info.get("kernel", {}).get("status") != "COMPLETA":
+            issues.append("Inventário System V e/ou validação de dumps não foi concluído")
+        if dumps.get("registros"):
+            issues.append("Dumps SHM disponíveis exigem validação de procedência e correlação com o incidente")
     sc_forense = case / "sc403-forense.json"
     if sc_forense.is_file() and not sc_forense.is_symlink():
         pacote = json.loads(sc_forense.read_text(encoding="utf-8"))
@@ -1167,6 +1176,23 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
             "sysv_segments_inventoried": len(sc_data.get("sysv", {}).get("segmentos", [])),
         }
     summary["persistence_risk"] = persistence_risk
+    shm_path = case / "sc403-systemv-shm.json"
+    if shm_path.is_file() and not shm_path.is_symlink():
+        dados_shm = json.loads(shm_path.read_text(encoding="utf-8"))
+        dump_registros = dados_shm.get("dumps", {}).get("registros", [])
+        summary["sc403_systemv"] = {
+            "cobertura_kernel": dados_shm.get("kernel", {}).get("status"),
+            "cobertura_dumps": dados_shm.get("dumps", {}).get("status"),
+            "segmentos_host_inventariados": len(dados_shm.get("kernel", {}).get("segmentos", [])),
+            "dumps_analisados": len(dump_registros),
+            "dumps_compativeis_requerem_validacao": sum(
+                x.get("classification") == "SHM_PAYLOAD_SCV_COMPATIVEL_REQUER_VALIDACAO"
+                for x in dump_registros),
+            "dumps_pendentes": sum(
+                x.get("classification") in ("SHM_DUMP_FORMAT_INVALID", "SHM_DUMP_REQUER_VALIDACAO")
+                for x in dump_registros),
+            "liberacao_autorizada": False,
+        }
     admin_path = case / "administrator-inventory.json"
     admin_coverage = json.loads(admin_path.read_text()) if admin_path.is_file() and not admin_path.is_symlink() else None
     summary["administrator_inventory"] = {"coverage": admin_coverage.get("coverage"), "count": admin_coverage.get("count")} if admin_coverage else {"coverage": "NOT EXECUTED", "count": None}
@@ -1283,6 +1309,8 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
         f"- Arquivos de configuração pendentes de análise: **{config_count}**",
         f"- Indicadores de persistência externa: **{host_indicators}**",
         f"- Itens de persistência do WordPress para revisão: **{summary['wordpress_persistence_review']}**",
+        *([f"- Dumps System V analisados: **{summary['sc403_systemv']['dumps_analisados']}** (compatíveis com indicadores SC: {summary['sc403_systemv']['dumps_compativeis_requerem_validacao']}; pendentes: {summary['sc403_systemv']['dumps_pendentes']})."]
+          if summary.get("sc403_systemv") else []),
         f"- Registros do inventário do servidor: **{len(host_records)}** (segurança conhecida: {host_known}; não classificados: {host_unclassified}; suspeitos: {host_indicators}; revisão: {host_review})",
         *[f"- Problema em verificação opcional: {issue}" for issue in optional_issues],
         "- Recomendação para reativação: **LIBERAÇÃO NÃO RECOMENDADA**",
@@ -1437,6 +1465,9 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
         f"- Arquivos de configuração do WordPress que exigem revisão: **{config_count}**",
         f"- Indicadores de persistência externa: **{host_indicators}**",
         f"- Registros do servidor que exigem revisão: **{host_review}**",
+        *([f"- Dumps System V examinados: **{summary['sc403_systemv']['dumps_analisados']}**; "
+           f"compatíveis com marcadores SC, mas sem origem comprovada: **{summary['sc403_systemv']['dumps_compativeis_requerem_validacao']}**."]
+          if summary.get("sc403_systemv") else []),
         "", "## Visão geral dos riscos", "",
         f"- Risco do banco de dados: **{'ALTO' if summary['confirmed_family_residues'] or summary['active_database_markers'] else 'REVISÃO NECESSÁRIA — opções privadas SC ou referências reversíveis presentes' if (summary.get('sc403_derived_options_requiring_review') or summary.get('reversed_component_references_requiring_review')) else 'BAIXO — nenhum indicador pesquisado encontrado no banco de dados' if audited else 'NÃO DETERMINADO'}**",
         f"- Risco dos arquivos: **{'ALTO — arquivos correlacionados a execução maliciosa' if summary['confirmed_compromised_files'] else 'REVISÃO NECESSÁRIA' if summary['file_indicators_requiring_review'] else 'BAIXO PARA OS INDICADORES PESQUISADOS'}**",
@@ -2565,6 +2596,8 @@ def parse_args() -> argparse.Namespace:
                         help="Regras YARA locais opcionais sob /etc/wp-integrity-audit (somente auditoria)")
     parser.add_argument("--sc-access-log", type=Path, action="append", default=[],
                         help="Log HTTP local para verificar endpoints SC (pode repetir; somente auditoria)")
+    parser.add_argument("--sc-shm-dump-dir", type=Path,
+                        help="Diretório privado contendo dumps SHM já preservados (somente auditoria; nunca anexa segmentos ativos)")
     parser.add_argument("--bundle-evidence", action="store_true", help="Cria arquivo TAR privado com evidências forenses (dados sensíveis)")
     parser.add_argument("--verify-case", type=Path, help="Verifica o manifesto de um caso existente sem analisar o WordPress")
     parser.add_argument("--email-to", help="Envia o PDF gerencial ao destinatário informado")
@@ -2627,6 +2660,8 @@ def parse_args() -> argparse.Namespace:
         parser.error("A correlação de logs SC somente está disponível na auditoria")
     if args.mode in ("apply-db", "apply-files", "recover") and args.sc_yara_rules:
         parser.error("Varredura YARA opcional somente no modo de auditoria")
+    if args.sc_shm_dump_dir and args.mode != "audit":
+        parser.error("A validação dos dumps SHM somente está disponível no modo de auditoria")
     if args.mode in ("apply-db", "apply-files", "recover") and (args.email_to or args.pdf_report or args.bundle_evidence):
         parser.error("Recuperação não pode combinar envio, PDF ou pacote de evidências na mesma execução")
     return args
@@ -2701,6 +2736,16 @@ def main() -> int:
             }
             write_private(case / "sc403-forense.json",
                           json.dumps(forense_sc, indent=2, ensure_ascii=False))
+            if args.sc_shm_dump_dir:
+                # Dump pré-coletado é evidência independente de segmento ativo.
+                # Nunca anexa, extrai ou elimina memória compartilhada.
+                try:
+                    shm_sc = sc403_shm.auditar(args.sc_shm_dump_dir)
+                except (sc403_shm.EvidenciaSHMInvalida, OSError) as erro:
+                    raise AuditError("Diretório ou coleta de dumps SHM inválidos; "
+                                     "auditoria de memória recusada") from erro
+                write_private(case / "sc403-systemv-shm.json",
+                              json.dumps(shm_sc, indent=2, ensure_ascii=False))
             if args.sc_yara_rules:
                 yara_result = sc403_yara.scanner_yara(target, args.sc_yara_rules)
                 write_private(case / "sc403-yara.json",
