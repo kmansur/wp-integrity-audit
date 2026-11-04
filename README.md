@@ -19,7 +19,9 @@ Os novos achados são correlacionados com o relatório JSON e a política conser
 
 **Créditos:** técnicas e metodologia inspiradas nos estudos abertos de [ux2dev/wordpress-sc403-cleaner](https://github.com/ux2dev/wordpress-sc403-cleaner) (GPL-2.0-or-later), e nas arquiteturas de monitoramento de [rfxn/linux-malware-detect](https://github.com/rfxn/linux-malware-detect) e análise estática de [nbs-system/php-malware-finder](https://github.com/nbs-system/php-malware-finder). Não foram incorporados seus scripts destrutivos ou bibliotecas externas. O código deste módulo é uma implementação independente.
 
-Limitações: não há ainda neutralização de service workers, inspeção do conteúdo de segmentos de memória, YARA integrado, análise profunda de corpos SQL ou limpeza simultânea de persistências. A recuperação em produção continua **não homologada**.
+A integração YARA é opcional: use `--sc-yara-rules /etc/wp-integrity-audit/regras/sc.yar` somente após instalar o executável YARA e revisar cuidadosamente as regras. Nunca carregue regras obtidas de terceiros sem validação; a ferramenta registra apenas nome da regra e caminho relativo, não trechos potencialmente sigilosos. Regras só são aceitas abaixo de `/etc/wp-integrity-audit`. Uma varredura YARA incompleta ou com correspondências impede o resultado limpo.
+
+Limitações: não há ainda neutralização de service workers, inspeção do conteúdo de segmentos de memória, análise profunda de corpos SQL ou limpeza simultânea de persistências. A recuperação em produção continua **não homologada**.
 
 Para validar:
 
