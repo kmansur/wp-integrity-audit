@@ -9,6 +9,7 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 ### Pré-validação conservadora da recuperação SC
 - Criado `bin/sc403_preflight.py` para confrontar caso forense previamente coletado com o estado atual do WordPress, exclusivamente em leitura.
 - Conferência de ABSPATH, manifesto SHA-256, hashes dos arquivos auditados, links simbólicos e indicadores de processos ativos, com limites de tamanho e orçamento de leitura.
+- Rejeição explícita de links simbólicos também em componentes intermediários dos caminhos registrados no manifesto, com teste de regressão.
 - Saída JSON opcional em caminho externo ao caso e à raiz pública; recusa sobrescrita e caminhos simbólicos de saída.
 - Parecer de recuperação sempre bloqueado para ações automáticas, exigindo validação independente de banco, backup restaurável, isolamento, sessões e navegadores.
 - Adicionados ensaios sintéticos de adulteração de evidências, troca de instalação, arquivos alterados, links simbólicos e PID suspeito.
