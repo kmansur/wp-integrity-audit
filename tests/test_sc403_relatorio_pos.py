@@ -56,7 +56,7 @@ class TestRelatorioSC(unittest.TestCase):
             resumo = json.loads((caso / "report.json").read_text(encoding="utf-8"))
             self.assertEqual(resumo["exit_code"], 40)
             self.assertEqual(resumo["summary"]["sc403_derived_options_requiring_review"], 1)
-            self.assertIn("opções privadas SC", gerencial.lower())
+            self.assertIn("opções privadas sc", gerencial.lower())
             self.assertIn("REVISÃO NECESSÁRIA", gerencial)
 
     def test_persistencia_pos_recuperacao_bloqueia_status_limpo(self):
