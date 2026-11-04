@@ -164,6 +164,7 @@ def comparar(anterior: Path, atual: Path) -> dict:
     suspeitos = [p for p in dados_forense.get("proc", {}).get("resultados", [])
                  if p.get("state") == "PROC_SC_REQUER_INVESTIGACAO"]
     novos = any(pares[k]["novos"] or pares[k]["hash_alterado"] for k in pares)
+    persistentes = any(pares[k]["persistentes"] for k in pares)
     retorno = {
         "schema_version": 1, "tipo": "COMPARACAO_FORENSE_SC",
         "abspath": antes["abspath"], "caso_anterior": str(anterior),
@@ -176,8 +177,9 @@ def comparar(anterior: Path, atual: Path) -> dict:
         "cobertura_incompleta": incompleta,
         "estado": ("INDICIOS_DE_REINFECCAO_OU_NOVA_ATIVIDADE" if novos or
                    suspeitos or procs_agora else
+                   "INDICADORES_PERSISTENTES_REQUEREM_REVISAO" if persistentes else
                    "REVISAO_NECESSARIA_COBERTURA_INCOMPLETA" if incompleta else
-                   "SEM_NOVO_INDICADOR_NOS_DADOS_COMPARADOS"),
+                   "SEM_INDICADOR_NOS_DADOS_COMPARADOS"),
         "liberacao_autorizada": False,
         "nota": ("Ausência de novos indicadores não demonstra erradicação. "
                  "Mudanças de hash podem ocorrer legitimamente e exigem revisão humana."),
