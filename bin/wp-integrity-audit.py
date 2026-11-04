@@ -374,8 +374,19 @@ def file_audit(target: Path, case: Path) -> list[dict]:
         except OSError:
             continue
     derivados = sc403_indicadores.investigar_arquivos(target)
-    anteriores = {item["path"] for item in findings}
-    findings.extend(item for item in derivados if item["path"] not in anteriores)
+    anteriores = {item["path"]: item for item in findings}
+    for item in derivados:
+        existente = anteriores.get(item["path"])
+        if existente is None:
+            findings.append(item)
+        else:
+            existente["sc403_derived_indicator"] = item["indicator"]
+            existente["sc403_timestomp_93819"] = item.get("timestomp_93819")
+            # Um hash/guard previamente reconhecido não elimina evidência
+            # independente de nome derivado; conservar IOC mais específico.
+            if existente.get("classification") == "LEGITIMO_VALIDADO":
+                existente["classification"] = "SC_CAMINHO_DERIVADO_REQUER_REVISAO"
+                existente["confidence"] = "MEDIA"
     write_private(case / "sc403-file-evidence.json", json.dumps(derivados, indent=2, ensure_ascii=False))
     write_private(case / "file-evidence.json", json.dumps(findings, indent=2, ensure_ascii=False))
     return findings
