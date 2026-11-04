@@ -36,7 +36,7 @@ def scanner_yara(site: Path, regras: Path, timeout: int = 120) -> dict:
         return {"status": "INCOMPLETA", "motivo": "FALHA_EXECUCAO_OU_TIMEOUT", "achados": []}
     if len(processo.stdout) > MAX_OUTPUT or len(processo.stderr) > MAX_OUTPUT:
         return {"status": "INCOMPLETA", "motivo": "SAIDA_EXCEDE_LIMITE", "achados": []}
-    if processo.returncode not in (0, 1):
+    if processo.returncode != 0:
         return {"status": "INCOMPLETA", "motivo": "ERRO_YARA", "achados": []}
     achados = []
     prefixo = str(site.resolve()) + os.sep
