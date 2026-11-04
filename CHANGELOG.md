@@ -4,6 +4,23 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 
 ## [Não publicado]
 
+## [0.33.0] - 2026-11-04
+
+### Segurança e consistência dos relatórios
+- Corrigido erro na geração do relatório técnico quando uma evidência derivada SC é um diretório ou arquivo sem hash completo. Agora apresenta `NÃO CALCULADO` em vez de interromper a auditoria.
+- Resumo gerencial inclui a quantidade de caminhos e opções privadas SC derivados para revisão, sem considerá-los automaticamente comprometidos.
+- Risco do banco deixa de ser rotulado como baixo quando há opções privadas SC derivadas detectadas.
+
+### Validação pós-recuperação
+- A recuperação assistida consulta novamente `/proc` e arquivos ZIP após as alterações; o resultado restrito é registrado em `sc403-recovery-postcheck.json`.
+- Persistências encontradas ou falta de cobertura após a recuperação causam bloqueio/revisão no parecer, sem autorizar reativação.
+- Incluídos testes sintéticos de relatórios sem hash, opções SC e pendências pós-recuperação.
+
+### Testes
+- Adicionado job de regressão completa em Python 3.11 ao workflow de segurança SC; mantidos testes SC em Python 3.10, 3.11 e 3.12.
+- Testes integrados com WordPress comprometido e MariaDB/MySQL em clone ainda necessários para homologação de recuperação destrutiva.
+
+
 ## [0.32.0] - 2026-11-04
 
 ### Comparação forense de reinfecção
