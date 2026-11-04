@@ -18,6 +18,8 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 - Adicionado conjunto inicial de regras estáticas de triagem `rules/sc403_triagem.yar`, não ativado automaticamente e sujeito à avaliação de falsos positivos.
 - Adicionada correlação opcional de endpoints SC em logs HTTP Apache/Nginx, inclusive gzip, com limites de leitura e saída agregada sem IPs ou URLs completas (`--sc-access-log`, `sc403-http-logs.json`).
 - Incluídos testes sintéticos dos logs, incluindo contagem exata, privacidade e arquivo compactado.
+- Adicionado `bin/sc403_plano.py` para gerar `sc403-recovery-plan.json`, com correlação dos indicadores e bloqueios à recuperação, sempre em modo não executável.
+- Adicionados testes para validar que ausência de cobertura e achados pendentes nunca autorizam liberação automática.
 - Corrigida distinção entre PID encerrado durante a varredura e erro de permissão de `/proc`; diretivas de carregamento PHP passam a exigir revisão.
 - Créditos e limitações documentados, preservando somente leitura e remediação assistida.
 
