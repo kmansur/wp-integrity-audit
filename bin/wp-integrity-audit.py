@@ -25,6 +25,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import component_versions
 import sc403_indicadores
+import sc403_forense
 import report_export
 import mail_delivery
 import remediacao_serializada as serial_wp
@@ -39,7 +40,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 
-VERSION = "0.29.0"
+VERSION = "0.30.0"
 IOC = re.compile(r"SC_ADV_BEGIN|--sc-cli|--sc-succ|trace-inspector-pad|trace-librarian-tag|agile-interface-vox|f88225c2|cipher-feeder|_sc_fpc|sc_cron_guard|sc_cron_recovery|e1v61n2r1im6t7_|sc_persist_manifest|sc_own_manifest|kinetic-relay-live|function ceya|Axiom Sentinel Snap|SCV:[0-9]+")
 PATTERN_NAMES = (".sc_", ".gr_", ".gk_", ".kk_", ".wp-object-cache", "f88225c2.zip")
 # Random option names confirmed during this incident. Keep this list explicit;
@@ -806,6 +807,23 @@ def optional_probe_review(case: Path) -> list[str]:
             issues.append("Invalid host persistence inventory")
         elif any(item.get("classification") == "HOST_INDICATOR_REQUIRES_INVESTIGATION" for item in records):
             issues.append("External host persistence indicators require investigation")
+    sc_forense = case / "sc403-forense.json"
+    if sc_forense.is_file() and not sc_forense.is_symlink():
+        pacote = json.loads(sc_forense.read_text(encoding="utf-8"))
+        zip_result = pacote.get("zip", {})
+        if zip_result.get("status") != "COMPLETA":
+            issues.append("A inspeção de arquivos ZIP foi incompleta; revisar limites e erros")
+        if zip_result.get("resultados"):
+            issues.append("Arquivos ZIP com indicadores SC ou inspeção limitada exigem revisão")
+        configs = pacote.get("php_config", {}).get("resultados", [])
+        if any(x.get("ioc") or x.get("state") in ("CONFIG_GRANDE_REQUER_REVISAO", "CONFIG_LEITURA_INCOMPLETA") for x in configs):
+            issues.append("Configuração PHP com indicador explícito ou cobertura incompleta")
+        proc_result = pacote.get("proc", {})
+        if proc_result.get("status") != "COMPLETA":
+            issues.append("Inspeção complementar de processos incompleta")
+        if any(x.get("state") == "PROC_SC_REQUER_INVESTIGACAO" for x in proc_result.get("resultados", [])):
+            issues.append("Processos associados à família SC exigem investigação")
+        # Memória compartilhada é inventário de host: não prova comprometimento.
     return issues
 
 
@@ -1086,6 +1104,16 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
     summary["host_unclassified_inventory"] = host_unclassified
     summary["host_persistence_indicators"] = host_indicators
     summary["wordpress_persistence_review"] = len(wordpress_persistence)
+    sc_forense_path = case / "sc403-forense.json"
+    if sc_forense_path.is_file() and not sc_forense_path.is_symlink():
+        sc_data = json.loads(sc_forense_path.read_text(encoding="utf-8"))
+        summary["sc403_forense"] = {
+            "zip_findings": len(sc_data.get("zip", {}).get("resultados", [])),
+            "zip_errors": len(sc_data.get("zip", {}).get("erros", [])),
+            "php_configuration_review": len(sc_data.get("php_config", {}).get("resultados", [])),
+            "associated_processes": len(sc_data.get("proc", {}).get("resultados", [])),
+            "sysv_segments_inventoried": len(sc_data.get("sysv", {}).get("segmentos", [])),
+        }
     summary["persistence_risk"] = persistence_risk
     admin_path = case / "administrator-inventory.json"
     admin_coverage = json.loads(admin_path.read_text()) if admin_path.is_file() and not admin_path.is_symlink() else None
@@ -2555,6 +2583,15 @@ def main() -> int:
         if is_audit:
             wordpress_persistence_inventory(target, case)
             recent_file_timeline(target, case)
+            # Camada SC complementar: investigação sem executar código do site.
+            forense_sc = {
+                "zip": sc403_forense.inspecionar_zips(target),
+                "php_config": sc403_forense.inspecionar_php_config(target),
+                "proc": sc403_forense.inspecionar_proc(target),
+                "sysv": sc403_forense.inventario_sysv(),
+            }
+            write_private(case / "sc403-forense.json",
+                          json.dumps(forense_sc, indent=2, ensure_ascii=False))
         if not (is_audit and args.skip_config):
             configuration_audit(target, case)
         if is_audit and not args.skip_host_persistence:
