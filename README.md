@@ -10,7 +10,7 @@ O relatório gerencial passa a mostrar explicitamente a quantidade de **caminhos
 
 Além da verificação anterior à recuperação, os modos assistidos `--recover`, `--apply-db` e `--apply-files` realizam nova leitura de `/proc` e análise de ZIPs **após as alterações**. O resultado fica em `sc403-recovery-postcheck.json`, com eventuais bloqueios. A confirmação de recuperação não pode se basear apenas na ausência de indicadores anteriores à intervenção; processos e pacotes podem ser recriados durante a troca dos arquivos.
 
-O parecer resultante não é automaticamente aprovado para liberação, e persistências ou cobertura incompleta geram revisão obrigatória. A verificação não encerra processos nem remove segmentos System V.
+O parecer resultante não é automaticamente aprovado para liberação, e persistências ou cobertura incompleta geram revisão obrigatória. A verificação não encerra processos nem remove segmentos System V. No inventário SQL de triggers, eventos e rotinas, consultas que ultrapassem 1.000 registros são marcadas como **INCOMPLETA** e registram o tipo de objeto cujo limite foi atingido; a ausência de mais resultados não é interpretada como auditoria integral.
 
 ### Testes e compatibilidade
 
