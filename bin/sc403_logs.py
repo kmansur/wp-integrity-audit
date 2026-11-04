@@ -31,9 +31,12 @@ def auditar_logs(caminhos: list[Path], endpoint_sw: int, endpoint_instalador: in
                 continue
             opener = gzip.open if caminho.suffix == ".gz" else open
             with opener(caminho, "rb") as stream:
-                for indice, linha in enumerate(stream, 1):
-                    if indice > LIMITE_LINHAS:
-                        item["estado"] = "LIMITE_LINHAS"
+                for indice in range(1, LIMITE_LINHAS + 2):
+                    linha = stream.readline(65537)
+                    if not linha:
+                        break
+                    if indice > LIMITE_LINHAS or len(linha) > 65536:
+                        item["estado"] = "LIMITE_DE_LINHAS_OU_TAMANHO"
                         cobertura = "INCOMPLETA"
                         break
                     for chave, expressao in patterns.items():
