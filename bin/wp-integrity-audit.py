@@ -27,6 +27,7 @@ import component_versions
 import sc403_indicadores
 import sc403_forense
 import sc403_yara
+import sc403_logs
 import report_export
 import mail_delivery
 import remediacao_serializada as serial_wp
@@ -815,6 +816,13 @@ def optional_probe_review(case: Path) -> list[str]:
             issues.append("Inventário de triggers, eventos e rotinas SQL incompleto")
         if sql_data.get("objetos"):
             issues.append("Objetos programáveis do banco SQL exigem revisão de procedência")
+    logs_path = case / "sc403-http-logs.json"
+    if logs_path.is_file() and not logs_path.is_symlink():
+        logs_sc = json.loads(logs_path.read_text(encoding="utf-8"))
+        if logs_sc.get("status") != "COMPLETA":
+            issues.append("Correlação dos logs HTTP com endpoints SC incompleta")
+        if logs_sc.get("total_service_worker") or logs_sc.get("total_instalador"):
+            issues.append("Acessos aos endpoints derivados SC encontrados nos logs HTTP")
     yara_path = case / "sc403-yara.json"
     if yara_path.is_file() and not yara_path.is_symlink():
         yara = json.loads(yara_path.read_text(encoding="utf-8"))
@@ -2524,6 +2532,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--offline", action="store_true", help="Desativa consultas externas ao WordPress.org")
     parser.add_argument("--sc-yara-rules", type=Path,
                         help="Regras YARA locais opcionais sob /etc/wp-integrity-audit (somente auditoria)")
+    parser.add_argument("--sc-access-log", type=Path, action="append", default=[],
+                        help="Log HTTP local para verificar endpoints SC (pode repetir; somente auditoria)")
     parser.add_argument("--bundle-evidence", action="store_true", help="Cria arquivo TAR privado com evidências forenses (dados sensíveis)")
     parser.add_argument("--verify-case", type=Path, help="Verifica o manifesto de um caso existente sem analisar o WordPress")
     parser.add_argument("--email-to", help="Envia o PDF gerencial ao destinatário informado")
@@ -2582,6 +2592,8 @@ def parse_args() -> argparse.Namespace:
         parser.error("A substituição de wp-content exige --replace-plugins-themes")
     if args.mode == "apply-db" and not (args.remove_db_option or args.remove_confirmed_encoded_db_payload or args.remove_cron_hook or args.deactivate_plugin):
         parser.error("--apply-db exige --remove-db-option, --remove-cron-hook ou --deactivate-plugin")
+    if args.mode in ("apply-db", "apply-files", "recover") and args.sc_access_log:
+        parser.error("A correlação de logs SC somente está disponível na auditoria")
     if args.mode in ("apply-db", "apply-files", "recover") and args.sc_yara_rules:
         parser.error("Varredura YARA opcional somente no modo de auditoria")
     if args.mode in ("apply-db", "apply-files", "recover") and (args.email_to or args.pdf_report or args.bundle_evidence):
@@ -2662,6 +2674,13 @@ def main() -> int:
                 yara_result = sc403_yara.scanner_yara(target, args.sc_yara_rules)
                 write_private(case / "sc403-yara.json",
                               json.dumps(yara_result, indent=2, ensure_ascii=False))
+            if args.sc_access_log:
+                identificadores_sc = sc403_indicadores.identificadores(target)
+                logs_sc = sc403_logs.auditar_logs(args.sc_access_log,
+                    identificadores_sc["endpoint_sw"],
+                    identificadores_sc["endpoint_instalador"])
+                write_private(case / "sc403-http-logs.json",
+                              json.dumps(logs_sc, indent=2, ensure_ascii=False))
         if not (is_audit and args.skip_config):
             configuration_audit(target, case)
         if is_audit and not args.skip_host_persistence:
