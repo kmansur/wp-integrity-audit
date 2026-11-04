@@ -155,6 +155,7 @@ def inspecionar_proc(raiz: Path, proc_root: Path = Path("/proc"),
     resultado = []
     erros = []
     vistos = 0
+    falhas_acesso = 0
     base = str(raiz.resolve())
     try:
         pids = [p for p in proc_root.iterdir() if p.name.isdecimal()]
@@ -190,8 +191,11 @@ def inspecionar_proc(raiz: Path, proc_root: Path = Path("/proc"),
                                   "state": "PROC_SC_REQUER_INVESTIGACAO" if indicador or arquivo_removido
                                   else "PROCESSO_ASSOCIADO_INVENTARIADO"})
         except (OSError, PermissionError):
+            falhas_acesso += 1
             continue
-    return {"status": "COMPLETA", "resultados": resultado, "erros": erros}
+    return {"status": "PARCIAL" if falhas_acesso else "COMPLETA",
+            "resultados": resultado, "erros": erros,
+            "processos_sem_acesso": falhas_acesso}
 
 
 def inventario_sysv() -> dict:
