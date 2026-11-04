@@ -1,5 +1,33 @@
 # Auditoria de Integridade WordPress — branch Python
 
+## Versão 0.34.0 — evidências System V SHM com validação isolada
+
+A v0.34.0 incorpora uma implementação independente da inspeção de memória compartilhada desenvolvida inicialmente no WH01, separando **inventário do kernel** de **arquivos forenses de dump**. Nenhum segmento em execução é anexado (`shmat`), lido ou removido; não são executados scripts PHP nem comandos `ipcrm`.
+
+O parâmetro opcional `--sc-shm-dump-dir` aceita apenas um diretório privado (permissões `0700`) de dumps **já obtidos por procedimento forense autorizado**. Cada arquivo deve se chamar `shmid-NUMERO.bin`. O resultado aparece no arquivo privado `sc403-systemv-shm.json`, separado dos demais relatórios.
+
+```bash
+python3 bin/wp-integrity-audit.py \\
+  /usr/local/www/data/mpctelecom/html \\
+  --domain-label mpctelecom.com.br \\
+  --case-root /var/lib/wp-integrity-audit/cases \\
+  --sc-shm-dump-dir /root/evidencias-sc/shm
+```
+
+O módulo aceita no máximo 32 arquivos, até 16 MiB por arquivo e 64 MiB de conteúdo total; bloqueia links simbólicos, mudanças detectadas durante a leitura e diretórios de dump acessíveis a grupo ou terceiros. Registra somente metadados, SHA-256, validação do cabeçalho `SCSHM1`, tamanho, versão `SCV` e presença de marcadores adicionais. **Os bytes do payload não são copiados para o relatório.**
+
+As classificações incluem:
+
+- `SHM_SEGMENT_REQUER_CAPTURA`: metadado de segmento no kernel, sem leitura de seu conteúdo; não atribui comprometimento ao WordPress.
+- `SHM_DUMP_FORMAT_INVALID`: dump não corresponde à estrutura declarada.
+- `SHM_DUMP_REQUER_VALIDACAO`: estrutura, hash, tamanho, cauda ou indicadores insuficientes.
+- `SHM_PAYLOAD_SCV_COMPATIVEL_REQUER_VALIDACAO`: conteúdo contém versão SCV e outro indicador estático, com estrutura e SHA-256 interno coerentes; **não comprova origem, autenticidade nem execução maliciosa.**
+
+A presença de um `shmid` no nome de arquivo não prova que aquele dump veio do segmento homônimo no servidor. O valor SHA-256 presente no cabeçalho é fornecido pelo próprio produtor do dump e **não constitui autenticação externa**. Para comprovar procedência, preserve cadeia de custódia, registro do coletor autorizado, hash do arquivo integral e metadados da captura. Os registros de kernel e dumps são reportados separadamente, evitando contagem duplicada.
+
+Os testes de regressão estão em `tests/test_sc403_shm.py`, com cenários sintéticos. A coleta de memória real e a erradicação coordenada continuam fora do escopo automático. A integração preserva o diretório de trabalho com alterações locais no WH01; a branch remota não deve ser aplicada por `git pull` naquele diretório enquanto houver conflitos.
+
+
 ## Versão 0.33.0 — validação pós-recuperação e consistência das evidências SC
 
 Esta versão corrige uma falha de apresentação: diretórios derivados do SC e arquivos grandes podem ser inventariados **sem SHA-256 completo**. A ausência do hash é registrada como **NÃO CALCULADO** no relatório técnico, sem interromper a geração do parecer ou tratar a evidência como limpa.
