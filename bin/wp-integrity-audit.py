@@ -2534,6 +2534,10 @@ def main() -> int:
         timestamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
         label = re.sub(r"[^A-Za-z0-9._-]", "_", args.domain_label or target.parent.name)
         case = ensure_private_dir(case_root / f"{label}-{timestamp}-{secrets.token_hex(3)}")
+        # Mapa privado da variante documentada, inclusive endpoints para
+        # investigação futura de logs e service workers; nenhuma chamada HTTP.
+        write_private(case / "sc403-identifiers.json", json.dumps(
+            sc403_indicadores.identificadores(target), indent=2, ensure_ascii=False))
         print(f"Version {VERSION}; mode={args.mode}; case={case}")
         is_audit = args.mode == "audit"
         files = [] if is_audit and args.skip_files else file_audit(target, case)
