@@ -43,7 +43,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 
-VERSION = "0.32.0"
+VERSION = "0.33.0"
 IOC = re.compile(r"SC_ADV_BEGIN|--sc-cli|--sc-succ|trace-inspector-pad|trace-librarian-tag|agile-interface-vox|f88225c2|cipher-feeder|_sc_fpc|sc_cron_guard|sc_cron_recovery|e1v61n2r1im6t7_|sc_persist_manifest|sc_own_manifest|kinetic-relay-live|function ceya|Axiom Sentinel Snap|SCV:[0-9]+")
 PATTERN_NAMES = (".sc_", ".gr_", ".gk_", ".kk_", ".wp-object-cache", "f88225c2.zip")
 # Random option names confirmed during this incident. Keep this list explicit;
@@ -1144,6 +1144,11 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
     summary["host_unclassified_inventory"] = host_unclassified
     summary["host_persistence_indicators"] = host_indicators
     summary["wordpress_persistence_review"] = len(wordpress_persistence)
+    summary["sc403_derived_file_review"] = sum(
+        bool(x.get("sc403_derived_indicator")) or
+        x.get("classification") in ("SC_CAMINHO_DERIVADO_REQUER_REVISAO", "SC_LEITURA_INCOMPLETA")
+        for x in findings
+    )
     sc_sql_path = case / "sc403-sql-objects.json"
     if sc_sql_path.is_file() and not sc_sql_path.is_symlink():
         sc_sql = json.loads(sc_sql_path.read_text(encoding="utf-8"))
@@ -1265,6 +1270,8 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
         f"- Payloads codificados que exigem revisão: **{summary.get('encoded_payloads_requiring_review', 0)}**",
         f"- Referências reversíveis de componentes que exigem revisão: **{summary.get('reversed_component_references_requiring_review', 0)}**",
         f"- Hooks de cron anômalos que exigem revisão: **{summary.get('cron_hook_anomalies_requiring_review', 0)}**",
+        f"- Arquivos/diretórios derivados da família SC para revisão: **{summary['sc403_derived_file_review']}**",
+        f"- Opções privadas SC derivadas para revisão: **{summary['sc403_derived_options_requiring_review']}**",
         f"- Referências históricas: **{summary['historical_references']}**",
         f"- Registros informativos: **{summary['informational_records']}**",
         f"- Indicadores ativos no banco de dados: **{summary['active_database_markers']}**",
@@ -1431,7 +1438,7 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
         f"- Indicadores de persistência externa: **{host_indicators}**",
         f"- Registros do servidor que exigem revisão: **{host_review}**",
         "", "## Visão geral dos riscos", "",
-        f"- Risco do banco de dados: **{'ALTO' if summary['confirmed_family_residues'] or summary['active_database_markers'] else 'REVISÃO NECESSÁRIA — referência reversível de componente encontrada' if summary.get('reversed_component_references_requiring_review') else 'BAIXO — nenhum indicador pesquisado encontrado no banco de dados' if audited else 'NÃO DETERMINADO'}**",
+        f"- Risco do banco de dados: **{'ALTO' if summary['confirmed_family_residues'] or summary['active_database_markers'] else 'REVISÃO NECESSÁRIA — opções privadas SC ou referências reversíveis presentes' if (summary.get('sc403_derived_options_requiring_review') or summary.get('reversed_component_references_requiring_review')) else 'BAIXO — nenhum indicador pesquisado encontrado no banco de dados' if audited else 'NÃO DETERMINADO'}**",
         f"- Risco dos arquivos: **{'ALTO — arquivos correlacionados a execução maliciosa' if summary['confirmed_compromised_files'] else 'REVISÃO NECESSÁRIA' if summary['file_indicators_requiring_review'] else 'BAIXO PARA OS INDICADORES PESQUISADOS'}**",
         f"- Risco do núcleo do WordPress: **{'MÉDIO — REVISÃO NECESSÁRIA' if core_count else 'MÉDIO — versão desatualizada; somas de verificação oficiais validadas' if component_result and component_result['summary'].get('core_outdated') and component_result['coverage'].get('core') == 'EXECUTED' else 'NENHUMA DIVERGÊNCIA EXPLÍCITA IDENTIFICADA' if component_result and component_result['coverage'].get('core') == 'EXECUTED' else 'NÃO DETERMINADO'}**",
         f"- Risco de persistência externa: **{traduzir_estado(persistence_risk)}**",
