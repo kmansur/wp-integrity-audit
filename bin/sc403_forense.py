@@ -218,3 +218,23 @@ def inventario_sysv() -> dict:
                            "nattch": int(campos[5]) if campos[5].isdigit() else None,
                            "state": "SYSV_INVENTARIADO_SEM_ATRIBUICAO"})
     return {"status": "COMPLETA", "segmentos": linhas}
+
+
+def bloqueios_recuperacao(proc: dict, zip_result: dict) -> list[str]:
+    """Retorna bloqueios com base em evidências atuais, sem alterar processos.
+
+    Segue política de falha fechada. Um inventário incompleto impede
+    intervenção em produção até identificar sua causa.
+    """
+    bloqueios = []
+    if not isinstance(proc, dict) or proc.get("status") != "COMPLETA":
+        bloqueios.append("PROC_COBERTURA_INCOMPLETA")
+    elif any(isinstance(item, dict) and
+             item.get("state") == "PROC_SC_REQUER_INVESTIGACAO"
+             for item in proc.get("resultados", [])):
+        bloqueios.append("PROCESSOS_SC_ATIVOS")
+    if not isinstance(zip_result, dict) or zip_result.get("status") != "COMPLETA":
+        bloqueios.append("ZIP_COBERTURA_INCOMPLETA")
+    elif zip_result.get("resultados"):
+        bloqueios.append("ZIP_SC_REQUER_REVISAO")
+    return bloqueios
