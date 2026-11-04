@@ -1936,13 +1936,18 @@ def database_sql_objects_audit(option_file: str, dbname: str, case: Path) -> dic
     )
     status = "COMPLETA_COM_VISIBILIDADE_LIMITADA"
     erros = []
+    fontes_limitadas = []
     for tabela, nome, atributo in tabelas:
         try:
             sql = (f"SELECT {nome}, {atributo} FROM information_schema.{tabela} "
                    f"WHERE {('TRIGGER_SCHEMA' if tabela == 'TRIGGERS' else 'EVENT_SCHEMA' if tabela == 'EVENTS' else 'ROUTINE_SCHEMA')}='{dbname}' "
-                   "LIMIT 1000;")
+                   "LIMIT 1001;")
             linhas = query_db(option_file, dbname, sql)
-            for linha in linhas:
+            # O registro adicional indica que o orçamento foi atingido.
+            if len(linhas) > 1000:
+                fontes_limitadas.append(tabela)
+                status = "INCOMPLETA"
+            for linha in linhas[:1000]:
                 if len(linha) != 2:
                     raise AuditError("Metadados SQL inesperados")
                 fonte.append({"tipo": tabela, "nome": linha[0][:191],
@@ -1952,6 +1957,7 @@ def database_sql_objects_audit(option_file: str, dbname: str, case: Path) -> dic
             erros.append(tabela)
             status = "INCOMPLETA"
     resultado = {"status": status, "objetos": fonte, "fontes_nao_consultadas": erros,
+                 "fontes_com_limite_atingido": fontes_limitadas,
                  "aviso": "O usuário SQL pode não ter permissão para visualizar todos os objetos."}
     write_private(case / "sc403-sql-objects.json",
                   json.dumps(resultado, indent=2, ensure_ascii=False))
