@@ -24,6 +24,7 @@ from pathlib import Path
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import component_versions
+import sc403_indicadores
 import report_export
 import mail_delivery
 import remediacao_serializada as serial_wp
@@ -38,7 +39,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 
-VERSION = "0.28.5"
+VERSION = "0.29.0"
 IOC = re.compile(r"SC_ADV_BEGIN|--sc-cli|--sc-succ|trace-inspector-pad|trace-librarian-tag|agile-interface-vox|f88225c2|cipher-feeder|_sc_fpc|sc_cron_guard|sc_cron_recovery|e1v61n2r1im6t7_|sc_persist_manifest|sc_own_manifest|kinetic-relay-live|function ceya|Axiom Sentinel Snap|SCV:[0-9]+")
 PATTERN_NAMES = (".sc_", ".gr_", ".gk_", ".kk_", ".wp-object-cache", "f88225c2.zip")
 # Random option names confirmed during this incident. Keep this list explicit;
@@ -372,6 +373,10 @@ def file_audit(target: Path, case: Path) -> list[dict]:
             })
         except OSError:
             continue
+    derivados = sc403_indicadores.investigar_arquivos(target)
+    anteriores = {item["path"] for item in findings}
+    findings.extend(item for item in derivados if item["path"] not in anteriores)
+    write_private(case / "sc403-file-evidence.json", json.dumps(derivados, indent=2, ensure_ascii=False))
     write_private(case / "file-evidence.json", json.dumps(findings, indent=2, ensure_ascii=False))
     return findings
 
@@ -738,7 +743,9 @@ def audit_status(files: list[dict], processes: list[str],
     cron_hook_review = sum(1 for x in (database or [])
                           if x.get("kind") == "cron_hook_anomaly"
                           and x.get("state") == "CRON_HOOK_ANOMALO_REQUER_REVISAO")
+    sc403_review = sum(1 for x in (database or []) if x.get("kind") == "sc403_derived_option")
     summary = {
+        "sc403_derived_options_requiring_review": sc403_review,
         "confirmed_family_residues": count("family_option") + encoded_family,
         "encoded_payloads_requiring_review": encoded_review,
         "reversed_component_references_requiring_review": reversed_review,
@@ -749,7 +756,7 @@ def audit_status(files: list[dict], processes: list[str],
         "validated_legitimate_files": sum(x.get("classification") == "LEGITIMO_VALIDADO" for x in files),
         "security_configuration_review": sum(x.get("classification") == "CONFIGURACAO_PLUGIN_SEGURANCA_REQUER_VALIDACAO" for x in files),
         "confirmed_compromised_files": confirmed_files,
-        "file_indicators_requiring_review": sum(x.get("classification") in ("IOC_REQUER_VALIDACAO", "ARQUIVO_SUSPEITO_REQUER_VALIDACAO", "PHP_UPLOAD_REQUER_VALIDACAO", "PHP_DIRETORIO_OCULTO_REQUER_VALIDACAO", "CACHE_PLUGIN_REQUER_VALIDACAO", "WEB_SHELL_HEURISTIC_REQUIRES_REVIEW", "PHP_OFUSCACAO_REQUER_QUARENTENA", "PHP_ANOMALIA_COMPORTAMENTAL_REQUER_REVISAO", "PLUGIN_MODIFICACAO_LICENCA_REQUER_QUARENTENA") for x in files),
+        "file_indicators_requiring_review": sum(x.get("classification") in ("IOC_REQUER_VALIDACAO", "ARQUIVO_SUSPEITO_REQUER_VALIDACAO", "PHP_UPLOAD_REQUER_VALIDACAO", "PHP_DIRETORIO_OCULTO_REQUER_VALIDACAO", "CACHE_PLUGIN_REQUER_VALIDACAO", "WEB_SHELL_HEURISTIC_REQUIRES_REVIEW", "PHP_OFUSCACAO_REQUER_QUARENTENA", "PHP_ANOMALIA_COMPORTAMENTAL_REQUER_REVISAO", "PLUGIN_MODIFICACAO_LICENCA_REQUER_QUARENTENA", "SC_CAMINHO_DERIVADO_REQUER_REVISAO", "SC_LEITURA_INCOMPLETA") for x in files),
         "suspicious_processes": len(processes),
     }
     if database is None:
@@ -764,7 +771,7 @@ def audit_status(files: list[dict], processes: list[str],
         return "AUDITORIA_INCOMPLETA", 40, summary
     if summary["confirmed_family_residues"]:
         return "RESIDUOS_REQUEREM_LIMPEZA", 10, summary
-    if summary["file_indicators_requiring_review"] or reversed_review or cron_hook_review:
+    if summary["file_indicators_requiring_review"] or reversed_review or cron_hook_review or sc403_review:
         return "AUDITORIA_INCOMPLETA", 40, summary
     return "SEM_MARCADOR_EXPLICITO", 0, summary
 
@@ -1679,7 +1686,7 @@ def database_cron_structure_scan(option_file: str, dbname: str, prefix: str) -> 
     return findings
 
 def database_audit(option_file: str, dbname: str, prefix: str, case: Path,
-                   post: bool = False) -> list[dict]:
+                   post: bool = False, site_root: Path | None = None) -> list[dict]:
     """Collect targeted SQL metadata without exporting option values.
 
     Every mandatory query must succeed, otherwise the entire audit fails.
@@ -1796,6 +1803,21 @@ def database_audit(option_file: str, dbname: str, prefix: str, case: Path,
     # option names as malicious.
     findings.extend(database_reversed_reference_scan(option_file, dbname, prefix))
     findings.extend(database_cron_structure_scan(option_file, dbname, prefix))
+    if site_root is None:
+        raise AuditError("Auditoria SC403 exige o caminho real do WordPress")
+    dados_sc = sc403_indicadores.identificadores(site_root)
+    nomes_sc = sorted(set(dados_sc["opcoes"].values()) | {dados_sc["opcao_payload"]})
+    nomes_sql = ",".join("'" + valor + "'" for valor in nomes_sc)
+    encontrados_sc = query_db(option_file, dbname,
+        f"SELECT option_name, OCTET_LENGTH(option_value), SHA2(option_value,256), "
+        f"HEX(LEFT(option_value,65536)) FROM {options} "
+        f"WHERE option_name IN ({nomes_sql}) ORDER BY option_name;")
+    try:
+        achados_sc = sc403_indicadores.linhas_opcoes(encontrados_sc, dados_sc)
+    except ValueError as erro:
+        raise AuditError("Falha na validação de evidência SC403 do banco") from erro
+    write_private(case / "sc403-database-evidence.json", json.dumps(achados_sc, indent=2, ensure_ascii=False))
+    findings.extend(achados_sc)
     write_private(case / ("database-post-audit.json" if post else "database-evidence.json"),
                   json.dumps(findings, indent=2))
     return findings
@@ -1986,6 +2008,10 @@ def post_recovery_blockers(database: list[dict], files: list[dict],
             blockers.append("database:" + str(item.get("kind")))
     if any(item.get("classification") == "IOC_REQUER_VALIDACAO" for item in files):
         blockers.append("file_ioc")
+    if any(x.get("kind") == "sc403_derived_option" for x in database):
+        blockers.append("sc403_derived_options")
+    if any(x.get("classification") in ("SC_CAMINHO_DERIVADO_REQUER_REVISAO", "SC_LEITURA_INCOMPLETA") for x in files):
+        blockers.append("sc403_derived_files")
     if processes:
         blockers.append("process_ioc")
     return blockers
@@ -2556,7 +2582,7 @@ def main() -> int:
         with database_client({"host": args.db_host or config["DB_HOST"],
                               "user": config["DB_USER"], "password": config["DB_PASSWORD"]}, case) as cnf:
             if args.mode in ("audit", "audit-db", "audit-db-post"):
-                database = database_audit(cnf, dbname, prefix, case, post=args.mode == "audit-db-post")
+                database = database_audit(cnf, dbname, prefix, case, post=args.mode == "audit-db-post", site_root=target)
                 if is_audit:
                     admin_account_inventory(cnf, dbname, prefix, case)
                     if args.skip_version_check:
@@ -2678,7 +2704,7 @@ def main() -> int:
                 (case / "file-evidence.json").rename(case / "file-evidence-before.json")
                 post_files = file_audit(target, case)
                 post_processes = process_audit(case)
-                database = database_audit(cnf, dbname, prefix, case, post=True)
+                database = database_audit(cnf, dbname, prefix, case, post=True, site_root=target)
                 make_report(case, args.mode, post_files, post_processes, database, dbname, prefix)
                 blockers = post_recovery_blockers(database, post_files, post_processes)
                 if blockers:
