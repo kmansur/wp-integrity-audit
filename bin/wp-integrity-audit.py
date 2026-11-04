@@ -1289,7 +1289,10 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
     for finding in findings:
         # Preserve actual relative file paths, including long directory names.
         path = sanitize_relative_path(finding["path"])
-        lines.append(f"| `{path}` | {finding['classification']} | {finding['sha256']} |")
+        # Diretórios e arquivos grandes podem não possuir hash completo;
+        # ausência do SHA-256 não pode interromper a geração do relatório.
+        digest = finding.get("sha256") or "NÃO CALCULADO"
+        lines.append(f"| `{path}` | {finding.get('classification', 'REVISÃO')} | {digest} |")
     lines.extend(["", "## Evidências de processos", "",
                   "As linhas abaixo preservam o caminho do executável para contenção; segredos explícitos e endereços IP são mascarados."])
     lines.extend(f"- `{redact_process_line(process)}`" for process in processes)
