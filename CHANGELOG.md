@@ -4,6 +4,25 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 
 ## [Não publicado]
 
+## [0.32.0] - 2026-11-04
+
+### Comparação forense de reinfecção
+- Criado `bin/sc403_reinfeccao.py` para comparar duas auditorias do mesmo `ABSPATH`, validando manifestos SHA-256, classificações de arquivos e achados SQL sem executar PHP ou alterar os casos.
+- Identificação de novos indicadores, indicadores persistentes, arquivos/opções com hash alterado e processos suspeitos, sempre com liberação automática desativada.
+- Rejeição de casos adulterados, caminhos simbólicos, inventários inconsistentes e instalações distintas; resultados opcionais em JSON privado fora dos casos.
+- Incluídos testes sintéticos para integridade, instalações divergentes e persistência de IOC.
+
+### Pré-checagem de segurança na recuperação
+- Adicionada inspeção renovada de `/proc` e arquivos ZIP antes de operações de recuperação reais nos modos existentes.
+- Operações interrompidas diante de execução suspeita, arquivos ZIP potencialmente persistentes ou verificação incompleta.
+- Adicionada função `bloqueios_recuperacao()` e testes cobrindo ausência de achados, processo suspeito, ZIP suspeito e falta de cobertura.
+- Gerado `sc403-recovery-precheck.json` no diretório privado do caso; simulações mantidas sem alterações.
+
+### Limitações
+- Comparação de auditorias e ausência de novos indicadores não comprovam erradicação.
+- Rotinas destrutivas automáticas do SC não foram habilitadas; testes integrados em clone seguem obrigatórios.
+
+
 ## [0.31.0] - 2026-11-04
 
 ### Pré-validação conservadora da recuperação SC
