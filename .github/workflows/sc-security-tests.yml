@@ -43,3 +43,18 @@ jobs:
         run: python bin/wp-integrity-audit.py --version
       - name: Validar sintaxe JavaScript da revogação manual
         run: node --check tools/sc403-browser-admin.js
+
+  testes-completos:
+    name: Regressão completa do auditor (Python 3.11)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Obter código
+        uses: actions/checkout@v4
+      - name: Preparar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Validar sintaxe
+        run: python -m compileall -q bin tests
+      - name: Executar todas as regressões
+        run: python -m unittest discover -s tests -v
