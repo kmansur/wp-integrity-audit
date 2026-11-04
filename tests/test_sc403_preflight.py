@@ -111,6 +111,23 @@ class TestPreflightSC(unittest.TestCase):
         resultado = self.analisar()
         self.assertIn("ARQUIVOS_ALTERADOS_DESDE_AUDITORIA", resultado["bloqueios"])
 
+    def test_manifesto_nao_aceita_symlink_intermediario(self):
+        with tempfile.TemporaryDirectory() as externo:
+            atalho = self.caso / "atalho"
+            atalho.symlink_to(Path(externo), target_is_directory=True)
+            arquivo = Path(externo) / "evidencia.txt"
+            arquivo.write_text("conteudo externo")
+            manifesto = json.loads((self.caso / "evidence-manifest.json").read_text())
+            raw = arquivo.read_bytes()
+            manifesto["files"].append({
+                "file": "atalho/evidencia.txt",
+                "sha256": hashlib.sha256(raw).hexdigest(),
+                "size_bytes": len(raw),
+            })
+            gravar_json(self.caso / "evidence-manifest.json", manifesto)
+            with self.assertRaises(sc403_preflight.PreflightError):
+                sc403_preflight.conferir_manifesto(self.caso)
+
     def test_processos_ativos_bloqueiam(self):
         with patch.object(sc403_preflight.sc403_forense, "inspecionar_proc",
                           return_value={"status": "COMPLETA", "resultados": [
