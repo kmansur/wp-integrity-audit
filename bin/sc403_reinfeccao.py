@@ -125,6 +125,8 @@ def _opcoes(entradas) -> dict[str, str]:
 
 
 def comparar(anterior: Path, atual: Path) -> dict:
+    if anterior.resolve(strict=True) == atual.resolve(strict=True):
+        raise ComparacaoRecusada("É necessário informar dois casos distintos")
     for caminho in (anterior, atual):
         if caminho.is_symlink() or not caminho.is_dir():
             raise ComparacaoRecusada("Diretório do caso inválido")
@@ -162,7 +164,12 @@ def comparar(anterior: Path, atual: Path) -> dict:
     incompleta = (dados_forense.get("proc", {}).get("status") != "COMPLETA"
                   or dados_forense.get("zip", {}).get("status") != "COMPLETA")
     suspeitos = [p for p in dados_forense.get("proc", {}).get("resultados", [])
-                 if p.get("state") == "PROC_SC_REQUER_INVESTIGACAO"]
+                 if isinstance(p, dict) and p.get("state") == "PROC_SC_REQUER_INVESTIGACAO"]
+    zip_atuais = dados_forense["zip"].get("resultados", [])
+    if not isinstance(zip_atuais, list):
+        raise ComparacaoRecusada("Inventário ZIP inválido")
+    zip_suspeitos = [z.get("path") for z in zip_atuais
+                    if isinstance(z, dict) and z.get("state") == "ZIP_PAYLOAD_REQUER_REVISAO"]
     novos = any(pares[k]["novos"] or pares[k]["hash_alterado"] for k in pares)
     persistentes = any(pares[k]["persistentes"] for k in pares)
     retorno = {
@@ -174,9 +181,10 @@ def comparar(anterior: Path, atual: Path) -> dict:
         "indicadores_processo_anterior": len(procs_antes),
         "indicadores_processo_atual": len(procs_agora),
         "processos_suspeitos_runtime_atual": len(suspeitos),
+        "arquivos_zip_com_indicadores_sc": sorted(p for p in zip_suspeitos if isinstance(p, str)),
         "cobertura_incompleta": incompleta,
         "estado": ("INDICIOS_DE_REINFECCAO_OU_NOVA_ATIVIDADE" if novos or
-                   suspeitos or procs_agora else
+                   suspeitos or procs_agora or zip_suspeitos else
                    "INDICADORES_PERSISTENTES_REQUEREM_REVISAO" if persistentes else
                    "REVISAO_NECESSARIA_COBERTURA_INCOMPLETA" if incompleta else
                    "SEM_INDICADOR_NOS_DADOS_COMPARADOS"),
