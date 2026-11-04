@@ -15,7 +15,7 @@ python3 bin/sc403_reinfeccao.py \\
   --output /root/comparacao-sc403.json
 ```
 
-O resultado diferencia **novos indícios**, **indicadores persistentes**, **mudança de hash** e **cobertura incompleta**; nunca autoriza reativação. Uma alteração de hash pode ser legítima e não é prova isolada de reinfecção. Mesmo duas auditorias aparentemente idênticas não demonstram erradicação. O retorno da comparação é `40` (revisão), ou `30` em caso de erro de segurança/validação.
+O resultado diferencia **novos indícios**, **indicadores persistentes**, **mudança de hash**, **ZIPs com indicadores SC** e **cobertura incompleta**; nunca autoriza reativação. A comparação do mesmo diretório de caso com ele próprio é recusada. Uma alteração de hash pode ser legítima e não é prova isolada de reinfecção. Mesmo duas auditorias aparentemente idênticas não demonstram erradicação. O retorno da comparação é `40` (revisão), ou `30` em caso de erro de segurança/validação.
 
 Os diretórios dos casos devem permanecer privados; arquivos de evidência ausentes, adulterados, não inventariados, com links simbólicos ou vinculados a outro `ABSPATH` levam à recusa da comparação.
 
