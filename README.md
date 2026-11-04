@@ -15,6 +15,8 @@ A inspeção de processos utiliza `/proc` e não persiste a linha de comando, po
 
 A consulta ao `information_schema` depende de permissões do usuário MySQL/MariaDB. Ausência de objetos visíveis não significa inexistência de objetos ocultos por permissões. A existência isolada de uma trigger também não é tratada como evidência de malware. A inspeção de ações SQL e sua procedência continua sendo uma etapa manual.
 
+Pode-se acrescentar `--sc-access-log /var/log/apache2/access.log` ou repetir a opção para outros arquivos, inclusive `.gz`. A correlação dos endpoints derivados produz `sc403-http-logs.json`, apenas com contagens, sem linhas originais, IPs, cookies, User-Agent ou URLs completas. Há limites de arquivos, bytes e linhas; falhas produzem cobertura incompleta. Isso não substitui investigação dos navegadores dos administradores.
+
 Os novos achados são correlacionados com o relatório JSON e a política conservadora de liberação. `sc403-forense.json` permanece como evidência técnica privada; não é enviado automaticamente ao cliente.
 
 **Créditos:** técnicas e metodologia inspiradas nos estudos abertos de [ux2dev/wordpress-sc403-cleaner](https://github.com/ux2dev/wordpress-sc403-cleaner) (GPL-2.0-or-later), e nas arquiteturas de monitoramento de [rfxn/linux-malware-detect](https://github.com/rfxn/linux-malware-detect) e análise estática de [nbs-system/php-malware-finder](https://github.com/nbs-system/php-malware-finder). Não foram incorporados seus scripts destrutivos ou bibliotecas externas. O código deste módulo é uma implementação independente.
