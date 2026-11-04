@@ -135,6 +135,8 @@ def analisar(caso: Path, site: Path) -> dict:
         raise PreflightError("Plano SC ausente ou incompatível")
     divergencias = []
     verificados = 0
+    bytes_conferidos = 0
+    maximo_bytes = 512 * 1024 * 1024
     for registro in evidencias:
         if not isinstance(registro, dict):
             raise PreflightError("Registro de arquivo inválido")
@@ -145,6 +147,14 @@ def analisar(caso: Path, site: Path) -> dict:
             divergencias.append({"arquivo": rel, "motivo": "HASH_ORIGINAL_AUSENTE"})
             continue
         caminho = site / rel
+        try:
+            tamanho_arquivo = caminho.lstat().st_size
+        except OSError:
+            tamanho_arquivo = 0
+        if bytes_conferidos + tamanho_arquivo > maximo_bytes:
+            divergencias.append({"arquivo": rel, "motivo": "ORCAMENTO_BYTES_EXCEDIDO"})
+            break
+        bytes_conferidos += tamanho_arquivo
         # Inspecionar componentes intermediários evita seguir symlinks.
         cursor = site
         simbolico = False
@@ -217,6 +227,9 @@ def main() -> int:
     resultado = analisar(args.case, args.site)
     if args.output is not None:
         destino = args.output.absolute()
+        # Diretório de saída também não pode passar por links simbólicos.
+        if destino.parent.is_symlink() or destino.parent.resolve(strict=True) != destino.parent:
+            raise PreflightError("Diretório de saída deve ser um caminho físico sem links")
         site = args.site.resolve(strict=True)
         caso = args.case.resolve(strict=True)
         if (destino == site or site in destino.parents or destino == caso or
