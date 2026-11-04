@@ -807,6 +807,13 @@ def optional_probe_review(case: Path) -> list[str]:
             issues.append("Invalid host persistence inventory")
         elif any(item.get("classification") == "HOST_INDICATOR_REQUIRES_INVESTIGATION" for item in records):
             issues.append("External host persistence indicators require investigation")
+    sql_objects = case / "sc403-sql-objects.json"
+    if sql_objects.is_file() and not sql_objects.is_symlink():
+        sql_data = json.loads(sql_objects.read_text(encoding="utf-8"))
+        if sql_data.get("status") == "INCOMPLETA":
+            issues.append("Inventário de triggers, eventos e rotinas SQL incompleto")
+        if sql_data.get("objetos"):
+            issues.append("Objetos programáveis do banco SQL exigem revisão de procedência")
     sc_forense = case / "sc403-forense.json"
     if sc_forense.is_file() and not sc_forense.is_symlink():
         pacote = json.loads(sc_forense.read_text(encoding="utf-8"))
@@ -1104,6 +1111,13 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
     summary["host_unclassified_inventory"] = host_unclassified
     summary["host_persistence_indicators"] = host_indicators
     summary["wordpress_persistence_review"] = len(wordpress_persistence)
+    sc_sql_path = case / "sc403-sql-objects.json"
+    if sc_sql_path.is_file() and not sc_sql_path.is_symlink():
+        sc_sql = json.loads(sc_sql_path.read_text(encoding="utf-8"))
+        summary["sc403_sql_objects"] = {
+            "count": len(sc_sql.get("objetos", [])),
+            "coverage": sc_sql.get("status"),
+        }
     sc_forense_path = case / "sc403-forense.json"
     if sc_forense_path.is_file() and not sc_forense_path.is_symlink():
         sc_data = json.loads(sc_forense_path.read_text(encoding="utf-8"))
@@ -1861,6 +1875,44 @@ def database_audit(option_file: str, dbname: str, prefix: str, case: Path,
     write_private(case / ("database-post-audit.json" if post else "database-evidence.json"),
                   json.dumps(findings, indent=2))
     return findings
+
+
+def database_sql_objects_audit(option_file: str, dbname: str, case: Path) -> dict:
+    """Inventaria triggers, eventos e rotinas SQL sem consultar seus corpos.
+
+    Informações do information_schema podem ser filtradas pelas permissões
+    do usuário. Zero registros visíveis NÃO prova inexistência de objetos.
+    """
+    if not re.fullmatch(r"[A-Za-z0-9_]+", dbname):
+        raise AuditError("Nome de banco inválido")
+    fonte = []
+    tabelas = (
+        ("TRIGGERS", "TRIGGER_NAME", "EVENT_OBJECT_TABLE"),
+        ("EVENTS", "EVENT_NAME", "EVENT_TYPE"),
+        ("ROUTINES", "ROUTINE_NAME", "ROUTINE_TYPE"),
+    )
+    status = "COMPLETA_COM_VISIBILIDADE_LIMITADA"
+    erros = []
+    for tabela, nome, atributo in tabelas:
+        try:
+            sql = (f"SELECT {nome}, {atributo} FROM information_schema.{tabela} "
+                   f"WHERE {('TRIGGER_SCHEMA' if tabela == 'TRIGGERS' else 'EVENT_SCHEMA' if tabela == 'EVENTS' else 'ROUTINE_SCHEMA')}='{dbname}' "
+                   "LIMIT 1000;")
+            linhas = query_db(option_file, dbname, sql)
+            for linha in linhas:
+                if len(linha) != 2:
+                    raise AuditError("Metadados SQL inesperados")
+                fonte.append({"tipo": tabela, "nome": linha[0][:191],
+                              "objeto": linha[1][:191],
+                              "state": "SQL_OBJETO_REQUER_VALIDACAO"})
+        except (AuditError, subprocess.CalledProcessError, OSError):
+            erros.append(tabela)
+            status = "INCOMPLETA"
+    resultado = {"status": status, "objetos": fonte, "fontes_nao_consultadas": erros,
+                 "aviso": "O usuário SQL pode não ter permissão para visualizar todos os objetos."}
+    write_private(case / "sc403-sql-objects.json",
+                  json.dumps(resultado, indent=2, ensure_ascii=False))
+    return resultado
 
 
 def snapshot(target: Path, case: Path, option_file: str, dbname: str) -> None:
@@ -2636,6 +2688,8 @@ def main() -> int:
                               "user": config["DB_USER"], "password": config["DB_PASSWORD"]}, case) as cnf:
             if args.mode in ("audit", "audit-db", "audit-db-post"):
                 database = database_audit(cnf, dbname, prefix, case, post=args.mode == "audit-db-post", site_root=target)
+                if is_audit:
+                    database_sql_objects_audit(cnf, dbname, case)
                 if is_audit:
                     admin_account_inventory(cnf, dbname, prefix, case)
                     if args.skip_version_check:
