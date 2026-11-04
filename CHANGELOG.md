@@ -14,6 +14,7 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 - Evidências segregadas em `sc403-systemv-shm.json`, com síntese no relatório técnico/gerencial e bloqueio de parecer limpo quando existirem dumps pendentes.
 - Acrescentados testes sintéticos de integridade, limites, link simbólico, dump truncado e inventário independente para eliminar suposições sobre a posição dos registros.
 - README atualizado com condições de uso e cadeia de custódia; mudanças locais não comitadas no WH01 permanecem preservadas.
+- Atualizado `docs/PROCEDIMENTO_RECUPERACAO_SC.md` para explicitar a separação entre metadados de kernel e dumps, bem como os limites de autenticidade.
 
 ### Limitações
 - Sem captura de memória ativa, operação `ipcrm`, encerramento de processos ou limpeza automática.
