@@ -2782,15 +2782,10 @@ def main() -> int:
                               json.dumps({"proc": runtime_sc, "zip": zip_sc,
                                           "somente_leitura": True},
                                          indent=2, ensure_ascii=False))
-                if runtime_sc.get("status") != "COMPLETA":
-                    raise AuditError("Inspeção /proc incompleta; recuperação interrompida")
-                if any(item.get("state") == "PROC_SC_REQUER_INVESTIGACAO"
-                       for item in runtime_sc.get("resultados", [])):
-                    raise AuditError("Processo SC suspeito ativo; recuperação coordenada obrigatória")
-                if zip_sc.get("status") != "COMPLETA":
-                    raise AuditError("Inspeção de ZIPs incompleta; recuperação interrompida")
-                if zip_sc.get("resultados"):
-                    raise AuditError("ZIP potencialmente persistente do SC exige análise antes de recuperar")
+                bloqueios_sc = sc403_forense.bloqueios_recuperacao(runtime_sc, zip_sc)
+                if bloqueios_sc:
+                    raise AuditError("Recuperação bloqueada por persistência SC ou cobertura incompleta: " +
+                                     ", ".join(bloqueios_sc))
             if args.core_source is not None:
                 raise AuditError("Substituição do núcleo ainda não homologada; --core-source bloqueado")
             if (target / "wp-content").is_symlink():
