@@ -4,6 +4,22 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 
 ## [Não publicado]
 
+## [0.34.0] - 2026-11-04
+
+### Auditoria forense de memória compartilhada System V
+- Incorporado `bin/sc403_shm.py`, com inventário de metadados `/proc/sysvipc/shm` separado da análise de dumps previamente preservados. Nunca anexa, lê ou remove segmentos ativos.
+- Adicionado `--sc-shm-dump-dir` somente no modo de auditoria; exige diretório privado e nomes `shmid-NUMERO.bin`, impondo limites por arquivo, total e quantidade.
+- Inspeção exclusivamente estática do cabeçalho `SCSHM1`, extensão declarada, SHA-256 interno, versão `SCV`, indicadores adicionais e preenchimento final; nenhuma execução de PHP.
+- Classificação conservadora `SHM_PAYLOAD_SCV_COMPATIVEL_REQUER_VALIDACAO`; hash interno e nome `shmid` não certificam origem ou comprovação de malware.
+- Evidências segregadas em `sc403-systemv-shm.json`, com síntese no relatório técnico/gerencial e bloqueio de parecer limpo quando existirem dumps pendentes.
+- Acrescentados testes sintéticos de integridade, limites, link simbólico, dump truncado e inventário independente para eliminar suposições sobre a posição dos registros.
+- README atualizado com condições de uso e cadeia de custódia; mudanças locais não comitadas no WH01 permanecem preservadas.
+
+### Limitações
+- Sem captura de memória ativa, operação `ipcrm`, encerramento de processos ou limpeza automática.
+- Testes automatizados não substituem a homologação em clone e a comprovação externa da origem dos dumps.
+
+
 ## [0.33.0] - 2026-11-04
 
 ### Segurança e consistência dos relatórios
