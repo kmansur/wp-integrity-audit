@@ -86,6 +86,13 @@ def conferir_manifesto(caso: Path) -> dict:
             raise PreflightError("Entrada de manifesto inválida")
         esperados.add(rel)
         atual = caso / rel
+        cursor = caso
+        for parte in Path(rel).parts:
+            cursor = cursor / parte
+            if cursor.is_symlink():
+                raise PreflightError("Manifesto contém caminho com link simbólico")
+        if not atual.resolve(strict=False).is_relative_to(caso):
+            raise PreflightError("Manifesto aponta para fora do caso")
         try:
             confirmado = _hash_arquivo(atual)
         except OSError:
