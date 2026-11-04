@@ -9,7 +9,8 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 ### Comparação forense de reinfecção
 - Criado `bin/sc403_reinfeccao.py` para comparar duas auditorias do mesmo `ABSPATH`, validando manifestos SHA-256, classificações de arquivos e achados SQL sem executar PHP ou alterar os casos.
 - Identificação de novos indicadores, indicadores persistentes, arquivos/opções com hash alterado e processos suspeitos, sempre com liberação automática desativada.
-- Rejeição de casos adulterados, caminhos simbólicos, inventários inconsistentes e instalações distintas; resultados opcionais em JSON privado fora dos casos.
+- Rejeição de casos adulterados, caminhos simbólicos, inventários inconsistentes, comparação do caso consigo mesmo e instalações distintas; resultados opcionais em JSON privado fora dos casos.
+- Inclusão de ZIPs com indicadores SC na avaliação do caso posterior, com testes sintéticos de persistência em arquivos compactados.
 - Incluídos testes sintéticos para integridade, instalações divergentes e persistência de IOC.
 
 ### Pré-checagem de segurança na recuperação
