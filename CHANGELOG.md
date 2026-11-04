@@ -14,6 +14,8 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 - Inventário de triggers, eventos e rotinas visíveis no MySQL/MariaDB, sem extrair corpos SQL.
 - Integrados achados e problemas de cobertura à política conservadora de liberação; gerado `sc403-forense.json` e `sc403-sql-objects.json` em diretório privado.
 - Incluídos testes de regressão com amostras PHP inertes, ZIP e processos simulados.
+- Adicionada integração YARA opt-in (`--sc-yara-rules`) com regras locais confiáveis, execução limitada, sem expor conteúdo, e registro `sc403-yara.json`.
+- Corrigida distinção entre PID encerrado durante a varredura e erro de permissão de `/proc`; diretivas de carregamento PHP passam a exigir revisão.
 - Créditos e limitações documentados, preservando somente leitura e remediação assistida.
 
 ### Pendências de homologação
