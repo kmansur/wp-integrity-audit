@@ -18,6 +18,7 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 - Operações interrompidas diante de execução suspeita, arquivos ZIP potencialmente persistentes ou verificação incompleta.
 - Adicionada função `bloqueios_recuperacao()` e testes cobrindo ausência de achados, processo suspeito, ZIP suspeito e falta de cobertura.
 - Gerado `sc403-recovery-precheck.json` no diretório privado do caso; simulações mantidas sem alterações.
+- Atualizado `docs/PROCEDIMENTO_RECUPERACAO_SC.md` com comparação formal entre casos e checagens pré-recuperação.
 
 ### Limitações
 - Comparação de auditorias e ausência de novos indicadores não comprovam erradicação.
