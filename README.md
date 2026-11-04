@@ -1,5 +1,7 @@
 # Auditoria de Integridade WordPress — branch Python
 
+Consulte também [Procedimento operacional de recuperação assistida do SC](docs/PROCEDIMENTO_RECUPERACAO_SC.md), com etapas de contenção por domínio, validação, quarentena, revisão de navegadores e auditoria posterior.
+
 ## Versão 0.31.0 — pré-validação e recuperação assistida SC
 
 Esta versão acrescenta o comando independente `bin/sc403_preflight.py` para conferir, sem alterar a instalação, um **caso de auditoria completo já encerrado** contra o estado atual do site. A pré-validação:
