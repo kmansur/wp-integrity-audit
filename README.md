@@ -1,5 +1,40 @@
 # Auditoria de Integridade WordPress — branch Python
 
+## Versão 0.32.0 — detecção de reinfecção e bloqueio de recuperação
+
+A versão 0.32.0 acrescenta um comparador independente de casos de auditoria e uma pré-checagem obrigatória antes de **qualquer operação real** de recuperação assistida pelos modos existentes.
+
+### Comparar duas auditorias do mesmo site
+
+`bin/sc403_reinfeccao.py` compara evidências de arquivos e banco de dados de dois casos íntegros, exige a mesma raiz `ABSPATH` e confere os manifestos SHA-256 de ambos os diretórios. Não altera WordPress, banco, casos nem processos.
+
+```bash
+python3 bin/sc403_reinfeccao.py \\
+  --anterior /var/lib/wp-integrity-audit/cases/CASO_ANTES \\
+  --atual /var/lib/wp-integrity-audit/cases/CASO_DEPOIS \\
+  --output /root/comparacao-sc403.json
+```
+
+O resultado diferencia **novos indícios**, **indicadores persistentes**, **mudança de hash** e **cobertura incompleta**; nunca autoriza reativação. Uma alteração de hash pode ser legítima e não é prova isolada de reinfecção. Mesmo duas auditorias aparentemente idênticas não demonstram erradicação. O retorno da comparação é `40` (revisão), ou `30` em caso de erro de segurança/validação.
+
+Os diretórios dos casos devem permanecer privados; arquivos de evidência ausentes, adulterados, não inventariados, com links simbólicos ou vinculados a outro `ABSPATH` levam à recusa da comparação.
+
+### Pré-checagem para a recuperação assistida
+
+Nos modos `--apply-db`, `--apply-files` e `--recover`, **somente quando houver solicitação de execução real**, o auditor agora:
+
+1. Inspeciona novamente processos Linux por `/proc`.
+2. Analisa ZIPs potencialmente utilizados para reinstalar o SC, sem extração no disco.
+3. Registra `sc403-recovery-precheck.json` no caso privado.
+4. Recusa a operação se encontrar processo com indicador SC, ZIP suspeito ou cobertura incompleta.
+
+O `--dry-run` continua disponível para planejamento, e os controles preexistentes de backup obrigatório, confirmação interativa, hashes e seletores exatos permanecem aplicáveis. Nenhum processo é encerrado e nenhum segmento de memória compartilhada é removido.
+
+**Limitações:** o código não identifica automaticamente todos os navegadores comprometidos nem oferece erradicação automática confiável do SC; ainda são necessárias homologação em clone, revisão do banco, isolamento do domínio e validação humana. A ausência de um indicador não prova limpeza.
+
+**Créditos:** pesquisa aberta de ux2dev, [wordpress-sc403-cleaner](https://github.com/ux2dev/wordpress-sc403-cleaner), sob GPL-2.0-or-later. Implementação Python independente, sem copiar rotinas destrutivas do projeto de referência.
+
+
 Consulte também [Procedimento operacional de recuperação assistida do SC](docs/PROCEDIMENTO_RECUPERACAO_SC.md), com etapas de contenção por domínio, validação, quarentena, revisão de navegadores e auditoria posterior.
 
 ## Versão 0.31.0 — pré-validação e recuperação assistida SC
