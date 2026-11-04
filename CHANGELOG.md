@@ -15,6 +15,7 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 - Criado `tools/sc403-browser-admin.js` para listar e revogar manualmente apenas registros de service worker com endpoint SC específico, mediante confirmação explícita, sem limpar armazenamento global.
 - Incluído `sc-security-tests.yml` para validação automatizada de sintaxe e testes específicos em Python 3.10, 3.11 e 3.12, além de sintaxe JavaScript.
 - Atualizados README e créditos ao trabalho público de ux2dev/wordpress-sc403-cleaner (GPL-2.0-or-later), sem incorporar seus procedimentos destrutivos.
+- Adicionado `docs/PROCEDIMENTO_RECUPERACAO_SC.md` com procedimento operacional em português para recuperação assistida, segregação por domínio e critérios de liberação manual.
 
 ### Limitações
 - Nenhuma neutralização automática de processos, memória System V, PHP-FPM, sessões, banco ou service workers.
