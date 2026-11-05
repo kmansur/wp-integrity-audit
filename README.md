@@ -1,5 +1,9 @@
 # Auditoria de Integridade WordPress — branch Python
 
+## Versão 0.40.1 — cobertura ampliada do monitoramento
+
+Além de arquivos, opções SQL, processos e ZIPs, o monitoramento compara metadados de reconstrução, linha do tempo, exposição lateral, memória System V, persistência e processos. O JSON guarda somente contagens, cobertura, tamanho e SHA-256, nunca os valores brutos dessas evidências.
+
 ## Versão 0.40.0 — monitoramento comparativo
 
 Compare dois casos preservados sem alterar os casos ou o WordPress:

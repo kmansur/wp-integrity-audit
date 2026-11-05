@@ -38,6 +38,17 @@ def caso(pasta, *, raiz="/var/www/site/", arquivo="wp-content/a.php", digest="a"
     escrever(pasta, "evidence-manifest.json", {"algorithm": "SHA-256", "files": arquivos})
 
 
+def atualizar_manifesto(pasta):
+    arquivos = []
+    for p in pasta.iterdir():
+        if p.name == "evidence-manifest.json":
+            continue
+        dados = p.read_bytes()
+        arquivos.append({"file": p.name, "sha256": hashlib.sha256(dados).hexdigest(),
+                         "size_bytes": len(dados)})
+    escrever(pasta, "evidence-manifest.json", {"algorithm": "SHA-256", "files": arquivos})
+
+
 class TestReinfeccao(unittest.TestCase):
     def test_monitoramento_tem_json_estavel_e_nunca_libera(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -51,6 +62,22 @@ class TestReinfeccao(unittest.TestCase):
             self.assertEqual(resultado["estado"], "MUDANCA_REQUER_REVISAO")
             self.assertFalse(resultado["liberacao_autorizada"])
             self.assertFalse(resultado["agendamento_automatico"])
+
+    def test_monitoramento_compara_evidencias_opcionais_sem_expor_valores(self):
+        with tempfile.TemporaryDirectory() as temp:
+            a, b = Path(temp) / "a", Path(temp) / "b"
+            caso(a)
+            caso(b)
+            escrever(a, "sc403-reinfection-state.json", {"cobertura": "COMPLETA", "indicadores": [{"nome": "sc_reins_adv", "valor_bruto": "segredo"}]})
+            escrever(b, "sc403-reinfection-state.json", {"cobertura": "COMPLETA", "indicadores": [{"nome": "sc_reins_adv", "valor_bruto": "outro"}]})
+            atualizar_manifesto(a)
+            atualizar_manifesto(b)
+            resultado = monitor.monitorar(a, b)
+            item = resultado["evidencias_opcionais"]["sc403-reinfection-state.json"]
+            self.assertTrue(item["alterada"])
+            texto = json.dumps(resultado, ensure_ascii=False)
+            self.assertNotIn("segredo", texto)
+            self.assertNotIn("outro", texto)
 
     def test_indicador_novo_exige_revisao(self):
         with tempfile.TemporaryDirectory() as temp:

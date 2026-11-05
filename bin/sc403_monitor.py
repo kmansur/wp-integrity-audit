@@ -6,10 +6,59 @@ e produz JSON estável para integração futura com Zabbix ou outro coletor.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from pathlib import Path
 
 import sc403_reinfeccao
+
+
+EVIDENCIAS_OPCIONAIS = (
+    "sc403-reinfection-state.json",
+    "sc403-timeline.json",
+    "sc403-lateral-exposure.json",
+    "sc403-systemv-shm.json",
+    "wordpress-persistence.json",
+    "process-evidence.json",
+)
+
+
+def _resumo_evidencia(caso: Path, nome: str) -> dict:
+    """Resume evidência opcional sem exportar valores ou payloads."""
+    caminho = caso / nome
+    if caminho.is_symlink() or not caminho.is_file():
+        return {"estado": "NAO_PRESENTE"}
+    try:
+        bruto = caminho.read_bytes()
+        valor = json.loads(bruto.decode("utf-8"))
+    except (OSError, ValueError, UnicodeDecodeError):
+        return {"estado": "INVALIDA_REQUER_REVISAO"}
+    resumo_base = {"sha256": hashlib.sha256(bruto).hexdigest(), "tamanho_bytes": len(bruto)}
+    if isinstance(valor, list):
+        return {"estado": "PRESENTE", "registros": len(valor), **resumo_base}
+    if not isinstance(valor, dict):
+        return {"estado": "FORMATO_REQUER_REVISAO"}
+    resumo = {"estado": "PRESENTE", **resumo_base}
+    for chave in ("cobertura", "status", "fatos_observados", "eventos_requerendo_revisao"):
+        if isinstance(valor.get(chave), (str, int, bool)):
+            resumo[chave] = valor[chave]
+    for chave in ("indicadores", "eventos", "riscos", "sites", "dumps", "processos_associados"):
+        item = valor.get(chave)
+        if isinstance(item, list):
+            resumo[chave + "_quantidade"] = len(item)
+        elif isinstance(item, dict):
+            resumo[chave + "_chaves"] = sorted(str(k) for k in item.keys())[:32]
+    return resumo
+
+
+def _comparar_evidencias_opcionais(anterior: Path, atual: Path) -> dict:
+    resultado = {}
+    for nome in EVIDENCIAS_OPCIONAIS:
+        antes = _resumo_evidencia(anterior, nome)
+        depois = _resumo_evidencia(atual, nome)
+        resultado[nome] = {"anterior": antes, "atual": depois,
+                           "alterada": antes != depois}
+    return resultado
 
 
 def monitorar(anterior: Path, atual: Path) -> dict:
@@ -23,6 +72,8 @@ def monitorar(anterior: Path, atual: Path) -> dict:
     if comparacao["processos_suspeitos_runtime_atual"] or comparacao["arquivos_zip_com_indicadores_sc"]:
         eventos += comparacao["processos_suspeitos_runtime_atual"]
         eventos += len(comparacao["arquivos_zip_com_indicadores_sc"])
+    evidencias = _comparar_evidencias_opcionais(anterior, atual)
+    eventos += sum(item["alterada"] for item in evidencias.values())
     estado = "MUDANCA_REQUER_REVISAO" if eventos else "SEM_MUDANCA_NOS_INDICADORES_COMPARADOS"
     return {
         "schema_version": 1,
@@ -37,6 +88,7 @@ def monitorar(anterior: Path, atual: Path) -> dict:
         "hashes_alterados": alterados,
         "processos_suspeitos_runtime": comparacao["processos_suspeitos_runtime_atual"],
         "zips_com_indicadores_sc": comparacao["arquivos_zip_com_indicadores_sc"],
+        "evidencias_opcionais": evidencias,
         "cobertura_incompleta": comparacao["cobertura_incompleta"],
         "liberacao_autorizada": False,
         "agendamento_automatico": False,

@@ -1,5 +1,9 @@
 # Python Operator Handbook
 
+## Monitoramento ampliado (0.40.1)
+
+O comparador também verifica mudanças nos arquivos opcionais de reconstrução, linha do tempo, exposição lateral, SHM, persistência e processos. Ele registra somente metadados e hashes; valores de banco, payloads, tokens e conteúdo bruto permanecem fora da saída. Qualquer alteração exige revisão humana e não autoriza reativação.
+
 ## Monitoramento comparativo (0.40.0)
 
 Use `bin/sc403_monitor.py` com dois casos íntegros e privados. O monitoramento reutiliza a validação de manifesto e ABSPATH, não executa PHP e não modifica os casos. Código de saída 40 indica novos indicadores, mudanças de hash ou cobertura incompleta; código 0 significa somente que não houve mudança nos indicadores comparados, nunca que o site está liberado.

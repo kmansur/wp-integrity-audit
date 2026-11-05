@@ -4,6 +4,13 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 
 ## [Não publicado]
 
+## [0.40.1] - 2026-11-04
+
+### Monitoramento
+- O monitoramento comparativo passou a resumir também estados de reconstrução, linha do tempo, exposição lateral, memória SHM, persistência WordPress e processos.
+- A comparação registra apenas contagens, cobertura, tamanho e SHA-256 das evidências opcionais; valores brutos e payloads não são exportados.
+- Alterações nessas evidências geram revisão, sem agendamento, alteração ou liberação automática.
+
 ## [0.40.0] - 2026-11-04
 
 ### Monitoramento
