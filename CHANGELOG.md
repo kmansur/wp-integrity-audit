@@ -4,6 +4,12 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 
 ## [Não publicado]
 
+## [0.41.2] - 2026-11-04
+
+### Corrigido
+- A auditoria de persistência passou a cobrir explicitamente cron, systemd, PHP, Apache, `rc.local` e `ld.so.preload` dentro das raízes autorizadas.
+- Adicionados limite de 20.000 arquivos, recusa de raízes amplas e rejeição de links simbólicos.
+
 ## [0.41.1] - 2026-11-04
 
 ### Integração

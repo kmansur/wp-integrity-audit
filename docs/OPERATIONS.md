@@ -1,5 +1,9 @@
 # Python Operator Handbook
 
+## Limites do inventário de persistência (0.41.2)
+
+O inventário de persistência aceita apenas raízes absolutas e específicas. Ele cobre cron, systemd, PHP, Apache, `rc.local` e `ld.so.preload`, sem seguir links simbólicos e com limite de 20.000 arquivos. Uma cobertura incompleta deve ser tratada como falha de escopo, não como ausência de persistência.
+
 ## Integração de cron/persistência (0.41.1)
 
 `--sc-host-root` integra o inventário seguro ao caso principal. Informe somente caminhos autorizados; a cobertura e os indicadores aparecem no relatório, e qualquer achado exige revisão. A ferramenta não altera crontab, systemd, Apache ou PHP-FPM.

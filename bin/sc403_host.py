@@ -13,6 +13,24 @@ import re
 
 MARCADORES = re.compile(r"SCV:[0-9]+|SCSHM1|sc_(?:reins|ini|fetch|cron|persist|last_)|kinetic-relay|cipher-feeder|defunct-kernel|trace-inspector|base64\s+-d", re.I)
 BASE64 = re.compile(r"(?<![A-Za-z0-9+/])[A-Za-z0-9+/]{32,}={0,2}(?![A-Za-z0-9+/])")
+LIMITE_ARQUIVOS = 20000
+
+
+def _raiz_segura(raiz: Path) -> Path:
+    if not raiz.is_absolute() or raiz.is_symlink():
+        raise ValueError("raiz de persistência deve ser absoluta e não simbólica")
+    real = raiz.resolve(strict=True)
+    if real == Path("/") or len(real.parts) < 3:
+        raise ValueError("raiz de persistência ampla demais")
+    return real
+
+
+def _elegivel(caminho: Path) -> bool:
+    texto = str(caminho)
+    partes = set(caminho.parts)
+    return ("cron" in texto or "systemd" in partes or "php" in partes or
+            "apache" in partes or caminho.name in {"rc.local", "ld.so.preload"} or
+            caminho.suffix in {".service", ".timer", ".socket", ".conf"})
 
 
 def _arquivo(caminho: Path, limite: int = 262144) -> dict:
@@ -48,14 +66,19 @@ def auditar(caminhos: list[Path]) -> dict:
     erros = []
     for raiz in caminhos:
         raiz = Path(raiz)
-        if raiz.is_symlink() or not raiz.is_dir():
+        try:
+            raiz = _raiz_segura(raiz)
+        except (OSError, ValueError):
             erros.append(f"RAIZ_INVALIDA:{raiz}")
             continue
         try:
             for caminho in sorted(raiz.rglob("*")):
                 if caminho.is_symlink() or not caminho.is_file():
                     continue
-                if caminho.name in {"crontab", "cron.allow", "cron.deny"} or "/cron" in str(caminho):
+                if len(registros) >= LIMITE_ARQUIVOS:
+                    erros.append("LIMITE_ARQUIVOS_ATINGIDO")
+                    break
+                if _elegivel(caminho):
                     registros.append(_arquivo(caminho))
         except OSError:
             erros.append(f"FALHA_LEITURA:{raiz}")

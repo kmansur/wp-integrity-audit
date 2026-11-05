@@ -26,6 +26,21 @@ class TestHostAudit(unittest.TestCase):
         resultado = sc403_host.auditar([Path("/nao-existe-wp-audit")])
         self.assertEqual(resultado["cobertura"], "INCOMPLETA")
 
+    def test_systemd_e_php_sao_inventariados_sem_raiz_ampla(self):
+        with tempfile.TemporaryDirectory() as temp:
+            raiz = Path(temp) / "etc"
+            (raiz / "systemd").mkdir(parents=True)
+            (raiz / "systemd" / "x.service").write_text("ExecStart=/bin/true\n")
+            (raiz / "php" / "8.2").mkdir(parents=True)
+            (raiz / "php" / "8.2" / "pool.conf").write_text("user = site\n")
+            resultado = sc403_host.auditar([raiz])
+            caminhos = {item["path"] for item in resultado["arquivos_inventariados"]}
+            self.assertEqual(len(caminhos), 2)
+
+    def test_raiz_ampla_e_recusada(self):
+        with self.assertRaises(ValueError):
+            sc403_host._raiz_segura(Path("/etc"))
+
     def test_selfcheck_nao_le_credenciais(self):
         resultado = sc403_selfcheck.verificar(Path(__file__).parents[1] / "bin")
         self.assertIn(resultado["status"], {"OK", "REVISAO_NECESSARIA"})
