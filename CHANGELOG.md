@@ -4,6 +4,12 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 
 ## [Não publicado]
 
+## [0.43.1] - 2026-11-04
+
+### Documentação
+- Adicionado `docs/USO.md` com comandos principais, códigos de saída, escopo seguro e limitações operacionais.
+- README passou a referenciar o guia de uso.
+
 ## [0.43.0] - 2026-11-04
 
 ### Núcleo operacional — Entrega A

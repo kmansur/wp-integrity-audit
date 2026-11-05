@@ -1,6 +1,10 @@
 # Auditoria de Integridade WordPress — branch Python
 
-## Versão 0.43.0 — núcleo operacional SC403 (Entrega A)
+## Guia de uso
+
+Os comandos principais, exemplos de auditoria, comparação, memória, persistência e simulação estão em [`docs/USO.md`](docs/USO.md).
+
+## Versão 0.43.1 — guia de uso e núcleo operacional SC403
 
 O núcleo adiciona validação de identidade, autorização vinculada ao hash canônico do plano, diário verificável, máquina de estados e simulação. A implementação não sinaliza processos, remove SHM, altera SQL/cron/systemd, reinicia serviços nem move arquivos.
 
