@@ -4,6 +4,10 @@
 
 Os comandos principais, exemplos de auditoria, comparação, memória, persistência e simulação estão em [`docs/USO.md`](docs/USO.md).
 
+## Versão 0.43.3 — endurecimento do núcleo operacional
+
+A Entrega A agora exige aprovação Ed25519 verificável por uma política externa de chaves, coleta identidade operacional mais forte de processos, grava diário com lock/fsync e executa simulação baseada no estado observado. Nenhum executor destrutivo foi habilitado.
+
 ## Versão 0.43.2 — correção da integração MySQL
 
 A fixture sintética cobre todas as tabelas consultadas pelo scanner SQL. Falhas de consulta recebem diagnóstico sanitizado e não são interpretadas como ausência de indicadores.

@@ -1,10 +1,10 @@
 # Núcleo operacional SC403 — Entrega A
 
-A versão 0.43.0 implementa somente a camada de autorização, identidade, diário, compensação declarativa, runtime de leitura e máquina de estados. Nenhum módulo executa operações de remediação.
+A versão 0.43.3 implementa somente a camada de autorização, identidade, diário, compensação declarativa, runtime de leitura e máquina de estados. Nenhum módulo executa operações de remediação.
 
 ## Componentes
 
-- `sc403_autorizacao.py`: representação canônica e vínculo da aprovação ao hash do plano. A assinatura externa é exigida, mas não é considerada criptograficamente verificada pelo projeto.
+- `sc403_autorizacao.py`: representação canônica e vínculo da aprovação ao hash do plano, com assinatura Ed25519 e política externa de chaves confiáveis.
 - `sc403_identidade.py`: comparação de host, boot ID, namespaces, caminho, banco e prefixo.
 - `sc403_journal.py`: diário JSONL append-only com cadeia SHA-256 verificável.
 - `sc403_runtime.py`: inventário de processo sem sinalização.

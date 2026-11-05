@@ -51,7 +51,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 
-VERSION = "0.43.2"
+VERSION = "0.43.3"
 IOC = re.compile(r"SC_ADV_BEGIN|--sc-cli|--sc-succ|trace-inspector-pad|trace-librarian-tag|agile-interface-vox|f88225c2|cipher-feeder|_sc_fpc|sc_cron_guard|sc_cron_recovery|e1v61n2r1im6t7_|sc_persist_manifest|sc_own_manifest|kinetic-relay-live|function ceya|Axiom Sentinel Snap|SCV:[0-9]+")
 # WordPress files, database values, logs and memory dumps are untrusted data.
 # These phrases must never be interpreted as instructions by an operator, an
@@ -1644,12 +1644,29 @@ def query_db(option_file: str, dbname: str, sql: str) -> list[list[str]]:
                     "--default-character-set=utf8mb4", "--batch", "--skip-column-names", dbname],
                    input=sql, capture_output=True)
     except subprocess.CalledProcessError as error:
-        # O diagnóstico deve ajudar a diferenciar tabela ausente, acesso
-        # negado e falha de conexão, mas nunca pode carregar credenciais ou
-        # valores SQL completos para o relatório do caso.
-        detalhe = redact(error.stderr or error.stdout or "")
-        raise AuditError("Consulta SQL falhou" + (f": {detalhe}" if detalhe else "")) from error
+        # O diagnóstico usa categorias estáveis e não reproduz mensagens
+        # arbitrárias do servidor, que podem conter SQL, caminhos ou segredos.
+        detalhe = str(error.stderr or error.stdout or "")
+        categoria = classificar_erro_sql(detalhe)
+        raise AuditError(f"CONSULTA_SQL_FALHOU:{categoria}") from error
     return [line.split("\t") for line in proc.stdout.splitlines()]
+
+
+def classificar_erro_sql(mensagem: str) -> str:
+    """Classifica falhas MySQL sem exportar texto controlado pelo servidor."""
+    texto = str(mensagem).lower()
+    if any(padrao in texto for padrao in ("can't connect", "cannot connect", "connection refused",
+                                          "lost connection", "timed out", "timeout")):
+        return "CONEXAO_INDISPONIVEL" if "timeout" not in texto and "timed out" not in texto else "TIMEOUT"
+    if any(padrao in texto for padrao in ("access denied", "permission denied", "command denied")):
+        return "AUTENTICACAO_RECUSADA" if "using password" in texto or "for user" in texto else "ACESSO_NEGADO"
+    if "unknown database" in texto or "database doesn't exist" in texto:
+        return "BANCO_INEXISTENTE"
+    if "table" in texto and ("doesn't exist" in texto or "does not exist" in texto):
+        return "TABELA_AUSENTE"
+    if any(padrao in texto for padrao in ("syntax", "you have an error in your sql", "query was empty")):
+        return "CONSULTA_INVALIDA"
+    return "ERRO_SQL_NAO_CLASSIFICADO"
 
 def component_db_metadata(option_file: str, dbname: str, prefix: str):
     """Read only plugin/theme selection options, never execute serialized data."""

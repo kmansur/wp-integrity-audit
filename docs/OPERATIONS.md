@@ -1,6 +1,6 @@
 # Python Operator Handbook
 
-## Núcleo operacional SC403 (0.43.0)
+## Núcleo operacional SC403 (0.43.3)
 
 A Entrega A fornece somente simulação: identidade, autorização, diário hash-chain, estados e compensação declarativa. O projeto não controla processos, IPC, SQL, cron, systemd, PHP-FPM ou filesystem. Aprovação deve ser vinculada ao plano canônico e autenticada externamente; o hash sozinho não autentica o aprovador.
 

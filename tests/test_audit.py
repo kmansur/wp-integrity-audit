@@ -231,6 +231,16 @@ class PythonAuditTests(unittest.TestCase):
         self.assertIn("--default-character-set=utf8mb4", argv)
         self.assertEqual(executa.call_args.kwargs["input"], "SELECT 1;")
 
+    def test_diagnostico_mysql_usa_categorias_sanitizadas(self):
+        import subprocess
+        erro = subprocess.CalledProcessError(1, ["mysql"], stderr=(
+            "ERROR 1146 (42S02): Table 'wp_audit.wp_posts' doesn't exist\n"
+        ))
+        with unittest.mock.patch.object(audit, "run", side_effect=erro):
+            with self.assertRaisesRegex(audit.AuditError, "TABELA_AUSENTE") as capturado:
+                audit.query_db("/tmp/configuracao-sintetica.cnf", "wordpress", "SELECT 1;")
+        self.assertNotIn("wp_posts", str(capturado.exception))
+
     def test_literal_config_parser(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "wp-config.php"

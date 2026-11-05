@@ -2,6 +2,8 @@
 
 Este guia descreve os principais comandos da versão atual. O comportamento padrão é somente leitura. A ferramenta não executa PHP encontrado no WordPress.
 
+O núcleo de remediação exige uma aprovação Ed25519 externa e uma política de chaves confiáveis para simulação autorizada. A versão atual ainda não executa remediação real.
+
 ## 1. Verificar versão e dependências
 
 ```bash

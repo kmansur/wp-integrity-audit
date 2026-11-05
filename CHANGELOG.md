@@ -4,6 +4,15 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 
 ## [Não publicado]
 
+## [0.43.3] - 2026-11-04
+
+### Segurança do núcleo operacional
+- Aprovação externa passou a exigir assinatura Ed25519 verificável e política de chaves confiáveis.
+- Identidade de processos passou a registrar UID/GID efetivos, boot ID, starttime e namespaces.
+- Diário passou a usar lock exclusivo, `O_NOFOLLOW`, permissões restritas, sequência monotônica, `flush` e `fsync`.
+- Simulação passou a validar autorização, identidade, backup e dependências observadas.
+- Diagnósticos SQL passaram a utilizar categorias sanitizadas.
+
 ## [0.43.2] - 2026-11-04
 
 ### Correções
