@@ -4,6 +4,13 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 
 ## [Não publicado]
 
+## [0.38.0] - 2026-11-04
+
+### Recuperação assistida como plano
+- O plano SC agora explicita etapas ordenadas, pré-condições, responsáveis, condições de interrupção e ações planejadas.
+- O plano incorpora exposição lateral e memória System V como bloqueios de revisão quando houver cobertura incompleta ou riscos registrados.
+- Todas as etapas permanecem declarativamente não executáveis; nenhum comando de limpeza, encerramento de processo ou alteração de serviço é emitido.
+
 ## [0.37.0] - 2026-11-04
 
 ### Adicionado

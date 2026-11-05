@@ -1,5 +1,9 @@
 # Auditoria de Integridade WordPress — branch Python
 
+## Versão 0.38.0 — coordenador de recuperação não executável
+
+Cada auditoria gera, em área privada, `sc403-recovery-plan.json`. O plano organiza preservação, validação de backup, contenção por domínio, revisão de persistência, quarentena, banco/credenciais e verificação pós-recuperação. Ele registra pré-condições, responsável sugerido e condições de interrupção, mas não contém comandos destrutivos e não autoriza liberação.
+
 ## Versão 0.37.0 — exposição lateral entre instalações
 
 Use `--sc-authorized-root` somente quando houver autorização explícita para a raiz informada. A opção pode ser repetida e executa uma investigação estrutural, sem escrever, executar PHP ou testar alterações nos sites:

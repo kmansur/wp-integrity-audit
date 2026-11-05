@@ -1,5 +1,11 @@
 # Python Operator Handbook
 
+## Coordenador de recuperação (0.38.0)
+
+O arquivo privado `sc403-recovery-plan.json` é um plano técnico não executável. Ele não encerra processos, não remove segmentos SHM, não altera cron, Apache, PHP-FPM, arquivos ou banco. O plano organiza as etapas em ordem, informa pré-condições e registra condições que exigem interrupção e revisão humana.
+
+Não trate `execucao_automatica_autorizada: false` ou `liberacao_do_site_autorizada: false` como formalidade: ambas são barreiras deliberadas. Antes de qualquer remediação, valide backup restaurável em ambiente descartável, isolamento do domínio, escopo do usuário Unix, processos associados, diretivas de persistência, dump SQL e rollback. Exposição lateral e dumps SHM pendentes mantêm bloqueios específicos no plano.
+
 ## Auditoria de exposição lateral (0.37.0)
 
 A opção `--sc-authorized-root` habilita uma coleta restrita de risco estrutural entre instalações WordPress. Informe apenas raízes previamente autorizadas e repita a opção para incluir mais de uma raiz. A coleta não percorre o servidor de forma irrestrita, não segue links simbólicos, não executa PHP, não testa escrita e não modifica Apache, PHP-FPM, cron, banco ou permissões.

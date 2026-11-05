@@ -82,8 +82,44 @@ def gerar_plano(caso: Path) -> dict:
         bloqueios.append("PROCESSO_SUSPEITO_ATIVO_OU_ASSOCIADO")
     if arquivos_revisao or opcoes_revisao or zip_revisao or registros_yara:
         bloqueios.append("INDICADORES_REQUEREM_VALIDACAO")
+    lateral = _ler(caso, "sc403-lateral-exposure.json", {})
+    if lateral:
+        cobertura["exposicao_lateral"] = lateral.get("cobertura", "INCOMPLETA")
+        if lateral.get("riscos") or lateral.get("cobertura") != "COMPLETA":
+            bloqueios.append("EXPOSICAO_LATERAL_REQUER_REVISAO")
+    shm = _ler(caso, "sc403-systemv-shm.json", {})
+    if shm:
+        cobertura["memoria_systemv"] = {
+            "kernel": shm.get("kernel", {}).get("status", "NAO_EXECUTADA"),
+            "dumps": shm.get("dumps", {}).get("status", "NAO_EXECUTADA"),
+        }
+        if shm.get("dumps", {}).get("status") not in (None, "COMPLETA"):
+            bloqueios.append("MEMORIA_SYSTEMV_REQUER_VALIDACAO")
+    etapas = [
+        {"ordem": 1, "nome": "preservar_evidencias", "responsavel": "equipe_forense",
+         "precondicoes": ["manifesto e hashes preservados", "cadeia de custódia registrada"],
+         "acoes_planejadas": ["validar o caso e o backup sem alterar o site"], "executavel": False},
+        {"ordem": 2, "nome": "validar_backup_restauravel", "responsavel": "administrador_do_ambiente",
+         "precondicoes": ["backup independente disponível", "teste em ambiente descartável"],
+         "acoes_planejadas": ["restaurar uma cópia fora da produção e conferir hashes"], "executavel": False},
+        {"ordem": 3, "nome": "conter_escopo_autorizado", "responsavel": "responsavel_pela_mudanca",
+         "precondicoes": ["domínio isolado", "janela aprovada", "processos associados identificados"],
+         "acoes_planejadas": ["registrar contenção por domínio; não aplicar bloqueio global"], "executavel": False},
+        {"ordem": 4, "nome": "neutralizar_persistencia", "responsavel": "equipe_tecnica",
+         "precondicoes": ["diretivas PHP e cron revisados", "evidência preservada"],
+         "acoes_planejadas": ["produzir plano específico de alteração e rollback"], "executavel": False},
+        {"ordem": 5, "nome": "quarentenar_artefatos", "responsavel": "equipe_forense",
+         "precondicoes": ["hashes e proprietário registrados", "quarentena fora do document root"],
+         "acoes_planejadas": ["mover somente itens aprovados e registrar rollback"], "executavel": False},
+        {"ordem": 6, "nome": "revisar_banco_e_credenciais", "responsavel": "administrador_do_site",
+         "precondicoes": ["dump consistente", "seletores exatos e aprovados"],
+         "acoes_planejadas": ["revisar opções, cron, sessões, administradores e salts"], "executavel": False},
+        {"ordem": 7, "nome": "verificar_pos_recuperacao", "responsavel": "equipe_forense",
+         "precondicoes": ["alterações documentadas", "auditoria independente agendada"],
+         "acoes_planejadas": ["executar nova auditoria e monitorar reaparecimento"], "executavel": False},
+    ]
     plano = {
-        "schema_version": 1,
+        "schema_version": 2,
         "tipo": "PLANO_TECNICO_NAO_EXECUTAVEL",
         "execucao_automatica_autorizada": False,
         "liberacao_do_site_autorizada": False,
@@ -102,6 +138,8 @@ def gerar_plano(caso: Path) -> dict:
         "endpoints_derivados": endpoints_http,
         "bloqueios": sorted(set(bloqueios)),
         "etapas_preparatorias": pendencias,
+        "etapas_coordenadas": etapas,
+        "condicoes_de_interrupcao": sorted(set(bloqueios)) or ["COBERTURA_COMPLETA_AINDA_EXIGE_APROVACAO"],
         "observacao": "Este plano não contém comandos destrutivos e não substitui análise humana.",
     }
     return plano
