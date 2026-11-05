@@ -51,7 +51,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 
-VERSION = "0.41.0"
+VERSION = "0.41.1"
 IOC = re.compile(r"SC_ADV_BEGIN|--sc-cli|--sc-succ|trace-inspector-pad|trace-librarian-tag|agile-interface-vox|f88225c2|cipher-feeder|_sc_fpc|sc_cron_guard|sc_cron_recovery|e1v61n2r1im6t7_|sc_persist_manifest|sc_own_manifest|kinetic-relay-live|function ceya|Axiom Sentinel Snap|SCV:[0-9]+")
 # WordPress files, database values, logs and memory dumps are untrusted data.
 # These phrases must never be interpreted as instructions by an operator, an
@@ -1315,10 +1315,24 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
         "sites": len(lateral_state.get("sites", [])) if lateral_state else 0,
         "risks": len(lateral_state.get("riscos", [])) if lateral_state else 0,
     }
+    host_path = case / "sc403-host-persistence.json"
+    host_state = None
+    if host_path.is_file() and not host_path.is_symlink():
+        host_state = json.loads(host_path.read_text(encoding="utf-8"))
+        if not isinstance(host_state, dict):
+            raise AuditError("Malformed host-persistence evidence")
+    summary["sc403_host_persistence"] = {
+        "coverage": host_state.get("cobertura") if host_state else "NOT EXECUTED",
+        "files": len(host_state.get("arquivos_inventariados", [])) if host_state else 0,
+        "indicators": len(host_state.get("indicadores_requerendo_revisao", [])) if host_state else 0,
+    }
     lateral_review = bool(lateral_state and (
         lateral_state.get("riscos") or lateral_state.get("cobertura") != "COMPLETA"))
+    host_persistence_review = bool(host_state and (
+        host_state.get("indicadores_requerendo_revisao") or host_state.get("cobertura") != "COMPLETA"))
+    summary["host_persistence_review_required"] = host_persistence_review
     summary["lateral_review_required"] = lateral_review
-    review_pending = bool(config_count or component_review or outdated_core or critical_component_review or lateral_review)
+    review_pending = bool(config_count or component_review or outdated_core or critical_component_review or lateral_review or host_persistence_review)
     summary["review_pending"] = review_pending
     # Precedence: independent compromise > known residues > active/heuristic review
     # > file-integrity review > ordinary version/provenance review > clean.
@@ -1403,6 +1417,7 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
         f"- Arquivos com texto que tenta influenciar a auditoria: **{summary['untrusted_instruction_indicators']}**",
         f"- Indicadores de estado de reconstrução SC: **{summary['sc403_reconstruction_state']['observed']}** (cobertura: {summary['sc403_reconstruction_state']['coverage']})",
         f"- Exposição lateral entre instalações: **{summary['sc403_lateral_exposure']['risks']}** riscos estruturais em {summary['sc403_lateral_exposure']['sites']} sites autorizados (cobertura: {summary['sc403_lateral_exposure']['coverage']})",
+        f"- Persistência Linux/cron autorizada: **{summary['sc403_host_persistence']['indicators']}** indicadores em {summary['sc403_host_persistence']['files']} arquivos (cobertura: {summary['sc403_host_persistence']['coverage']})",
         f"- Divergências no núcleo do WordPress: **{core_count}**",
         f"- Arquivos de configuração pendentes de análise: **{config_count}**",
         f"- Indicadores de persistência externa: **{host_indicators}**",
@@ -1479,6 +1494,11 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
                           f"- Sites WordPress encontrados nas raízes autorizadas: **{len(lateral_state.get('sites', []))}**",
                           f"- Riscos estruturais registrados: **{len(lateral_state.get('riscos', []))}**",
                           f"- Pools PHP-FPM inventariados: **{len(lateral_state.get('pools_php_fpm', []))}**"])
+        if host_state:
+            lines.extend(["", "### Persistência Linux e cron", "",
+                          "Arquivos autorizados foram inventariados sem executar comandos encontrados; Base64 foi analisado apenas em memória.",
+                          f"- Arquivos inventariados: **{len(host_state.get('arquivos_inventariados', []))}**",
+                          f"- Indicadores requerendo revisão: **{len(host_state.get('indicadores_requerendo_revisao', []))}**"])
     lines.extend(["", "## Integridade do núcleo do WordPress", "",
                   f"- Status: `{summary['component_coverage'].get('core', core.get('status', 'NOT EXECUTED'))}`",
                   f"- Divergências: **{core_count}**", ""])
@@ -2733,6 +2753,8 @@ def parse_args() -> argparse.Namespace:
                         help="Diretório privado contendo dumps SHM já preservados (somente auditoria; nunca anexa segmentos ativos)")
     parser.add_argument("--sc-authorized-root", type=Path, action="append", default=[],
                         help="Raiz explicitamente autorizada para auditoria lateral; pode repetir (somente auditoria)")
+    parser.add_argument("--sc-host-root", type=Path, action="append", default=[],
+                        help="Raiz autorizada de cron/persistência Linux; pode repetir (somente auditoria)")
     parser.add_argument("--bundle-evidence", action="store_true", help="Cria arquivo TAR privado com evidências forenses (dados sensíveis)")
     parser.add_argument("--verify-case", type=Path, help="Verifica o manifesto de um caso existente sem analisar o WordPress")
     parser.add_argument("--email-to", help="Envia o PDF gerencial ao destinatário informado")
@@ -2767,11 +2789,11 @@ def parse_args() -> argparse.Namespace:
         return args
     if args.verify_case:
         if (args.target is not None or args.compare or args.mode != "audit" or
-                args.bundle_evidence or args.pdf_report or args.sc_authorized_root):
+                args.bundle_evidence or args.pdf_report or args.sc_authorized_root or args.sc_host_root):
             parser.error("--verify-case must be used alone without a target or report options")
         return args
     if args.compare:
-        if args.target is not None or args.email_to or args.mode != "audit" or args.skip_db or args.source or args.core_source or args.skip_core or args.skip_host_persistence or args.skip_files or args.skip_config or args.skip_processes or args.skip_elementor or args.skip_version_check or args.offline or args.official_compare or args.sc_authorized_root:
+        if args.target is not None or args.email_to or args.mode != "audit" or args.skip_db or args.source or args.core_source or args.skip_core or args.skip_host_persistence or args.skip_files or args.skip_config or args.skip_processes or args.skip_elementor or args.skip_version_check or args.offline or args.official_compare or args.sc_authorized_root or args.sc_host_root:
             parser.error("--compare cannot be combined with a target or audit/recovery options")
         return args
     if args.email_to and (args.compare or args.verify_case or args.mode != "audit"):
@@ -2808,6 +2830,8 @@ def parse_args() -> argparse.Namespace:
         parser.error("A validação dos dumps SHM somente está disponível no modo de auditoria")
     if args.sc_authorized_root and args.mode != "audit":
         parser.error("A auditoria lateral somente está disponível no modo de auditoria")
+    if args.sc_host_root and args.mode != "audit":
+        parser.error("A auditoria de persistência Linux somente está disponível no modo de auditoria")
     if args.mode in ("apply-db", "apply-files", "recover") and (args.email_to or args.pdf_report or args.bundle_evidence):
         parser.error("Recuperação não pode combinar envio, PDF ou pacote de evidências na mesma execução")
     return args
@@ -2884,6 +2908,10 @@ def main() -> int:
                     raise AuditError("Raiz autorizada inválida para auditoria lateral") from erro
                 write_private(case / "sc403-lateral-exposure.json",
                               json.dumps(lateral, indent=2, ensure_ascii=False))
+            if args.sc_host_root:
+                host = sc403_host.auditar(args.sc_host_root)
+                write_private(case / "sc403-host-persistence.json",
+                              json.dumps(host, indent=2, ensure_ascii=False))
             # Camada SC complementar: investigação sem executar código do site.
             forense_sc = {
                 "zip": sc403_forense.inspecionar_zips(target),

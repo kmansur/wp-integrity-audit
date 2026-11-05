@@ -1,5 +1,9 @@
 # Auditoria de Integridade WordPress — branch Python
 
+## Versão 0.41.1 — integração de persistência autorizada
+
+Use `--sc-host-root` para incluir raízes explicitamente autorizadas de cron/persistência no caso da auditoria. O resultado privado `sc403-host-persistence.json` aparece também nos relatórios e não executa os comandos encontrados.
+
 ## Versão 0.41.0 — auto-verificação e persistência Linux
 
 Verifique dependências locais sem acessar um site:

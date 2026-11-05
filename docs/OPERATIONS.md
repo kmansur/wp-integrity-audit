@@ -1,5 +1,9 @@
 # Python Operator Handbook
 
+## Integração de cron/persistência (0.41.1)
+
+`--sc-host-root` integra o inventário seguro ao caso principal. Informe somente caminhos autorizados; a cobertura e os indicadores aparecem no relatório, e qualquer achado exige revisão. A ferramenta não altera crontab, systemd, Apache ou PHP-FPM.
+
 ## Auto-verificação e cron (0.41.0)
 
 `--self-check` valida apenas a instalação do auditor e retorna 40 se houver dependência ausente. `bin/sc403_host.py` recebe raízes explicitamente autorizadas para inventário de cron e persistência. O código lê arquivos como dados não confiáveis, registra hash e marcadores e decodifica Base64 sem executar o resultado. Não use essa função como autorização para remover tarefas; qualquer alteração deve seguir o plano aprovado e preservar rollback.

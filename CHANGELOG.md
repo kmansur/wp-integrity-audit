@@ -4,6 +4,12 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 
 ## [Não publicado]
 
+## [0.41.1] - 2026-11-04
+
+### Integração
+- Integrado `--sc-host-root` ao fluxo principal de auditoria, gerando `sc403-host-persistence.json` e resumo técnico/gerencial.
+- Indicadores ou cobertura incompleta de cron/persistência autorizados mantêm o caso em revisão.
+
 ## [0.41.0] - 2026-11-04
 
 ### Auditoria segura do ambiente
