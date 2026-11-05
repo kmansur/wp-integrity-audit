@@ -811,6 +811,7 @@ $table_prefix = 'wp_';
         with patch("sys.argv", ["wp-integrity-audit.py", "/tmp/example-site"]):
             options = audit.parse_args()
         self.assertEqual(options.mode, "audit")
+        self.assertEqual(options.db_host, audit.DEFAULT_DB_HOST)
         for flag in ("skip_db", "skip_files", "skip_config", "skip_core",
                      "skip_host_persistence", "skip_processes", "skip_elementor"):
             self.assertFalse(getattr(options, flag))
@@ -824,6 +825,12 @@ $table_prefix = 'wp_';
         self.assertTrue(options.skip_core)
         self.assertTrue(options.skip_host_persistence)
         self.assertTrue(options.skip_db)
+
+    def test_host_mysql_padrao_pode_ser_substituido(self):
+        from unittest.mock import patch
+        with patch("sys.argv", ["wp-integrity-audit.py", "--db-host", "mysql.exemplo", "/tmp/example-site"]):
+            options = audit.parse_args()
+        self.assertEqual(options.db_host, "mysql.exemplo")
 
     def test_skipped_checks_keep_clean_case_incomplete(self):
         import json

@@ -121,8 +121,8 @@ def grafo(manifesto: dict) -> dict:
             "observacao": "Relações estruturais não comprovam comprometimento."}
 
 
-def simular(manifesto: dict, estado_atual: dict) -> dict:
-    validacao = validar(manifesto)
+def simular(manifesto: dict, estado_atual: dict, agora: dt.datetime | None = None) -> dict:
+    validacao = validar(manifesto, agora=agora)
     divergencias = []
     esperado = manifesto["identity"]
     observado = estado_atual.get("identity", {}) if isinstance(estado_atual, dict) else {}

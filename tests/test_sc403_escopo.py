@@ -48,7 +48,7 @@ class TestEscopo(unittest.TestCase):
         base = manifesto()
         estado = {"identity": {**base["identity"], "boot_id": "boot-diferente"},
                   "evidence_manifest_sha256": base["evidence_manifest_sha256"]}
-        resultado = escopo.simular(base, estado)
+        resultado = escopo.simular(base, estado, agora=dt.datetime(2026, 11, 4, 12, tzinfo=dt.timezone.utc))
         self.assertTrue(resultado["simulacao"])
         self.assertTrue(resultado["bloqueado"])
         self.assertFalse(resultado["alteracoes_realizadas"])

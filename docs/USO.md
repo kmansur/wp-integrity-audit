@@ -4,6 +4,8 @@ Este guia descreve os principais comandos da versão atual. O comportamento padr
 
 O núcleo de remediação exige uma aprovação Ed25519 externa e uma política de chaves confiáveis para simulação autorizada. A versão atual ainda não executa remediação real.
 
+O host MySQL padrão é `187.120.197.140`. Substitua-o com `--db-host mysql.exemplo` quando o banco estiver em outro endereço.
+
 ## 1. Verificar versão e dependências
 
 ```bash
@@ -20,6 +22,7 @@ O `--self-check` verifica Python, módulos e ferramentas locais. Avisos sobre `m
 python3 bin/wp-integrity-audit.py \
   /usr/local/www/data/exemplo/html \
   --domain-label exemplo.com.br \
+  --db-host 187.120.197.140 \
   --case-root /var/lib/wp-integrity-audit/cases
 ```
 

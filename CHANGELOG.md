@@ -4,6 +4,12 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 
 ## [Não publicado]
 
+## [0.43.4] - 2026-11-05
+
+### Banco de dados
+- Host MySQL padrão definido como `187.120.197.140`, com substituição explícita por `--db-host`.
+- A configuração `DB_HOST` do `wp-config.php` continua sendo coletada como evidência, mas não substitui o destino operacional padrão sem parâmetro explícito.
+
 ## [0.43.3] - 2026-11-04
 
 ### Segurança do núcleo operacional

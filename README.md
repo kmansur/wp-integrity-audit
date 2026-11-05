@@ -4,6 +4,10 @@
 
 Os comandos principais, exemplos de auditoria, comparação, memória, persistência e simulação estão em [`docs/USO.md`](docs/USO.md).
 
+## Versão 0.43.4 — host MySQL padrão configurável
+
+O auditor usa `187.120.197.140` como host MySQL padrão. Para outro destino, informe `--db-host HOST_OU_IP`; nenhum segredo é aceito na linha de comando.
+
 ## Versão 0.43.3 — endurecimento do núcleo operacional
 
 A Entrega A agora exige aprovação Ed25519 verificável por uma política externa de chaves, coleta identidade operacional mais forte de processos, grava diário com lock/fsync e executa simulação baseada no estado observado. Nenhum executor destrutivo foi habilitado.
