@@ -1,0 +1,455 @@
+"""Passive WordPress component provenance and version inventory (no PHP execution)."""
+from __future__ import annotations
+import csv
+import hashlib
+import io
+import json
+from pathlib import Path
+import re
+import urllib.error
+import urllib.parse
+import urllib.request
+
+API = "https://api.wordpress.org"
+INCIDENT_COMPONENT_SLUGS = {"kinetic-relay-live"}
+VERSION_RE = re.compile(r"^[0-9]+(?:\.[0-9]+){1,4}(?:[-+._][A-Za-z0-9.-]+)?$")
+HEADERS = re.compile(r"(?im)^\s*(?:/\*)?\s*\*?\s*(Plugin Name|Theme Name|Version|Template|Update URI|Plugin URI|Theme URI)\s*:\s*([^\r\n]{0,250})")
+HEADER_BLOCK = re.compile(r"/\*.*?\*/", re.S)
+STATIC_ROOT = {"index.php", "wp-activate.php", "wp-blog-header.php", "wp-comments-post.php", "wp-config-sample.php",
+               "wp-cron.php", "wp-links-opml.php", "wp-load.php", "wp-login.php", "wp-mail.php",
+               "wp-settings.php", "wp-signup.php", "wp-trackback.php", "xmlrpc.php"}
+
+def file_digest(path: Path, algorithm: str = "sha256") -> str:
+    """Stream file hashes without loading entire components into memory."""
+    if path.is_symlink() or not path.is_file():
+        raise OSError("Cannot hash symlink or nonregular file")
+    digest = hashlib.new(algorithm)
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1048576), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def headers(path: Path) -> dict:
+    if path.is_symlink() or not path.is_file():
+        return {}
+    with path.open("rb") as handle:
+        data = handle.read(8192).decode("utf-8-sig", "replace")
+    # Não interpretar anotações de tipos ou strings PHP como cabeçalhos.
+    for match in HEADER_BLOCK.finditer(data):
+        campos = {}
+        for key, value in HEADERS.findall(match.group()):
+            campos.setdefault(key.lower().replace(" ", "_"), re.sub(r"\s*\*/\s*$", "", value).strip())
+        if campos.get("plugin_name") or campos.get("theme_name"):
+            return campos
+    return {}
+
+def api_json(path: str, params: dict, *, timeout: int = 12) -> tuple[str, dict | None, str]:
+    query = urllib.parse.urlencode(params)
+    url = API + path + "?" + query
+    try:
+        request = urllib.request.Request(url, headers={"User-Agent": "wp-integrity-audit/version-audit"})
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            endpoint = urllib.parse.urlparse(response.geturl())
+            if endpoint.scheme != "https" or endpoint.hostname != "api.wordpress.org":
+                return "API_UNAVAILABLE", None, url
+            if response.status != 200:
+                return "API_UNAVAILABLE", None, url
+            raw = response.read(2_000_001)
+            if len(raw) > 2_000_000:
+                return "API_UNAVAILABLE", None, url
+            data = json.loads(raw)
+        if not isinstance(data, dict):
+            return "API_UNAVAILABLE", None, url
+        if "error" in data:
+            return "NOT_FOUND_OFFICIAL_REPOSITORY", None, url
+        return "SUCCESS", data, url
+    except urllib.error.HTTPError as error:
+        return ("NOT_FOUND_OFFICIAL_REPOSITORY" if error.code == 404 and
+                path in ("/plugins/info/1.2/", "/themes/info/1.2/") else "API_UNAVAILABLE"), None, url
+    except (OSError, ValueError, TimeoutError):
+        return "API_UNAVAILABLE", None, url
+
+def local_core(target: Path) -> dict:
+    path = target / "wp-includes" / "version.php"
+    result = {"component_id": "CORE-001", "type": "core", "slug": "wordpress", "local_version": None,
+              "locale": "en_US", "official_version": None, "source": "local",
+              "state": "CORE_CHECKSUM_INDISPONIVEL", "query_status": "SKIPPED", "findings": [],
+              "query_url": None}
+    if path.is_symlink() or not path.is_file():
+        result["findings"] = [{"path": "wp-includes/version.php", "reason": "MISSING"}]
+        result["state"] = "CORE_AUSENTE_REQUER_REVISAO"
+        return result
+    contents = path.read_text(encoding="utf-8", errors="replace")[:65536]
+    version = re.search(r'\$wp_version\s*=\s*["\']([0-9][0-9.]*)["\']', contents)
+    locale = re.search(r'\$wp_local_package\s*=\s*["\']([A-Za-z_]{2,15})["\']', contents)
+    result["local_version"] = version.group(1) if version else None
+    if locale:
+        result["locale"] = locale.group(1)
+    return result
+
+def local_components(target: Path, kind: str, active_plugins: set[str] | None = None,
+                     template: str | None = None, stylesheet: str | None = None) -> list[dict]:
+    root = target / "wp-content" / ("plugins" if kind == "plugin" else "themes")
+    if not root.is_dir() or root.is_symlink():
+        return []
+    result = []
+    for entry in sorted(root.iterdir()):
+        if entry.is_symlink() or not entry.is_dir() or not re.fullmatch(r"[A-Za-z0-9_.-]+", entry.name):
+            continue
+        if kind == "plugin":
+            candidates = sorted(p for p in entry.glob("*.php") if p.is_file() and not p.is_symlink())
+            parsed = [(p, headers(p)) for p in candidates]
+            main, info = next(((p, h) for p, h in parsed if h.get("plugin_name")), (None, {}))
+        else:
+            main = entry / "style.css"
+            info = headers(main)
+        slug = entry.name
+        name = info.get("plugin_name" if kind == "plugin" else "theme_name") or slug
+        declared_version = info.get("version") or None
+        local_version = declared_version if declared_version and VERSION_RE.fullmatch(declared_version) else None
+        header_status = ("CABECALHO_NAO_LOCALIZADO" if not info else
+                         "VERSAO_AUSENTE" if not declared_version else
+                         "VERSAO_INVALIDA" if not local_version else "VALIDADO")
+        parent = info.get("template") if kind == "theme" else None
+        update_uri = info.get("update_uri", "")
+        custom_uri = bool(update_uri and "wordpress.org" not in update_uri.lower())
+        default_state = ("PLUGIN_REQUER_REVISAO" if kind == "plugin" else "TEMA_REQUER_REVISAO")
+        if kind == "plugin" and slug in INCIDENT_COMPONENT_SLUGS:
+            default_state = "PLUGIN_FAMILIA_INCIDENTE_REQUER_QUARENTENA"
+        if parent and kind == "theme":
+            default_state = "TEMA_FILHO_CUSTOMIZADO"
+        elif kind == "plugin" and not local_version:
+            default_state = "PLUGIN_VERSAO_NAO_IDENTIFICADA"
+        elif custom_uri:
+            default_state = "PLUGIN_PREMIUM_REQUER_FONTE_CONFIAVEL" if kind == "plugin" else "TEMA_PREMIUM_REQUER_FONTE_CONFIAVEL"
+        record = {"component_id": f'{"PLUGIN" if kind == "plugin" else "THEME"}-{len(result)+1:03d}',
+                  "type": kind, "slug": slug, "name": name, "local_version": local_version,
+                  "official_version": None, "source": "declared-custom-update-uri" if custom_uri else "unknown", "state": default_state,
+                  "query_status": "SKIPPED", "query_url": None,
+                  "main_file": main.relative_to(target).as_posix() if main else None,
+                  "main_file_sha256": file_digest(main) if main and main.is_file() and not main.is_symlink() else None,
+                  "header_status": header_status,
+                  "active": (None if active_plugins is None else any(p.startswith(slug + "/") for p in active_plugins)) if kind == "plugin" else (slug == stylesheet),
+                  "parent_theme": parent, "child_theme": bool(parent),
+                  "update_uri_present": bool(update_uri)}
+        result.append(record)
+    return result
+
+def compare_official(record: dict) -> None:
+    kind = record["type"]
+    slug = record["slug"]
+    path = ("/plugins/info/1.2/" if kind == "plugin" else "/themes/info/1.2/")
+    action = ("plugin_information" if kind == "plugin" else "theme_information")
+    status, data, url = api_json(path, {"action": action, "request[slug]": slug})
+    record["query_url"] = url
+    if kind == "plugin" and slug in INCIDENT_COMPONENT_SLUGS:
+        record["incident_family_candidate"] = True
+        record["review_guidance"] = (
+            "Componente associado aos indicadores observados no incidente; "
+            "mantenha isolado e faça quarentena reversível após preservar evidências."
+        )
+    if status == "API_UNAVAILABLE":
+        record["query_status"] = status
+        return
+    if status == "NOT_FOUND_OFFICIAL_REPOSITORY" or not data or not data.get("version"):
+        record["query_status"] = "NOT_FOUND_OFFICIAL_REPOSITORY"
+        record["state"] = "PLUGIN_ORIGEM_NAO_CONFIRMADA_REQUER_REVISAO" if kind == "plugin" else "TEMA_NAO_ENCONTRADO_NO_REPOSITORIO"
+        record["review_guidance"] = "Não localizado no repositório oficial consultado. Isso não comprova malware; confirme fornecedor, licença, origem do pacote e hash."
+        if kind == "plugin" and slug in INCIDENT_COMPONENT_SLUGS:
+            record["state"] = "PLUGIN_FAMILIA_INCIDENTE_REQUER_QUARENTENA"
+        return
+    official = str(data["version"])
+    if kind == "plugin" and not record.get("local_version"):
+        record["state"] = "PLUGIN_VERSAO_NAO_IDENTIFICADA"
+        record["review_guidance"] = "Versão não encontrada em cabeçalho válido do arquivo principal; confira os metadados e o pacote instalado, especialmente se ativo."
+        record["official_version"] = official
+        record["source"] = "wordpress.org"
+        record["query_status"] = "OFFICIAL_COMPONENT_FOUND_VERSION_UNVERIFIED"
+        if slug in INCIDENT_COMPONENT_SLUGS:
+            record["state"] = "PLUGIN_FAMILIA_INCIDENTE_REQUER_QUARENTENA"
+        return
+    record["official_version"] = official
+    record["source"] = "wordpress.org"
+    if not record["local_version"]:
+        record["state"] = "PLUGIN_REQUER_REVISAO" if kind == "plugin" else "TEMA_REQUER_REVISAO"
+    elif official == record["local_version"]:
+        record["query_status"] = "OFFICIAL_MATCH"
+        record["state"] = "PLUGIN_OFICIAL_ATUAL" if kind == "plugin" else "TEMA_OFICIAL_ATUAL"
+    else:
+        # Versão local superior ou divergente não equivale a coincidência oficial.
+        if version_tuple(record["local_version"]) < version_tuple(official):
+            record["query_status"] = "OFFICIAL_OUTDATED"
+            record["state"] = "PLUGIN_OFICIAL_DESATUALIZADO" if kind == "plugin" else "TEMA_OFICIAL_DESATUALIZADO"
+        else:
+            record["query_status"] = "OFFICIAL_VERSION_DIFFERENT_UNVERIFIED"
+            record["state"] = "PLUGIN_REQUER_REVISAO" if kind == "plugin" else "TEMA_REQUER_REVISAO"
+            record["review_guidance"] = "A versão local difere da versão divulgada na fonte oficial; confirme a procedência sem assumir correspondência."
+    if kind == "plugin" and slug in INCIDENT_COMPONENT_SLUGS:
+        record["state"] = "PLUGIN_FAMILIA_INCIDENTE_REQUER_QUARENTENA"
+
+def official_plugin_checksums(record: dict, target: Path) -> None:
+    """Compare official plugin MD5 manifest; never download executable packages."""
+    slug, version = record["slug"], record["local_version"]
+    if not version or not re.fullmatch(r"[A-Za-z0-9_.-]+", slug) or not VERSION_RE.fullmatch(version):
+        return
+    url = f"https://downloads.wordpress.org/plugin-checksums/{slug}/{version}.json"
+    record["checksum_query_url"] = url
+    try:
+        request = urllib.request.Request(url, headers={"User-Agent": "wp-integrity-audit/version-audit"})
+        with urllib.request.urlopen(request, timeout=12) as response:
+            final = urllib.parse.urlparse(response.geturl())
+            if final.scheme != "https" or final.hostname != "downloads.wordpress.org":
+                record["checksum_status"] = "API_UNAVAILABLE"
+                return
+            payload = response.read(3_000_001)
+        if len(payload) > 3_000_000:
+            record["checksum_status"] = "API_UNAVAILABLE"
+            return
+        data = json.loads(payload)
+        checksums = data.get("files") if isinstance(data, dict) else None
+        if not isinstance(checksums, dict) or not checksums:
+            record["checksum_status"] = "UNAVAILABLE"
+            if record["state"] == "PLUGIN_OFICIAL_ATUAL":
+                record["state"] = "PLUGIN_OFICIAL_SEM_CHECKSUM"
+            return
+        changed = []
+        verified = 0
+        root = target / "wp-content" / "plugins" / slug
+        for name, digest in checksums.items():
+            if not isinstance(name, str) or name.startswith("/") or ".." in Path(name).parts:
+                continue
+            expected = digest.get("md5") if isinstance(digest, dict) else digest
+            if not isinstance(expected, str) or not re.fullmatch("[0-9a-fA-F]{32}", expected):
+                continue
+            verified += 1
+            file = root / name
+            if file.is_symlink() or not file.is_file():
+                changed.append({"path": name, "reason": "MISSING"})
+            elif file_digest(file, "md5") != expected.lower():
+                changed.append({"path": name, "reason": "MODIFIED"})
+        if not verified:
+            record["checksum_status"] = "UNAVAILABLE"
+            return
+        record["checksum_verified_files"] = verified
+        # Inspect extra executable files omitted from official plugin manifests.
+        declared = set(checksums)
+        for file in root.rglob("*"):
+            if file.is_symlink() or not file.is_file():
+                continue
+            relative = file.relative_to(root).as_posix()
+            if relative not in declared and file.suffix.lower() in (".php", ".phtml", ".phar", ".php5", ".pht"):
+                changed.append({"path": relative, "reason": "EXTRA_EXECUTABLE"})
+        record["checksum_findings"] = changed
+        record["checksum_status"] = "MODIFIED" if changed else "MATCH"
+        if changed:
+            record["state"] = "PLUGIN_COM_ARQUIVOS_MODIFICADOS"
+    except urllib.error.HTTPError as error:
+        record["checksum_status"] = "UNAVAILABLE" if error.code == 404 else "API_UNAVAILABLE"
+        if error.code == 404 and record["state"] == "PLUGIN_OFICIAL_ATUAL":
+            record["state"] = "PLUGIN_OFICIAL_SEM_CHECKSUM"
+    except (OSError, ValueError, TimeoutError):
+        record["checksum_status"] = "API_UNAVAILABLE"
+
+
+def version_tuple(value: str) -> tuple[int, ...]:
+    return tuple(int(x) for x in re.findall(r"\d+", value)[:5])
+
+def check_core(target: Path, record: dict, offline: bool) -> None:
+    if offline or not record["local_version"]:
+        return
+    status, data, url = api_json("/core/checksums/1.0/", {"version": record["local_version"], "locale": record["locale"]})
+    record["query_url"] = url
+    if status != "SUCCESS" or not data or not isinstance(data.get("checksums"), dict):
+        record["query_status"] = "API_UNAVAILABLE"
+        return
+    checksums = data["checksums"]
+    mismatch = []
+    verified = 0
+    for relative, expected in checksums.items():
+        if not isinstance(relative, str) or not re.fullmatch(r"[a-fA-F0-9]{32}", str(expected)):
+            continue
+        if (Path(relative).is_absolute() or ".." in Path(relative).parts or
+                relative.startswith("wp-content/") or relative == "wp-config.php"):
+            continue
+        verified += 1
+        path = target / relative
+        if not path.is_file() or path.is_symlink():
+            mismatch.append({"path": relative, "reason": "MISSING"})
+        elif file_digest(path, "md5") != expected.lower():
+            mismatch.append({"path": relative, "reason": "MODIFIED"})
+    if verified == 0:
+        record["query_status"] = "API_UNAVAILABLE"
+        return
+    record["verified_files"] = verified
+    names = set(checksums)
+    for folder in ("wp-admin", "wp-includes"):
+        for file in (target / folder).rglob("*"):
+            if file.is_file() and not file.is_symlink():
+                relative = file.relative_to(target).as_posix()
+                if relative not in names and file.suffix.lower() in (".php", ".phtml", ".phar"):
+                    mismatch.append({"path": relative, "reason": "EXTRA"})
+    for file in target.glob("*.php"):
+        if file.name not in names and file.name not in ("wp-config.php",):
+            mismatch.append({"path": file.name, "reason": "EXTRA"})
+    record["findings"] = mismatch
+    record["official_version"] = record["local_version"]
+    record["source"] = "wordpress.org"
+    record["query_status"] = "OFFICIAL_MATCH"
+    record["state"] = ("CORE_AUSENTE_REQUER_REVISAO" if any(f["reason"] == "MISSING" for f in mismatch) else
+                       "CORE_MODIFICADO_REQUER_REVISAO" if mismatch else "CORE_VALIDADO")
+
+def check_core_latest(record: dict) -> None:
+    """Compare against advertised upstream version without changing local Core."""
+    status, data, url = api_json("/core/version-check/1.7/", {"locale": record["locale"]})
+    record["version_query_url"] = url
+    if status != "SUCCESS" or not data or not isinstance(data.get("offers"), list):
+        record["version_query_status"] = "API_UNAVAILABLE"
+        return
+    offers = [x for x in data["offers"] if isinstance(x, dict) and isinstance(x.get("current"), str)]
+    if not offers or not VERSION_RE.fullmatch(offers[0]["current"]):
+        record["version_query_status"] = "API_UNAVAILABLE"
+        return
+    newest = offers[0]["current"]
+    record["official_version"] = newest
+    if record["local_version"] and version_tuple(record["local_version"]) < version_tuple(newest):
+        record["version_query_status"] = "OFFICIAL_OUTDATED"
+        if record["state"] == "CORE_VALIDADO":
+            record["state"] = "CORE_DESATUALIZADO"
+    else:
+        record["version_query_status"] = "OFFICIAL_MATCH"
+
+
+def audit(target: Path, case: Path, *, offline: bool = False,
+          active_plugins: set[str] | None = None, template: str | None = None,
+          stylesheet: str | None = None, skip_core: bool = False) -> dict:
+    core = local_core(target)
+    plugins = local_components(target, "plugin", active_plugins, template, stylesheet)
+    themes = local_components(target, "theme", active_plugins, template, stylesheet)
+    online = not offline
+    if online:
+        if not skip_core:
+            check_core(target, core, False)
+            check_core_latest(core)
+        for rec in plugins + themes:
+            if rec["child_theme"] or rec["update_uri_present"]:
+                rec["query_status"] = "PREMIUM_OR_CUSTOM_COMPONENT"
+                continue
+            compare_official(rec)
+            if rec["type"] == "plugin" and rec["source"] == "wordpress.org":
+                official_plugin_checksums(rec, target)
+    if skip_core:
+        core["state"] = "CORE_CHECKSUM_INDISPONIVEL"
+        core["query_status"] = "SKIPPED"
+    records = [core] + plugins + themes
+    # For incident-associated components, preserve a complete file manifest so
+    # a later exact-directory quarantine can be hash-bound without rescanning
+    # an untrusted directory heuristically.
+    directory_evidence = {}
+    for rec in plugins:
+        if rec.get("slug") not in INCIDENT_COMPONENT_SLUGS:
+            continue
+        root = target / "wp-content" / "plugins" / rec["slug"]
+        files = []
+        for file in sorted(root.rglob("*")):
+            if file.is_symlink():
+                files.append({"path": file.relative_to(target).as_posix(),
+                              "classification": "SYMLINK_REQUER_REVISAO"})
+                continue
+            if not file.is_file():
+                continue
+            files.append({"path": file.relative_to(target).as_posix(), "sha256": file_digest(file),
+                          "size": file.stat().st_size,
+                          "classification": "PLUGIN_FAMILIA_INCIDENTE_REQUER_QUARENTENA"})
+        directory_evidence[rec["slug"]] = files
+    coverage = {"local": "EXECUTED", "official": "SKIPPED" if offline else
+                "UNAVAILABLE" if any(r["query_status"] == "API_UNAVAILABLE" for r in records)
+                else "EXECUTED", "reason": "Offline mode" if offline else None,
+                "status": "AUDITORIA_LOCAL_SEM_CONSULTA_OFICIAL" if offline else "EXECUTED"}
+    coverage["core"] = ("SKIPPED" if offline or skip_core else
+                        "EXECUTED" if core.get("verified_files", 0) > 0 else "UNAVAILABLE")
+    result = {"coverage": coverage, "components": records,
+              "summary": {"core_version": core["local_version"],
+                          "core_outdated": int(core["state"] == "CORE_DESATUALIZADO" or core.get("version_query_status") == "OFFICIAL_OUTDATED"),
+                          "plugins_checked": len(plugins), "themes_checked": len(themes),
+                          "plugins_outdated": sum(r["state"] == "PLUGIN_OFICIAL_DESATUALIZADO" for r in plugins),
+                          "themes_outdated": sum(r["state"] == "TEMA_OFICIAL_DESATUALIZADO" for r in themes),
+                          "unlisted": sum(r["query_status"] == "NOT_FOUND_OFFICIAL_REPOSITORY" for r in records),
+                          "plugins_requiring_provenance_review": sum(p["state"] in ("PLUGIN_ORIGEM_NAO_CONFIRMADA_REQUER_REVISAO", "PLUGIN_VERSAO_NAO_IDENTIFICADA", "PLUGIN_PREMIUM_REQUER_FONTE_CONFIAVEL") for p in plugins),
+                          "incident_components_requiring_quarantine": sum(p["state"] == "PLUGIN_FAMILIA_INCIDENTE_REQUER_QUARENTENA" for p in plugins),
+                          "plugins_premium_custom": sum(r["state"] in ("PLUGIN_PREMIUM_REQUER_FONTE_CONFIAVEL", "PLUGIN_CUSTOMIZADO") for r in plugins),
+                          "themes_premium_custom": sum(r["state"] in ("TEMA_PREMIUM_REQUER_FONTE_CONFIAVEL", "TEMA_CUSTOMIZADO", "TEMA_FILHO_CUSTOMIZADO") for r in themes)}}
+    (case / "component-version-evidence.json").write_text(json.dumps(result, indent=2, ensure_ascii=False))
+    (case / "component-directory-evidence.json").write_text(json.dumps(directory_evidence, indent=2, ensure_ascii=False))
+    lines = ["# Versões e procedência dos componentes", "",
+             f"- WordPress instalado: {core['local_version'] or 'Não identificado'}",
+             f"- WordPress de referência: {core['official_version'] or 'Não determinado'}",
+             f"- Estado do núcleo: {core['state']}", f"- Núcleo desatualizado: {result['summary']['core_outdated']}",
+             f"- Plugins verificados: {len(plugins)}", f"- Plugins desatualizados: {result['summary']['plugins_outdated']}",
+             f"- Temas verificados: {len(themes)}", f"- Temas desatualizados: {result['summary']['themes_outdated']}",
+             f"- Consulta oficial: {coverage['official']}", "",
+             "| ID | Tipo | Nome | Instalada | Oficial | Origem | Ativo | Tema pai | Consulta | Estado |",
+             "|---|---|---|---|---|---|---|---|---|---|---|"]
+    for item in records:
+        lines.append("| " + " | ".join(str(item.get(k) or "-").replace("|", "\\|").replace("\n", " ") for k in
+                                     ("component_id", "type", "name", "local_version", "official_version", "source", "active", "parent_theme", "query_status", "state")) + " |")
+    review_items = [r for r in records if r.get("review_guidance")]
+    if review_items:
+        lines.extend(["", "## Componentes que exigem validação manual", ""])
+        for item in review_items:
+            lines.append(f"- {item['component_id']} ({item['slug']}): {item['review_guidance']}")
+    (case / "component-version-report.md").write_text("\n".join(lines) + "\n")
+    with (case / "component-version-report.csv").open("w", newline="") as stream:
+        writer = csv.DictWriter(stream, fieldnames=("component_id", "type", "slug", "name", "local_version",
+                                                     "official_version", "source", "active", "parent_theme", "main_file", "main_file_sha256", "header_status", "state", "query_status", "query_url", "checksum_status", "review_guidance"))
+        writer.writeheader()
+        writer.writerows({key: item.get(key) for key in writer.fieldnames} for item in records)
+    return result
+
+
+def write_skipped(case: Path) -> None:
+    """Record explicitly reduced coverage without network or component access."""
+    result = {"coverage": {"local": "SKIPPED", "official": "SKIPPED",
+                           "reason": "--skip-version-check",
+                           "status": "AUDITORIA_COM_COBERTURA_REDUZIDA"},
+              "components": [], "summary": {}}
+    (case / "component-version-evidence.json").write_text(json.dumps(result, indent=2))
+    (case / "component-version-report.md").write_text(
+        "# Versões e procedência dos componentes\n\nCobertura: AUDITORIA_COM_COBERTURA_REDUZIDA\n")
+    (case / "component-version-report.csv").write_text(
+        "component_id,type,slug,name,local_version,official_version,source,active,state,query_status\n")
+
+
+def append_management_section(case: Path) -> None:
+    """Keep the management overview consistent with detailed component evidence."""
+    source = case / "component-version-evidence.json"
+    if not source.is_file():
+        return
+    result = json.loads(source.read_text())
+    coverage = result["coverage"]
+    summary = result.get("summary", {})
+    def exibir(estado):
+        return {"EXECUTED": "EXECUTADA", "NOT EXECUTED": "NÃO EXECUTADA",
+                "SKIPPED": "IGNORADA", "UNAVAILABLE": "INDISPONÍVEL"}.get(estado, estado)
+
+    body = ["", "## Versões e componentes", "",
+            f"- Cobertura: {exibir(coverage['status'])}",
+            f"- Inspeção das versões locais: {exibir(coverage['local'])}",
+            f"- Consulta oficial: {exibir(coverage['official'])}",
+            f"- Motivo da omissão: {coverage.get('reason') or 'Nenhum'}",
+            f"- WordPress instalado: {summary.get('core_version') or 'Não identificado'}",
+            f"- Verificação do núcleo: {exibir(coverage.get('core', 'NOT EXECUTED'))}",
+            f"- Núcleo desatualizado: {summary.get('core_outdated', 0)}",
+            f"- Plugins verificados: {summary.get('plugins_checked', 0)}",
+            f"- Plugins desatualizados: {summary.get('plugins_outdated', 0)}",
+            f"- Plugins premium/personalizados: {summary.get('plugins_premium_custom', 0)}",
+            f"- Plugins para revisão de origem/versão: {summary.get('plugins_requiring_provenance_review', 0)}",
+            f"- Componentes associados ao incidente que exigem quarentena: {summary.get('incident_components_requiring_quarantine', 0)}",
+            f"- Temas verificados: {summary.get('themes_checked', 0)}",
+            f"- Temas desatualizados: {summary.get('themes_outdated', 0)}",
+            f"- Temas premium/personalizados: {summary.get('themes_premium_custom', 0)}",
+            f"- Componentes não localizados no repositório oficial: {summary.get('unlisted', 0)}",
+            "- Detalhamento: component-version-report.md", ""]
+    for path in (case / "report.md", case / "technical-report.md"):
+        if path.is_file():
+            path.write_text(path.read_text() + "\n".join(body) + "\n")

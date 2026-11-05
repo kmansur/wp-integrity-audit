@@ -1,0 +1,90 @@
+name: Python validation
+
+on:
+  push:
+    branches: [Python]
+  pull_request:
+    paths:
+      - 'bin/**'
+      - 'tests/**'
+      - '.github/workflows/python-ci.yml'
+
+# Supersede obsolete runs while iterating on this development branch.
+concurrency:
+  group: python-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.10', '3.11', '3.12', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Instalar dependências do núcleo
+        run: python -m pip install -r requirements.txt
+      - name: Compile all Python source
+        run: python -m compileall -q bin tests
+      - name: Run isolated unit tests
+        run: python -m unittest discover -s tests -v
+      - name: Verify CLI help
+        run: python bin/wp-integrity-audit.py --help
+
+  pdf-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Instalar dependências do núcleo
+        run: python -m pip install -r requirements.txt
+      - name: Instalar dependências opcionais do PDF
+        run: python -m pip install 'reportlab>=4,<5' 'PyMuPDF>=1.25,<2'
+      - name: Executar testes de exportação PDF e segurança
+        run: python -m unittest discover -s tests -p 'test_audit.py' -v
+
+  mysql-integration:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: synthetic-test-password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -psynthetic-test-password"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Instalar dependências do núcleo
+        run: python -m pip install -r requirements.txt
+      - name: Install MySQL client tools
+        run: sudo apt-get update && sudo apt-get install -y default-mysql-client
+      - name: Run synthetic MySQL integration tests
+        env:
+          WP_AUDIT_INTEGRATION: '1'
+          WP_AUDIT_DB_HOST: '127.0.0.1'
+          WP_AUDIT_DB_USER: 'root'
+          WP_AUDIT_DB_PASSWORD: 'synthetic-test-password'
+        run: python -m unittest discover -s tests -p 'test_integration.py' -v
