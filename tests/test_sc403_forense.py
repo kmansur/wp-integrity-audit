@@ -14,6 +14,25 @@ import sc403_forense as sc
 
 
 class TestForenseSC(unittest.TestCase):
+    def test_arvore_grande_sem_zip_nao_fica_incompleta_por_arquivos_comuns(self):
+        with tempfile.TemporaryDirectory() as nome:
+            raiz = Path(nome)
+            for indice in range(120):
+                (raiz / f"arquivo-{indice}.php").write_text("<?php return 1;")
+            resultado = sc.inspecionar_zips(raiz, maximo_arquivos=1)
+            self.assertEqual(resultado["status"], "COMPLETA")
+            self.assertEqual(resultado["candidatos_zip"], 0)
+            self.assertEqual(resultado["arquivos_percorridos"], 120)
+
+    def test_excesso_de_candidatos_zip_bloqueia_com_motivo_explicito(self):
+        with tempfile.TemporaryDirectory() as nome:
+            raiz = Path(nome)
+            for indice in range(3):
+                with zipfile.ZipFile(raiz / f"pacote-{indice}.zip", "w") as z:
+                    z.writestr("ok.txt", "conteudo")
+            resultado = sc.inspecionar_zips(raiz, maximo_arquivos=2)
+            self.assertEqual(resultado["status"], "INCOMPLETA")
+            self.assertEqual(resultado["motivo"], "LIMITE_CANDIDATOS_ZIP")
     def test_zip_inerte_com_marcador(self):
         with tempfile.TemporaryDirectory() as nome:
             raiz = Path(nome)

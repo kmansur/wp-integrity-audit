@@ -51,7 +51,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 
-VERSION = "0.43.8"
+VERSION = "0.43.9"
 DEFAULT_DB_HOST = "187.120.197.140"
 IOC = re.compile(r"SC_ADV_BEGIN|SC_DB_BEGIN|SC_TH_BEGIN|SC_CORE_BOOT_VER|SC_WC|php\.euc-eludom-etile|sc_boot_ver|sc_payload_persistent|sc_persist_manifest|sc_c2_cache|sc_last_c2|sc_own_rec|sc_own_manifest|sc_sw_had|sc_sw_last_url|sc_ini_fail|sc_ini_dead|sc_fetch_fails|sc_pad_off_ts|sc_reins_(?:adv|db)|sc_cron_fetch|--sc-cli|--sc-succ|trace-inspector-pad|trace-librarian-tag|agile-interface-vox|f88225c2|cipher-feeder|_sc_fpc|sc_cron_guard|sc_cron_recovery|e1v61n2r1im6t7_|kinetic-relay-live|function ceya|Axiom Sentinel Snap|SCV:[0-9]+")
 # WordPress files, database values, logs and memory dumps are untrusted data.

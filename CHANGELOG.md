@@ -4,6 +4,13 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 
 ## [Não publicado]
 
+## [0.43.9] - 2026-11-05
+
+### Escalabilidade e cobertura
+- A inspeção de ZIPs deixou de marcar a auditoria incompleta por contar todos os arquivos comuns da instalação.
+- O limite passou a ser aplicado somente a candidatos `.zip`, com limite separado de diretórios e contadores explícitos de cobertura.
+- Adicionados testes para árvores grandes sem ZIPs e excesso de candidatos ZIP.
+
 ## [0.43.8] - 2026-11-05
 
 ### Correções

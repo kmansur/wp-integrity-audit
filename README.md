@@ -16,6 +16,10 @@ Comentários normais do WordPress, como `Don't show`, não são tratados como in
 
 O `.htaccess` defensivo padrão em `wp-content/uploads/wpforms` é validado por estrutura. A regra não dispensa a revisão de permissões, proprietário ou outras configurações do servidor.
 
+## Versão 0.43.9 — inspeção de ZIP escalável
+
+A auditoria de ZIPs não fica incompleta apenas porque uma instalação possui muitos arquivos comuns. O limite é aplicado aos candidatos `.zip`, com proteção independente contra excesso de diretórios e itens internos.
+
 ## Versão 0.43.5 — validação exata do Wordfence
 
 O detector reconhece o `wp-content/plugins/wordfence/lib/wordfenceClass.php` somente quando o SHA-256 coincide com a cópia oficial revisada da versão 9.0.2. Essa validação reduz falso positivo de heurísticas, mas não valida proprietário, permissões, timestamps ou a instalação inteira.

@@ -25,6 +25,7 @@ LIMITE_ZIP = 64 * 1024 * 1024
 LIMITE_ITEM = 8 * 1024 * 1024
 LIMITE_ITENS = 2500
 LIMITE_SCAN = 32 * 1024 * 1024
+LIMITE_DIRETORIOS = 100000
 RE_SHELL = re.compile(rb"eval\s*\(\s*base64_decode\s*\(|gzinflate\s*\(\s*base64_decode", re.I)
 
 
@@ -56,23 +57,41 @@ def _amostra_php(arquivo: Path, maximo: int = LIMITE_SCAN) -> tuple[bool, bool, 
     return marcador, shell, "COMPLETA"
 
 
-def inspecionar_zips(raiz: Path, maximo_arquivos: int = 15000) -> dict:
+def inspecionar_zips(raiz: Path, maximo_arquivos: int = 4096,
+                     maximo_diretorios: int = LIMITE_DIRETORIOS) -> dict:
     """Analisa metadados de ZIP e amostras limitadas de PHP sem extrair em disco.
 
-    Não aceita links simbólicos, arquivos muito grandes ou índices excessivos.
+    O limite de arquivos se aplica somente a candidatos ``*.zip``. Arquivos
+    comuns não podem tornar a cobertura incompleta em instalações grandes.
+    A quantidade de diretórios possui limite separado para proteger contra
+    árvores abusivas. Não aceita links simbólicos, arquivos muito grandes ou
+    índices ZIP excessivos.
     """
     resultados = []
-    verificados = 0
+    arquivos_percorridos = 0
+    diretorios_percorridos = 0
+    candidatos_zip = 0
     erros = []
     for diretorio, pastas, arquivos in os.walk(raiz, followlinks=False):
+        diretorios_percorridos += 1
+        if diretorios_percorridos > maximo_diretorios:
+            return {"status": "INCOMPLETA", "motivo": "LIMITE_DIRETORIOS",
+                    "resultados": resultados, "erros": erros,
+                    "arquivos_percorridos": arquivos_percorridos,
+                    "diretorios_percorridos": diretorios_percorridos,
+                    "candidatos_zip": candidatos_zip}
         pastas[:] = [p for p in pastas if not (Path(diretorio) / p).is_symlink()]
         for nome in arquivos:
-            verificados += 1
-            if verificados > maximo_arquivos:
-                return {"status": "INCOMPLETA", "motivo": "LIMITE_INVENTARIO",
-                        "resultados": resultados, "erros": erros}
+            arquivos_percorridos += 1
             if not nome.lower().endswith(".zip"):
                 continue
+            candidatos_zip += 1
+            if candidatos_zip > maximo_arquivos:
+                return {"status": "INCOMPLETA", "motivo": "LIMITE_CANDIDATOS_ZIP",
+                        "resultados": resultados, "erros": erros,
+                        "arquivos_percorridos": arquivos_percorridos,
+                        "diretorios_percorridos": diretorios_percorridos,
+                        "candidatos_zip": candidatos_zip}
             caminho = Path(diretorio) / nome
             if caminho.is_symlink():
                 continue
@@ -115,7 +134,10 @@ def inspecionar_zips(raiz: Path, maximo_arquivos: int = 15000) -> dict:
             except (OSError, ValueError, RuntimeError, zipfile.BadZipFile) as erro:
                 erros.append({"path": relativo, "reason": type(erro).__name__})
     return {"status": "INCOMPLETA" if erros else "COMPLETA",
-            "resultados": resultados, "erros": erros}
+            "resultados": resultados, "erros": erros,
+            "arquivos_percorridos": arquivos_percorridos,
+            "diretorios_percorridos": diretorios_percorridos,
+            "candidatos_zip": candidatos_zip}
 
 
 def inspecionar_php_config(raiz: Path) -> dict:

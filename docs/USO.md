@@ -10,6 +10,8 @@ Comentários de documentação do core (`wp-includes` e `wp-admin`) são context
 
 O `.htaccess` padrão do WPForms em uploads pode ser classificado como legítimo quando bloqueia handlers de script e não contém pré-carregamento, proxy ou redirecionamento externo.
 
+A inspeção de ZIP percorre arquivos comuns sem consumi-los do limite de candidatos. O relatório registra arquivos percorridos, diretórios percorridos e ZIPs candidatos; excesso de diretórios ou ZIPs mantém a cobertura incompleta.
+
 O núcleo de remediação exige uma aprovação Ed25519 externa e uma política de chaves confiáveis para simulação autorizada. A versão atual ainda não executa remediação real.
 
 O host MySQL padrão é `187.120.197.140`. Substitua-o com `--db-host mysql.exemplo` quando o banco estiver em outro endereço.
