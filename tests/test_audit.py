@@ -192,6 +192,13 @@ class PythonAuditTests(unittest.TestCase):
         self.assertTrue(callable(audit.sql_cleanup))
         self.assertTrue(callable(audit.official_sync))
 
+    def test_hash_oficial_wordfence_e_exato_e_nao_confia_so_no_caminho(self):
+        caminho = "wp-content/plugins/wordfence/lib/wordfenceClass.php"
+        digest = audit.REVIEWED_OFFICIAL_FILE_HASHES[caminho]["sha256"]
+        self.assertTrue(audit.is_reviewed_official_file(caminho, digest))
+        self.assertFalse(audit.is_reviewed_official_file(caminho, "0" * 64))
+        self.assertFalse(audit.is_reviewed_official_file("outro.php", digest))
+
     def test_subprocesso_nao_utf8_preserva_octetos_sem_travar(self):
         """Saída Latin-1 de ferramenta externa não pode derrubar a auditoria."""
         import sys

@@ -51,7 +51,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 
-VERSION = "0.43.4"
+VERSION = "0.43.5"
 DEFAULT_DB_HOST = "187.120.197.140"
 IOC = re.compile(r"SC_ADV_BEGIN|--sc-cli|--sc-succ|trace-inspector-pad|trace-librarian-tag|agile-interface-vox|f88225c2|cipher-feeder|_sc_fpc|sc_cron_guard|sc_cron_recovery|e1v61n2r1im6t7_|sc_persist_manifest|sc_own_manifest|kinetic-relay-live|function ceya|Axiom Sentinel Snap|SCV:[0-9]+")
 # WordPress files, database values, logs and memory dumps are untrusted data.
@@ -97,6 +97,17 @@ BEHAVIOR_PATTERNS = {
     "DYNAMIC_EXECUTION": re.compile(r"\b(?:eval|assert|create_function|include|require)(?:_once)?\s*\(\s*\$", re.I),
     "ESCAPED_STRING_ASSEMBLY": re.compile(r"(?:\\x[0-9a-f]{2}|\\[0-7]{3})", re.I),
     "RANDOM_FUNCTION_NAMES": re.compile(r"function\s+[A-Za-z_][A-Za-z0-9_]{8,}\s*\(", re.I),
+}
+# Hashes de componentes oficiais previamente verificados. A validação é por
+# conteúdo exato; caminho, nome ou versão declarada isoladamente não conferem
+# legitimidade. Metadados de filesystem continuam sendo avaliados à parte.
+REVIEWED_OFFICIAL_FILE_HASHES = {
+    "wp-content/plugins/wordfence/lib/wordfenceClass.php": {
+        "sha256": "bba370f5daedd80ace9384ae2c35f137a03627264e739617018c4adbe3df3ad8",
+        "component": "Wordfence Security",
+        "version": "9.0.2",
+        "source": "WordPress.org SVN tag 9.0.2",
+    },
 }
 LICENSE_BYPASS_PATTERNS = (
     re.compile(r"delete_(?:option|transient)\s*\(\s*['\"]wp_rocket_no_licence['\"]", re.I),
@@ -284,6 +295,12 @@ def classify_file(relative: str, name: str, text: str, indicator: str | None) ->
     return ("ARQUIVO_SUSPEITO_REQUER_VALIDACAO", "Suspicious filename requires manual review")
 
 
+def is_reviewed_official_file(relative: str, digest: str) -> bool:
+    """Retorna verdadeiro somente para hash exato de fonte oficial revisada."""
+    reviewed = REVIEWED_OFFICIAL_FILE_HASHES.get(relative)
+    return bool(reviewed and reviewed.get("sha256") == digest)
+
+
 def obfuscation_indicators(text: str) -> list[str]:
     """Return multiple independent static obfuscation signals, never execute code."""
     hits = [name for name, pattern in OBFUSCATION_PATTERNS.items() if pattern.search(text)]
@@ -427,8 +444,15 @@ def file_audit(target: Path, case: Path) -> list[dict]:
         if relative.startswith("wp-content/wflogs/"):
             snippet = ""  # Wordfence configuration may contain secrets.
         try:
+            digest = sha256(path)
+            official = REVIEWED_OFFICIAL_FILE_HASHES.get(relative) if is_reviewed_official_file(relative, digest) else None
+            if official and not match and not generic_match and not license_bypass:
+                classification, reason = (
+                    "LEGITIMO_VALIDADO",
+                    f"SHA-256 coincide com fonte oficial {official['source']} ({official['component']} {official['version']}); metadados e permissões continuam sujeitos a revisão",
+                )
             findings.append({
-                "path": relative, "sha256": sha256(path), "size": stat_info.st_size if path.suffix.lower() in SCRIPT_EXTENSIONS else path.stat().st_size,
+                "path": relative, "sha256": digest, "size": stat_info.st_size if path.suffix.lower() in SCRIPT_EXTENSIONS else path.stat().st_size,
                 "mtime_utc": dt.datetime.fromtimestamp(stat_info.st_mtime, dt.timezone.utc).isoformat() if path.suffix.lower() in SCRIPT_EXTENSIONS else None,
                 "ctime_utc": dt.datetime.fromtimestamp(stat_info.st_ctime, dt.timezone.utc).isoformat() if path.suffix.lower() in SCRIPT_EXTENSIONS else None,
                 "classification": classification, "reason": reason,
@@ -442,6 +466,10 @@ def file_audit(target: Path, case: Path) -> list[dict]:
                 "timestamp_watermark_93819": timestamp_watermark,
                 "confidence": confidence_for_classification(classification),
                 "license_bypass": license_bypass,
+                "official_hash_match": bool(official),
+                "official_source": official["source"] if official else None,
+                "official_component": official["component"] if official else None,
+                "official_version": official["version"] if official else None,
             })
         except OSError:
             continue

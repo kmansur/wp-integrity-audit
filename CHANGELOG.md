@@ -4,6 +4,12 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 
 ## [Não publicado]
 
+## [0.43.5] - 2026-11-05
+
+### Correções
+- O `wordfenceClass.php` oficial da versão 9.0.2 passa a ser reconhecido por SHA-256 exato da fonte WordPress.org, reduzindo falso positivo de heurísticas legítimas de rede, arquivos e chamadas dinâmicas.
+- A validação de conteúdo não dispensa a revisão independente de proprietário, permissões, timestamps ou outros indicadores do arquivo.
+
 ## [0.43.4] - 2026-11-05
 
 ### Banco de dados

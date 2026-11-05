@@ -4,6 +4,10 @@
 
 Os comandos principais, exemplos de auditoria, comparação, memória, persistência e simulação estão em [`docs/USO.md`](docs/USO.md).
 
+## Versão 0.43.5 — validação exata do Wordfence
+
+O detector reconhece o `wp-content/plugins/wordfence/lib/wordfenceClass.php` somente quando o SHA-256 coincide com a cópia oficial revisada da versão 9.0.2. Essa validação reduz falso positivo de heurísticas, mas não valida proprietário, permissões, timestamps ou a instalação inteira.
+
 ## Versão 0.43.4 — host MySQL padrão configurável
 
 O auditor usa `187.120.197.140` como host MySQL padrão. Para outro destino, informe `--db-host HOST_OU_IP`; nenhum segredo é aceito na linha de comando.

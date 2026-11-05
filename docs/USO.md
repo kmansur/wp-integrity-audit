@@ -2,6 +2,8 @@
 
 Este guia descreve os principais comandos da versão atual. O comportamento padrão é somente leitura. A ferramenta não executa PHP encontrado no WordPress.
 
+Componentes oficiais revisados, como o `wordfenceClass.php` da versão 9.0.2, só recebem validação de conteúdo quando o SHA-256 completo coincide com a fonte registrada. Proprietário, grupo, permissões, timestamps, banco, cron e processos continuam sendo avaliados separadamente.
+
 O núcleo de remediação exige uma aprovação Ed25519 externa e uma política de chaves confiáveis para simulação autorizada. A versão atual ainda não executa remediação real.
 
 O host MySQL padrão é `187.120.197.140`. Substitua-o com `--db-host mysql.exemplo` quando o banco estiver em outro endereço.
