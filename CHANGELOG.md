@@ -4,6 +4,12 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 
 ## [Não publicado]
 
+## [0.43.8] - 2026-11-05
+
+### Correções
+- O padrão defensivo do `.htaccess` do diretório `wp-content/uploads/wpforms` passa a ser validado estruturalmente, evitando pendência indevida por `SetHandler`/`RemoveHandler`.
+- A validação exige marcadores WPForms, bloqueio de handlers de script e ausência de pré-carregamento, proxy ou redirecionamento externo.
+
 ## [0.43.7] - 2026-11-05
 
 ### Correções

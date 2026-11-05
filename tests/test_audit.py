@@ -210,6 +210,25 @@ class PythonAuditTests(unittest.TestCase):
             findings = audit.file_audit(root, case)
             self.assertFalse(any(item["path"] == "wp-includes/admin-bar.php" for item in findings))
 
+    def test_wpforms_htaccess_defensivo_e_validado_contextualmente(self):
+        conteudo = """# BEGIN WPForms
+<Files *>
+ SetHandler none
+ SetHandler default-handler
+ RemoveHandler .cgi .php .phtml .py
+ RemoveType .cgi .php .phtml .py
+</Files>
+<IfModule mod_php8.c>
+ php_flag engine off
+</IfModule>
+<IfModule headers_module>
+ Header set X-Robots-Tag \"noindex\"
+</IfModule>
+# END WPForms
+"""
+        self.assertTrue(audit.wpforms_upload_guard("wp-content/uploads/wpforms/.htaccess", conteudo))
+        self.assertFalse(audit.wpforms_upload_guard("wp-content/uploads/.htaccess", conteudo))
+
     def test_subprocesso_nao_utf8_preserva_octetos_sem_travar(self):
         """Saída Latin-1 de ferramenta externa não pode derrubar a auditoria."""
         import sys

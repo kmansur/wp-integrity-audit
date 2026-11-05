@@ -12,6 +12,10 @@ O detector incorpora indicadores de alta confiança do catálogo público `iocs.
 
 Comentários normais do WordPress, como `Don't show`, não são tratados como instruções para suprimir auditoria em arquivos do core sem outros indicadores fortes.
 
+## Versão 0.43.8 — proteção de uploads do WPForms
+
+O `.htaccess` defensivo padrão em `wp-content/uploads/wpforms` é validado por estrutura. A regra não dispensa a revisão de permissões, proprietário ou outras configurações do servidor.
+
 ## Versão 0.43.5 — validação exata do Wordfence
 
 O detector reconhece o `wp-content/plugins/wordfence/lib/wordfenceClass.php` somente quando o SHA-256 coincide com a cópia oficial revisada da versão 9.0.2. Essa validação reduz falso positivo de heurísticas, mas não valida proprietário, permissões, timestamps ou a instalação inteira.
