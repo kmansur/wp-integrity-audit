@@ -4,6 +4,12 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 
 ## [Não publicado]
 
+## [0.43.2] - 2026-11-04
+
+### Correções
+- Fixture de integração MySQL passou a criar todas as tabelas consultadas pelo scanner de conteúdo codificado.
+- Falhas do cliente MySQL agora recebem diagnóstico sanitizado e continuam sendo tratadas como cobertura indisponível, sem expor credenciais.
+
 ## [0.43.1] - 2026-11-04
 
 ### Documentação

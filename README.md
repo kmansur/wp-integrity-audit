@@ -4,6 +4,10 @@
 
 Os comandos principais, exemplos de auditoria, comparação, memória, persistência e simulação estão em [`docs/USO.md`](docs/USO.md).
 
+## Versão 0.43.2 — correção da integração MySQL
+
+A fixture sintética cobre todas as tabelas consultadas pelo scanner SQL. Falhas de consulta recebem diagnóstico sanitizado e não são interpretadas como ausência de indicadores.
+
 ## Versão 0.43.1 — guia de uso e núcleo operacional SC403
 
 O núcleo adiciona validação de identidade, autorização vinculada ao hash canônico do plano, diário verificável, máquina de estados e simulação. A implementação não sinaliza processos, remove SHM, altera SQL/cron/systemd, reinicia serviços nem move arquivos.

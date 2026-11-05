@@ -49,9 +49,31 @@ class MySQLFixtureTests(unittest.TestCase):
                 user_id BIGINT NOT NULL,
                 meta_key VARCHAR(191), meta_value LONGTEXT
             );
+            CREATE TABLE IF NOT EXISTS wp_postmeta (
+                meta_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                post_id BIGINT NOT NULL,
+                meta_key VARCHAR(255), meta_value LONGTEXT
+            );
+            CREATE TABLE IF NOT EXISTS wp_posts (
+                ID BIGINT AUTO_INCREMENT PRIMARY KEY,
+                post_content LONGTEXT
+            );
+            CREATE TABLE IF NOT EXISTS wp_comments (
+                comment_ID BIGINT AUTO_INCREMENT PRIMARY KEY,
+                comment_content TEXT
+            );
+            CREATE TABLE IF NOT EXISTS wp_commentmeta (
+                meta_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                comment_id BIGINT NOT NULL,
+                meta_key VARCHAR(255), meta_value LONGTEXT
+            );
             DELETE FROM wp_options;
             DELETE FROM wp_users;
             DELETE FROM wp_usermeta;
+            DELETE FROM wp_postmeta;
+            DELETE FROM wp_posts;
+            DELETE FROM wp_comments;
+            DELETE FROM wp_commentmeta;
             INSERT INTO wp_options(option_name,option_value) VALUES
                 ('active_plugins','a:1:{i:0;s:19:"legitimate/plugin.php";}'),
                 ('cron','a:0:{}'),
@@ -81,6 +103,10 @@ class MySQLFixtureTests(unittest.TestCase):
             DELETE FROM wp_options;
             DELETE FROM wp_users;
             DELETE FROM wp_usermeta;
+            DELETE FROM wp_postmeta;
+            DELETE FROM wp_posts;
+            DELETE FROM wp_comments;
+            DELETE FROM wp_commentmeta;
             INSERT INTO wp_options(option_name, option_value) VALUES
               ('active_plugins','a:1:{i:0;s:21:"legitimate/plugin.php";}'),
               ('cron','a:0:{}'),

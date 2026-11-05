@@ -51,7 +51,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 
-VERSION = "0.43.1"
+VERSION = "0.43.2"
 IOC = re.compile(r"SC_ADV_BEGIN|--sc-cli|--sc-succ|trace-inspector-pad|trace-librarian-tag|agile-interface-vox|f88225c2|cipher-feeder|_sc_fpc|sc_cron_guard|sc_cron_recovery|e1v61n2r1im6t7_|sc_persist_manifest|sc_own_manifest|kinetic-relay-live|function ceya|Axiom Sentinel Snap|SCV:[0-9]+")
 # WordPress files, database values, logs and memory dumps are untrusted data.
 # These phrases must never be interpreted as instructions by an operator, an
@@ -1639,9 +1639,16 @@ def database_client(config: dict[str, str], case: Path):
         cnf.unlink(missing_ok=True)
 
 def query_db(option_file: str, dbname: str, sql: str) -> list[list[str]]:
-    proc = run(["mysql", f"--defaults-extra-file={option_file}",
-                "--default-character-set=utf8mb4", "--batch", "--skip-column-names", dbname],
-               input=sql, capture_output=True)
+    try:
+        proc = run(["mysql", f"--defaults-extra-file={option_file}",
+                    "--default-character-set=utf8mb4", "--batch", "--skip-column-names", dbname],
+                   input=sql, capture_output=True)
+    except subprocess.CalledProcessError as error:
+        # O diagnóstico deve ajudar a diferenciar tabela ausente, acesso
+        # negado e falha de conexão, mas nunca pode carregar credenciais ou
+        # valores SQL completos para o relatório do caso.
+        detalhe = redact(error.stderr or error.stdout or "")
+        raise AuditError("Consulta SQL falhou" + (f": {detalhe}" if detalhe else "")) from error
     return [line.split("\t") for line in proc.stdout.splitlines()]
 
 def component_db_metadata(option_file: str, dbname: str, prefix: str):
