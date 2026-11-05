@@ -4,6 +4,16 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 
 ## [Não publicado]
 
+## [0.43.0] - 2026-11-04
+
+### Núcleo operacional — Entrega A
+- Adicionados módulos independentes para autorização, identidade, diário hash-chain, runtime somente leitura, máquina de estados e plano de compensação.
+- O diário detecta adulteração e a simulação bloqueia identidade divergente ou pré-condições ausentes.
+- A aprovação é vinculada ao hash canônico do plano, exige assinatura externa identificada e continua sem habilitar execução.
+
+### Segurança
+- Nenhum executor de PID, SHM, SQL, cron, systemd, PHP-FPM ou quarentena foi habilitado.
+
 ## [0.42.1] - 2026-11-04
 
 ### Segurança

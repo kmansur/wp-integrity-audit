@@ -1,5 +1,11 @@
 # Auditoria de Integridade WordPress — branch Python
 
+## Versão 0.43.0 — núcleo operacional SC403 (Entrega A)
+
+O núcleo adiciona validação de identidade, autorização vinculada ao hash canônico do plano, diário verificável, máquina de estados e simulação. A implementação não sinaliza processos, remove SHM, altera SQL/cron/systemd, reinicia serviços nem move arquivos.
+
+Consulte `docs/NUCLEO_OPERACIONAL_SC403.md`. A assinatura/aprovação deve ser verificada por mecanismo externo; um hash isolado não prova quem autorizou a operação.
+
 ## Versão 0.42.1 — validação de caminhos e validade
 
 Manifestos com componentes de caminho `..` ou expirados são recusados também durante a geração do grafo. Isso impede que uma futura etapa operacional interprete um alvo fora do escopo autorizado.
