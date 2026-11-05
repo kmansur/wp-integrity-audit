@@ -1,5 +1,21 @@
 # Auditoria de Integridade WordPress — branch Python
 
+## Versão 0.41.0 — auto-verificação e persistência Linux
+
+Verifique dependências locais sem acessar um site:
+
+```bash
+python3 bin/wp-integrity-audit.py --self-check
+```
+
+Para inventariar uma cópia autorizada de cron/persistência, use o módulo somente leitura:
+
+```bash
+python3 -c 'import sys,json; sys.path.insert(0,"bin"); import sc403_host; print(json.dumps(sc403_host.auditar([__import__("pathlib").Path("/var/spool/cron")]), ensure_ascii=False, indent=2))'
+```
+
+O inventário calcula metadados e procura marcadores, podendo decodificar Base64 somente em memória. Não executa comandos, não altera cron/systemd e não acessa credenciais.
+
 ## Versão 0.40.1 — cobertura ampliada do monitoramento
 
 Além de arquivos, opções SQL, processos e ZIPs, o monitoramento compara metadados de reconstrução, linha do tempo, exposição lateral, memória System V, persistência e processos. O JSON guarda somente contagens, cobertura, tamanho e SHA-256, nunca os valores brutos dessas evidências.

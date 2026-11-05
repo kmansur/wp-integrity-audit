@@ -30,6 +30,8 @@ import sc403_timeline
 import sc403_lateral
 import sc403_homologacao
 import sc403_monitor
+import sc403_host
+import sc403_selfcheck
 import sc403_forense
 import sc403_shm
 import sc403_yara
@@ -49,7 +51,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 
-VERSION = "0.40.1"
+VERSION = "0.41.0"
 IOC = re.compile(r"SC_ADV_BEGIN|--sc-cli|--sc-succ|trace-inspector-pad|trace-librarian-tag|agile-interface-vox|f88225c2|cipher-feeder|_sc_fpc|sc_cron_guard|sc_cron_recovery|e1v61n2r1im6t7_|sc_persist_manifest|sc_own_manifest|kinetic-relay-live|function ceya|Axiom Sentinel Snap|SCV:[0-9]+")
 # WordPress files, database values, logs and memory dumps are untrusted data.
 # These phrases must never be interpreted as instructions by an operator, an
@@ -2753,8 +2755,16 @@ def parse_args() -> argparse.Namespace:
                         help="Compara dois diretórios de casos existentes sem analisar um site em produção")
     parser.add_argument("--compare-output", type=Path,
                         help="Diretório privado para resultados da comparação")
+    parser.add_argument("--self-check", action="store_true",
+                        help="Verifica dependências locais sem acessar um site")
     parser.add_argument("--version", action="version", version=VERSION)
     args = parser.parse_args()
+    if args.self_check:
+        incompat = (args.target is not None or args.compare or args.verify_case or
+                     args.mode != "audit" or args.email_to or args.pdf_report)
+        if incompat:
+            parser.error("--self-check deve ser usado sozinho")
+        return args
     if args.verify_case:
         if (args.target is not None or args.compare or args.mode != "audit" or
                 args.bundle_evidence or args.pdf_report or args.sc_authorized_root):
@@ -2822,6 +2832,10 @@ def main() -> int:
     # Protect backup and report files from their first byte of creation.
     os.umask(0o077)
     args = parse_args()
+    if args.self_check:
+        resultado = sc403_selfcheck.verificar(Path(__file__).resolve().parent)
+        print(json.dumps(resultado, indent=2, ensure_ascii=False))
+        return 0 if resultado["status"] == "OK" else 40
     if args.verify_case:
         verdict = verify_evidence_manifest(args.verify_case)
         print(json.dumps(verdict, indent=2))

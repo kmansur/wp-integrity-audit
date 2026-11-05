@@ -1,5 +1,9 @@
 # Python Operator Handbook
 
+## Auto-verificação e cron (0.41.0)
+
+`--self-check` valida apenas a instalação do auditor e retorna 40 se houver dependência ausente. `bin/sc403_host.py` recebe raízes explicitamente autorizadas para inventário de cron e persistência. O código lê arquivos como dados não confiáveis, registra hash e marcadores e decodifica Base64 sem executar o resultado. Não use essa função como autorização para remover tarefas; qualquer alteração deve seguir o plano aprovado e preservar rollback.
+
 ## Monitoramento ampliado (0.40.1)
 
 O comparador também verifica mudanças nos arquivos opcionais de reconstrução, linha do tempo, exposição lateral, SHM, persistência e processos. Ele registra somente metadados e hashes; valores de banco, payloads, tokens e conteúdo bruto permanecem fora da saída. Qualquer alteração exige revisão humana e não autoriza reativação.

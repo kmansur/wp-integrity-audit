@@ -4,6 +4,13 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 
 ## [Não publicado]
 
+## [0.41.0] - 2026-11-04
+
+### Auditoria segura do ambiente
+- Adicionado `--self-check` para verificar versão Python, módulos e ferramentas disponíveis sem acessar WordPress ou credenciais.
+- Adicionado `bin/sc403_host.py` para inventário somente leitura de cron e arquivos de persistência autorizados, com decodificação Base64 apenas em memória.
+- Comandos encontrados em cron nunca são executados; resultados registram hashes, marcadores e limitações.
+
 ## [0.40.1] - 2026-11-04
 
 ### Monitoramento
