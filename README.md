@@ -1,5 +1,13 @@
 # Auditoria de Integridade WordPress — branch Python
 
+## Versão 0.36.0 — estado de reconstrução e correlação conservadora
+
+A auditoria SQL identifica estados `sc_reins_*`, `sc_ini_*`, falhas de busca e timestamps de recuperação sem alterar ou executar seus valores. O arquivo privado `sc403-reinfection-state.json` separa fatos observados de hipóteses e compara contadores diários somente com a data UTC da coleta. A presença desses estados não é considerada comprometimento confirmado sem correlação independente.
+
+O levantamento de cobertura da referência externa está em `docs/COMPARATIVO_SC403.md`.
+
+A auditoria também registra `sc403-timeline.json`. Timestamps de arquivos, contadores e ocorrências em logs são mantidos com sua fonte e confiabilidade; mtime manipulável e ausência de horário não são convertidos em uma cronologia afirmativa. PHP grande com comentários/padding aparente e `mtime % 100000 == 93819` produzem revisão contextual, nunca comprometimento confirmado isoladamente.
+
 ## Versão 0.35.0 — evidências não confiáveis e proteção contra instruções inseridas
 
 Todo conteúdo coletado durante a auditoria é tratado como dado não confiável. Frases encontradas em arquivos, banco de dados, logs ou dumps que tentem instruir um operador, uma IA ou o próprio auditor são registradas para revisão e nunca são obedecidas. Elas não alteram o escopo, não desativam verificações e não autorizam limpeza ou liberação.

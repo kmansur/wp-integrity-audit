@@ -2,6 +2,16 @@
 
 ## Read-only audit
 
+### Estado de reconstrução SC (0.36.0)
+
+As auditorias com banco executam uma consulta limitada para `sc_reins_*`, `sc_ini_fail`, `sc_ini_dead`, `sc_fetch_fails` e timestamps de recuperação. A análise é somente de metadados: valores não são alterados, desserializados nem executados. O resultado privado `sc403-reinfection-state.json` informa o dia UTC observado, a interpretação reconhecida, fatos, hipóteses e limitações.
+
+Um contador do dia atual pode indicar backoff ou circuito de falha, mas não demonstra que uma reconstrução ocorreu. Um contador ausente também não prova ausência de persistência. Não remova opções `sc_*` com base apenas nesta evidência.
+
+### Timestamps, padding e linha do tempo
+
+`mtime % 100000 == 93819` e PHP com tamanho/padding incomum são sinais contextuais. O auditor registra esses sinais como revisão e preserva tamanho, hash e metadados, sem declarar malware por um único indício. `sc403-timeline.json` diferencia coleta, metadado de arquivo, estado SQL, processo e endpoint em log; quando não existe horário observável, o evento permanece sem data confiável.
+
 ```bash
 python3 bin/wp-integrity-audit.py --audit /path/to/wordpress --case-root /secure/cases
 python3 bin/wp-integrity-audit.py --audit-db /path/to/wordpress --case-root /secure/cases

@@ -4,6 +4,18 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 
 ## [Não publicado]
 
+## [0.36.0] - 2026-11-04
+
+### Estado de reconstrução do SC
+- Adicionado `bin/sc403_reconstrucao.py` para identificar e interpretar, somente em leitura, contadores `sc_reins_*`, circuit breakers `sc_ini_*`, falhas de busca e timestamps de recuperação.
+- Gerado `sc403-reinfection-state.json` com fatos observados, hipóteses, comparação do dia UTC e limitações explícitas.
+- Estados de reconstrução não são tratados automaticamente como comprometimento confirmado.
+- Atualizados relatório técnico, relatório gerencial e evidências SQL sem exportar valores brutos.
+- Acrescentada revisão contextual de PHP grande com padding aparente e do resíduo de timestamp `mtime % 100000 == 93819`; nenhum dos dois sinais isolados confirma malware.
+- Gerado `sc403-timeline.json` com fontes, horários observados, níveis de confiabilidade e eventos sem data inventada.
+- Criado `docs/COMPARATIVO_SC403.md` com o levantamento da referência GPL-2.0-or-later e as funcionalidades não incorporadas por segurança.
+- Adicionados testes para formatos válidos, formatos malformados e mudança de dia UTC.
+
 ## [0.35.0] - 2026-11-04
 
 ### Proteção contra instruções inseridas em evidências

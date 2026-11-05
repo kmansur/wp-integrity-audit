@@ -25,6 +25,8 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import component_versions
 import sc403_indicadores
+import sc403_reconstrucao
+import sc403_timeline
 import sc403_forense
 import sc403_shm
 import sc403_yara
@@ -44,7 +46,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 
-VERSION = "0.35.0"
+VERSION = "0.36.0"
 IOC = re.compile(r"SC_ADV_BEGIN|--sc-cli|--sc-succ|trace-inspector-pad|trace-librarian-tag|agile-interface-vox|f88225c2|cipher-feeder|_sc_fpc|sc_cron_guard|sc_cron_recovery|e1v61n2r1im6t7_|sc_persist_manifest|sc_own_manifest|kinetic-relay-live|function ceya|Axiom Sentinel Snap|SCV:[0-9]+")
 # WordPress files, database values, logs and memory dumps are untrusted data.
 # These phrases must never be interpreted as instructions by an operator, an
@@ -340,10 +342,14 @@ def file_audit(target: Path, case: Path) -> list[dict]:
         obfuscation_hits: list[str] = []
         behavioral_hits: list[str] = []
         untrusted_hits: list[str] = []
+        padding_hits: list[str] = []
+        timestamp_watermark = False
         behavioral_score = 0
         license_bypass = False
         if path.suffix.lower() in SCRIPT_EXTENSIONS:
             try:
+                stat_info = path.stat()
+                timestamp_watermark = int(stat_info.st_mtime) % 100000 == 93819
                 with path.open("rb") as stream:
                     overlap = b""
                     bounded = bytearray()
@@ -365,13 +371,19 @@ def file_audit(target: Path, case: Path) -> list[dict]:
                             break
                         overlap = sample[-256:]
                     bounded_text = bytes(bounded).decode("utf-8", "replace")
+                    if stat_info.st_size >= 4 * 1024 * 1024:
+                        if re.search(r"/\*[^*\n]{512,}\*/", bounded_text, re.S):
+                            padding_hits.append("COMENTARIO_EXTENSO_EM_PHP_GRANDE")
+                        if len(re.findall(r"[A-Fa-f0-9]{128,}", bounded_text)) >= 3:
+                            padding_hits.append("SEQUENCIAS_HEX_EXTENSAS")
                     obfuscation_hits = obfuscation_indicators(bounded_text)
                     behavioral_hits, behavioral_score = behavioral_anomaly_indicators(relative, bounded_text)
                     license_bypass = sum(bool(pattern.search(bounded_text)) for pattern in LICENSE_BYPASS_PATTERNS) >= 2
             except OSError:
                 continue
         behavioral_review = behavioral_score >= 5
-        if not (unusual or upload_php or hidden_php or match or generic_match or license_bypass or behavioral_review or untrusted_hits):
+        timestamp_review = timestamp_watermark and path.suffix.lower() in SCRIPT_EXTENSIONS
+        if not (unusual or upload_php or hidden_php or match or generic_match or license_bypass or behavioral_review or untrusted_hits or timestamp_review or padding_hits):
             continue
         filename_indicator = match.group(0) if match else ("known-payload-name" if known_payload_filename else None)
         classification, reason = classify_file(relative, name, safe_text, filename_indicator)
@@ -392,6 +404,16 @@ def file_audit(target: Path, case: Path) -> list[dict]:
                 "CONTEUDO_NAO_CONFIAVEL_REQUER_REVISAO",
                 "Texto com aparência de instrução para alterar ou suprimir a auditoria; tratado exclusivamente como dado não confiável",
             )
+        if padding_hits and not match and not generic_match and not behavioral_review and len(obfuscation_hits) < 3:
+            classification, reason = (
+                "PHP_PADDING_REQUER_REVISAO",
+                "Arquivo PHP grande com sinais de preenchimento artificial; tamanho isolado não confirma malware",
+            )
+        elif timestamp_review and not (match or generic_match or behavioral_review or padding_hits) and len(obfuscation_hits) < 3:
+            classification, reason = (
+                "TIMESTAMP_WATERMARK_REQUER_REVISAO",
+                "mtime termina no resíduo 93819; timestamp isolado pode ser legítimo ou manipulado",
+            )
         if upload_php and not match and not generic_match and reviewed_metform_cache(relative, path):
             classification, reason = "LEGITIMO_VALIDADO", "Exact SHA-256 matches reviewed MetForm cache artifact; not plugin-wide trust"
         if hidden_php and not match and not generic_match and classification == "ARQUIVO_SUSPEITO_REQUER_VALIDACAO":
@@ -400,7 +422,9 @@ def file_audit(target: Path, case: Path) -> list[dict]:
             snippet = ""  # Wordfence configuration may contain secrets.
         try:
             findings.append({
-                "path": relative, "sha256": sha256(path), "size": path.stat().st_size,
+                "path": relative, "sha256": sha256(path), "size": stat_info.st_size if path.suffix.lower() in SCRIPT_EXTENSIONS else path.stat().st_size,
+                "mtime_utc": dt.datetime.fromtimestamp(stat_info.st_mtime, dt.timezone.utc).isoformat() if path.suffix.lower() in SCRIPT_EXTENSIONS else None,
+                "ctime_utc": dt.datetime.fromtimestamp(stat_info.st_ctime, dt.timezone.utc).isoformat() if path.suffix.lower() in SCRIPT_EXTENSIONS else None,
                 "classification": classification, "reason": reason,
                 "indicator": match.group(0) if match else ("known-payload-name" if known_payload_filename else ("filename" if unusual else "upload PHP")),
                 "snippet": snippet,
@@ -408,6 +432,8 @@ def file_audit(target: Path, case: Path) -> list[dict]:
                 "behavioral_indicators": behavioral_hits,
                 "behavioral_score": behavioral_score,
                 "untrusted_content_indicators": untrusted_hits,
+                "padding_indicators": padding_hits,
+                "timestamp_watermark_93819": timestamp_watermark,
                 "confidence": confidence_for_classification(classification),
                 "license_bypass": license_bypass,
             })
@@ -775,7 +801,7 @@ def audit_status(files: list[dict], processes: list[str],
     """Conservative audit outcomes; do not interpret historical references as activity."""
     count = lambda kind: sum(
         int(x["length"]) if kind in ("session_rows", "application_password_rows")
-        else int(x.get("state") not in ("ABSENT", "NOT_FOUND"))
+        else int(x.get("state") not in ("ABSENT", "NOT_FOUND", "RECONSTRUCAO_ESTADO_REQUER_REVISAO"))
         for x in (database or []) if x.get("kind") == kind)
     # A direct family process is execution evidence, not merely a heuristic
     # filename match.  When it is present, direct IOC-bearing files are
@@ -807,7 +833,7 @@ def audit_status(files: list[dict], processes: list[str],
         "validated_legitimate_files": sum(x.get("classification") == "LEGITIMO_VALIDADO" for x in files),
         "security_configuration_review": sum(x.get("classification") == "CONFIGURACAO_PLUGIN_SEGURANCA_REQUER_VALIDACAO" for x in files),
         "confirmed_compromised_files": confirmed_files,
-        "file_indicators_requiring_review": sum(x.get("classification") in ("IOC_REQUER_VALIDACAO", "ARQUIVO_SUSPEITO_REQUER_VALIDACAO", "PHP_UPLOAD_REQUER_VALIDACAO", "PHP_DIRETORIO_OCULTO_REQUER_VALIDACAO", "CACHE_PLUGIN_REQUER_VALIDACAO", "WEB_SHELL_HEURISTIC_REQUIRES_REVIEW", "PHP_OFUSCACAO_REQUER_QUARENTENA", "PHP_ANOMALIA_COMPORTAMENTAL_REQUER_REVISAO", "PLUGIN_MODIFICACAO_LICENCA_REQUER_QUARENTENA", "SC_CAMINHO_DERIVADO_REQUER_REVISAO", "SC_LEITURA_INCOMPLETA", "CONTEUDO_NAO_CONFIAVEL_REQUER_REVISAO") for x in files),
+        "file_indicators_requiring_review": sum(x.get("classification") in ("IOC_REQUER_VALIDACAO", "ARQUIVO_SUSPEITO_REQUER_VALIDACAO", "PHP_UPLOAD_REQUER_VALIDACAO", "PHP_DIRETORIO_OCULTO_REQUER_VALIDACAO", "CACHE_PLUGIN_REQUER_VALIDACAO", "WEB_SHELL_HEURISTIC_REQUIRES_REVIEW", "PHP_OFUSCACAO_REQUER_QUARENTENA", "PHP_ANOMALIA_COMPORTAMENTAL_REQUER_REVISAO", "PLUGIN_MODIFICACAO_LICENCA_REQUER_QUARENTENA", "SC_CAMINHO_DERIVADO_REQUER_REVISAO", "SC_LEITURA_INCOMPLETA", "CONTEUDO_NAO_CONFIAVEL_REQUER_REVISAO", "PHP_PADDING_REQUER_REVISAO", "TIMESTAMP_WATERMARK_REQUER_REVISAO") for x in files),
         "suspicious_processes": len(processes),
     }
     if database is None:
@@ -1265,6 +1291,16 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
     summary["untrusted_instruction_indicators"] = sum(
         bool(item.get("untrusted_content_indicators")) for item in findings
     )
+    recon_path = case / "sc403-reinfection-state.json"
+    recon_state = None
+    if recon_path.is_file() and not recon_path.is_symlink():
+        recon_state = json.loads(recon_path.read_text(encoding="utf-8"))
+        if not isinstance(recon_state, dict):
+            raise AuditError("Malformed SC reconstruction-state evidence")
+    summary["sc403_reconstruction_state"] = {
+        "coverage": recon_state.get("cobertura") if recon_state else "NOT EXECUTED",
+        "observed": recon_state.get("fatos_observados", 0) if recon_state else 0,
+    }
     # Precedence: independent compromise > known residues > active/heuristic review
     # > file-integrity review > ordinary version/provenance review > clean.
     # An existing residue or active-indicator status must not be silently erased.
@@ -1346,6 +1382,7 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
         f"- Configurações de segurança pendentes de validação: **{summary['security_configuration_review']}**",
         f"- Processos suspeitos: **{summary['suspicious_processes']}**",
         f"- Arquivos com texto que tenta influenciar a auditoria: **{summary['untrusted_instruction_indicators']}**",
+        f"- Indicadores de estado de reconstrução SC: **{summary['sc403_reconstruction_state']['observed']}** (cobertura: {summary['sc403_reconstruction_state']['coverage']})",
         f"- Divergências no núcleo do WordPress: **{core_count}**",
         f"- Arquivos de configuração pendentes de análise: **{config_count}**",
         f"- Indicadores de persistência externa: **{host_indicators}**",
@@ -1409,6 +1446,13 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
                    f"- Indicadores conhecidos no cron: {len(item['indicator_matches'])}"]
                   if item.get("kind") == "cron_metadata" else []), "",
             ])
+        if recon_state:
+            lines.extend(["", "### Estado de reconstrução e contadores diários SC", "",
+                          "Os itens abaixo são estados observados, não prova isolada de execução. A interpretação usa somente formatos reconhecidos e a data UTC da coleta.", ""])
+            for item in recon_state.get("indicadores", []):
+                lines.append(f"- `{item.get('nome', '[NOME_OMITIDO]')}`: {item.get('fato', '')} Classificação: `{item.get('classificacao', 'REVISÃO')}`.")
+            for limitacao in recon_state.get("limitacoes", []):
+                lines.append(f"- Limitação: {limitacao}")
     lines.extend(["", "## Integridade do núcleo do WordPress", "",
                   f"- Status: `{summary['component_coverage'].get('core', core.get('status', 'NOT EXECUTED'))}`",
                   f"- Divergências: **{core_count}**", ""])
@@ -1433,6 +1477,7 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
     if audited:
         def positive(kind: str) -> int:
             return sum(item.get("state") not in ("NOT_FOUND", "ABSENT")
+                       and item.get("state") != "RECONSTRUCAO_ESTADO_REQUER_REVISAO"
                        for item in database if item["kind"] == kind)
         lines.extend([
             f"- Resíduos da família investigada: **{positive('family_option')}**.",
@@ -1452,6 +1497,7 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
     else:
         def total(kind: str) -> int:
             return sum(int(x["length"]) if kind in ("session_rows", "application_password_rows") else (x.get("state") != "NOT_FOUND")
+                       and x.get("state") != "RECONSTRUCAO_ESTADO_REQUER_REVISAO"
                        for x in database if x["kind"] == kind)
         family = total("family_option")
         lines.append(f"- Resíduos em opções e transientes: **{family}**.")
@@ -1504,6 +1550,7 @@ def make_report(case: Path, mode: str, findings: list[dict], processes: list[str
         f"- Indicadores ativos no banco de dados: **{summary['active_database_markers']}**",
         f"- Processos suspeitos: **{summary['suspicious_processes']}**",
         f"- Arquivos com texto que tenta influenciar a auditoria: **{summary['untrusted_instruction_indicators']}**",
+        f"- Indicadores de estado de reconstrução SC: **{summary['sc403_reconstruction_state']['observed']}**",
         f"- Divergências do núcleo do WordPress que exigem revisão: **{core_count}**",
         f"- Inventário de administradores: **{traduzir_estado(summary['administrator_inventory']['coverage'])}** (quantidade: {summary['administrator_inventory']['count'] if summary['administrator_inventory']['count'] is not None else 'não determinada'})",
         f"- Arquivos de configuração do WordPress que exigem revisão: **{config_count}**",
@@ -1898,6 +1945,14 @@ def database_audit(option_file: str, dbname: str, prefix: str, case: Path,
             raise AuditError("Malformed encoded database evidence") from error
         details[row[0]] = {"sha256": row[2], "value_length_bytes": int(row[1]),
                            "value_prefix": excerpt}
+    recon_names = ",".join("'" + nome + "'" for nome in sc403_reconstrucao.NOMES_EXATOS)
+    recon_query = (f"SELECT option_name, OCTET_LENGTH(option_value), SHA2(option_value,256), "
+                   f"HEX(LEFT(option_value,2048)) FROM {options} WHERE option_name IN ({recon_names}) "
+                   "OR option_name LIKE 'sc#_reins#_%' ESCAPE '#';")
+    recon_rows = query_db(option_file, dbname, recon_query)
+    recon_state = sc403_reconstrucao.analisar(recon_rows)
+    write_private(case / "sc403-reinfection-state.json",
+                  json.dumps(recon_state, indent=2, ensure_ascii=False))
     findings = []
     for kind, sql in statements:
         rows = query_db(option_file, dbname, sql + ";")
@@ -1951,6 +2006,13 @@ def database_audit(option_file: str, dbname: str, prefix: str, case: Path,
                                      else ", ".join(safe_tokens) if safe_tokens else "[OMITTED_BY_POLICY]"),
                     "decoded_excerpt": "[OMITTED_BY_POLICY]",
                 })
+                if sc403_reconstrucao.e_indicador_reconstrucao(name):
+                    findings[-1]["state"] = "RECONSTRUCAO_ESTADO_REQUER_REVISAO"
+                    findings[-1]["value_classification"] = "ESTADO_RECONSTRUCAO_SC_NAO_CONFIRMADO"
+                    findings[-1]["descriptive_note"] = (
+                        "Estado de retry, circuito de falha ou recuperação observado; "
+                        "não é comprometimento confirmado sem correlação independente."
+                    )
         else:
             findings.append({"kind": kind, "name": "(none)", "length": "0", "state": "NOT_FOUND"})
     cron_info = details.get("cron")
@@ -2822,6 +2884,7 @@ def main() -> int:
             else:
                 component_versions.audit(target, case, offline=args.offline, skip_core=args.skip_core)
             make_report(case, args.mode, files, processes)
+            sc403_timeline.gerar(case, files, processes)
             component_versions.append_management_section(case)
             mark_incomplete_case(case, omitted)
             incident_containment_note(case, label)
@@ -2857,6 +2920,9 @@ def main() -> int:
                                                  active_plugins=installed_plugins, template=template,
                                                  stylesheet=stylesheet)
                 make_report(case, args.mode, files, processes, database, dbname, prefix)
+                recon_path = case / "sc403-reinfection-state.json"
+                recon_state = json.loads(recon_path.read_text(encoding="utf-8")) if recon_path.is_file() and not recon_path.is_symlink() else None
+                sc403_timeline.gerar(case, files, processes, recon_state)
                 if is_audit:
                     component_versions.append_management_section(case)
                 if omitted:
