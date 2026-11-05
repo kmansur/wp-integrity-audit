@@ -4,6 +4,19 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 
 ## [Não publicado]
 
+## [0.37.0] - 2026-11-04
+
+### Adicionado
+- Auditoria estrutural, somente leitura e limitada a raízes explicitamente autorizadas, para exposição lateral entre instalações WordPress.
+- Inventário de proprietários UID/GID, diretórios sensíveis, proteção de PHP em `uploads`, processos associados por caminho e pools PHP-FPM quando a associação estiver comprovada no texto da configuração.
+- Evidência privada `sc403-lateral-exposure.json`, com separação entre risco estrutural, possibilidade de propagação e comprometimento confirmado.
+- Opção repetível `--sc-authorized-root` para solicitar a análise de uma ou mais raízes autorizadas.
+- Testes de compartilhamento de UID e diretórios graváveis sem transformar esses sinais em prova de infecção.
+
+### Segurança
+- A auditoria lateral recusa raízes simbólicas, raízes amplas demais e limites de varredura excedidos.
+- Não há testes de escrita, execução de PHP, alteração de permissões, reinício de serviços ou varredura irrestrita de `/usr/local/www/data`.
+
 ## [0.36.0] - 2026-11-04
 
 ### Estado de reconstrução do SC
@@ -865,4 +878,17 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 
 ### Fixed
 - Permit the reversible quarantine helper to act on the new explicit PHP-obfuscation and premium-license-bypass classifications, still requiring exact evidence and hash equality.
+
+## [0.37.0] - 2026-11-04
+
+### Adicionado
+- Auditoria estrutural, somente leitura e limitada a raízes explicitamente autorizadas, para exposição lateral entre instalações WordPress.
+- Inventário de proprietários UID/GID, diretórios sensíveis, proteção de PHP em `uploads`, processos associados por caminho e pools PHP-FPM quando a associação estiver comprovada no texto da configuração.
+- Evidência privada `sc403-lateral-exposure.json`, com separação entre risco estrutural, possibilidade de propagação e comprometimento confirmado.
+- Opção repetível `--sc-authorized-root` para solicitar a análise de uma ou mais raízes autorizadas.
+- Testes de compartilhamento de UID e diretórios graváveis sem transformar esses sinais em prova de infecção.
+
+### Segurança
+- A auditoria lateral recusa raízes simbólicas, raízes amplas demais e limites de varredura excedidos.
+- Não há testes de escrita, execução de PHP, alteração de permissões, reinício de serviços ou varredura irrestrita de `/usr/local/www/data`.
 

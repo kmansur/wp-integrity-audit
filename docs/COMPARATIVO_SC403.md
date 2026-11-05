@@ -38,9 +38,15 @@ A evidência `sc403-reinfection-state.json` separa fatos observados, hipóteses 
 
 O projeto de referência declara GPL-2.0-or-later. A implementação deste repositório é independente, conserva apenas conceitos e indicadores necessários para defesa e mantém a atribuição documental. Não incorporar trechos de código da referência sem revisão de licença.
 
+## Auditoria lateral na versão 0.37.0
+
+`bin/sc403_lateral.py` acrescenta um inventário estrutural limitado às raízes passadas por `--sc-authorized-root`. Ele localiza instalações WordPress, proprietários UID/GID, diretórios sensíveis, bloqueio de PHP em `uploads`, processos que referenciem o caminho e pools PHP-FPM com associação textual observável. A implementação não segue links simbólicos, não testa escrita, não executa conteúdo do site e não varre uma raiz ampla por conveniência.
+
+O resultado privado `sc403-lateral-exposure.json` classifica UID compartilhado e permissões como risco estrutural. Esses sinais podem indicar possibilidade de propagação, mas não comprovam comprometimento. A associação com um pool é registrada como não comprovada quando o caminho não aparece na configuração; isso também não prova isolamento. A referência externa não é usada como autorização para encerrar processos ou alterar serviços.
+
 ## Lacunas remanescentes
 
 - Correlação temporal entre fontes ainda depende de documentação externa da coleta.
 - A origem de um dump SHM não é autenticada pelo SHA-256 contido no próprio dump.
 - Não há homologação integrada em clone com PHP-FPM, Apache/Nginx e MariaDB.
-- A exposição lateral entre múltiplas instalações será tratada em versão posterior, com raízes autorizadas explicitamente.
+- Não há detecção automática de propagação efetiva entre sites; a auditoria lateral descreve exposição estrutural e requer correlação com arquivos, banco, processos, logs e memória.

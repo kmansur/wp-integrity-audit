@@ -1,5 +1,19 @@
 # Auditoria de Integridade WordPress — branch Python
 
+## Versão 0.37.0 — exposição lateral entre instalações
+
+Use `--sc-authorized-root` somente quando houver autorização explícita para a raiz informada. A opção pode ser repetida e executa uma investigação estrutural, sem escrever, executar PHP ou testar alterações nos sites:
+
+```bash
+python3 bin/wp-integrity-audit.py \
+  /usr/local/www/data/site-principal/html \
+  --domain-label exemplo.com.br \
+  --sc-authorized-root /usr/local/www/data/conta-a \
+  --sc-authorized-root /usr/local/www/data/conta-b
+```
+
+O arquivo privado `sc403-lateral-exposure.json` registra instalações WordPress encontradas, UID/GID, diretórios sensíveis, proteção de PHP em `uploads`, processos cujo comando contém o caminho do site e pools PHP-FPM somente quando a associação é observável na configuração. UID compartilhado, diretório gravável ou ausência de associação textual com um pool são riscos estruturais e não comprovam infecção. Para evitar escopo acidental, a ferramenta não aceita `/`, `/usr/local`, `/usr/local/www` ou outra raiz ampla como autorização implícita.
+
 ## Versão 0.36.0 — estado de reconstrução e correlação conservadora
 
 A auditoria SQL identifica estados `sc_reins_*`, `sc_ini_*`, falhas de busca e timestamps de recuperação sem alterar ou executar seus valores. O arquivo privado `sc403-reinfection-state.json` separa fatos observados de hipóteses e compara contadores diários somente com a data UTC da coleta. A presença desses estados não é considerada comprometimento confirmado sem correlação independente.
