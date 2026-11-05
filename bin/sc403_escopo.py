@@ -42,7 +42,8 @@ def _data_utc(valor: str) -> dt.datetime:
 
 
 def _identificador(valor, nome: str) -> str:
-    if not isinstance(valor, str) or not valor or "*" in valor or "?" in valor or not ID_EXATO.fullmatch(valor):
+    if (not isinstance(valor, str) or not valor or "*" in valor or "?" in valor or
+            "\x00" in valor or ".." in Path(valor).parts or not ID_EXATO.fullmatch(valor)):
         raise EscopoRecusado(f"identificador inválido ou amplo: {nome}")
     return valor
 
@@ -106,7 +107,7 @@ def validar(manifesto: dict, agora: dt.datetime | None = None) -> dict:
 
 
 def grafo(manifesto: dict) -> dict:
-    validar(manifesto, agora=dt.datetime.fromtimestamp(0, tz=dt.timezone.utc))
+    validar(manifesto)
     nos, arestas = [], []
     identidade = manifesto["identity"]
     for chave, valor in (("site", identidade["wordpress_path"]), ("banco", identidade["database"]),

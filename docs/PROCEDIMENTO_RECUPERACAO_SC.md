@@ -1,6 +1,6 @@
 # Procedimento operacional — recuperação assistida de WordPress comprometido pelo SC
 
-**Versão de referência:** WP Integrity Audit 0.34.0  
+**Versão de referência:** WP Integrity Audit 0.42.0
 **Público:** equipe técnica autorizada, em Debian/Ubuntu  
 **Estado:** procedimento controlado de pré-validação; não é homologação de limpeza automática
 
@@ -35,6 +35,16 @@ Caso exista dump de memória já preservado por procedimento autorizado, sua an�
 Diferencie registros de `kernel.segmentos` (metadados do host) de `dumps.registros` (arquivos apresentados). Um `shmid` coincidente não prova que o dump foi obtido daquele segmento. Um cabeçalho `SCSHM1` com SHA-256 coerente e `SCV` também não prova autenticidade ou compromisso. A classificação `SHM_PAYLOAD_SCV_COMPATIVEL_REQUER_VALIDACAO` exige investigação humana e não autoriza indisponibilidade ou limpeza.
 
 ## Fase 2 — pré-validação atual
+
+Antes de qualquer alteração futura, gere uma proposta de escopo granular e mantenha-a fora do document root:
+
+```bash
+python3 bin/sc403_escopo.py gerar /var/lib/wp-integrity-audit/cases/CASO_DA_AUDITORIA
+python3 bin/sc403_escopo.py validar /root/sc403-remediation-scope.json
+python3 bin/sc403_escopo.py grafo /root/sc403-remediation-scope.json
+```
+
+O manifesto deve conter identidade do servidor, boot ID, namespaces, banco, UID/GID, responsáveis, validade e alvos individuais. A versão atual somente valida e simula; ela não executa `kill`, `ipcrm`, SQL, cron, systemd, Apache ou PHP-FPM. Qualquer divergência invalida a autorização.
 
 Aponte para o diretório exato do caso recém-gerado:
 
@@ -109,6 +119,6 @@ A recuperação assistida real também inclui nova verificação de processos e 
 
 ## Limites conhecidos
 
-A versão 0.31.0 não possui neutralização automática completa de SC e não comprova o conteúdo de segmentos System V. O inventário SQL pode ser limitado pelas permissões do usuário. Regras YARA, caminhos derivados e timestamps, isoladamente, não são prova suficiente para alteração destrutiva.
+A versão 0.42.0 não possui execução destrutiva de remediação. O inventário SQL pode ser limitado pelas permissões do usuário e a análise de System V depende de metadados/dumps autorizados. Regras YARA, caminhos derivados e timestamps, isoladamente, não são prova suficiente para alteração destrutiva.
 
 **Crédito técnico:** estudo de [ux2dev/wordpress-sc403-cleaner](https://github.com/ux2dev/wordpress-sc403-cleaner), GPL-2.0-or-later. O projeto WP Integrity Audit utiliza implementação independente e preserva atribuição ao autor.

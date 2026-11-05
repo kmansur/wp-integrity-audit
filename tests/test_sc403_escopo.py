@@ -35,6 +35,11 @@ class TestEscopo(unittest.TestCase):
         with self.assertRaises(escopo.EscopoRecusado):
             escopo.validar(base, dt.datetime(2026, 11, 6, tzinfo=dt.timezone.utc))
         base = manifesto()
+        base["operations"] = ["quarentenar"]
+        base["resources"]["arquivos"] = [{"id": "wp-content/../fora.php", "operation": "quarentenar"}]
+        with self.assertRaises(escopo.EscopoRecusado):
+            escopo.validar(base, dt.datetime(2026, 11, 4, 12, tzinfo=dt.timezone.utc))
+        base = manifesto()
         base["resources"]["processos"] = [{"id": "*", "operation": "sinalizar"}]
         with self.assertRaises(escopo.EscopoRecusado):
             escopo.validar(base, dt.datetime(2026, 11, 4, 12, tzinfo=dt.timezone.utc))

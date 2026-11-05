@@ -1,5 +1,9 @@
 # Python Operator Handbook
 
+## Validação adicional do escopo (0.42.1)
+
+O validador rejeita travessia de diretórios em identificadores de recursos e não processa grafos de manifestos expirados. A simulação continua sem alterar recursos.
+
 ## Manifesto de remediação SC403 (0.42.0)
 
 Use `bin/sc403_escopo.py` para gerar proposta, validar identidade, construir dependências e simular o estado atual. O manifesto deve permanecer fora do document root e protegido contra alterações. PID, SHMID, banco, arquivo, cron, systemd e pool PHP não podem ser representados por curingas. A simulação bloqueia boot ID, namespace, banco, caminho ou hash de evidência divergentes.
@@ -258,24 +262,3 @@ When `--pdf-report` fails (missing ReportLab or a renderer error), the CLI uses 
 ## Explicit SMTP delivery (0.21.0)
 
 Copy `config/smtp.example.cfg` to `/etc/wp-integrity-audit/smtp.cfg` and configure hostname, verified TLS mode, sender, username and an absolute password_file. Restrict both files to 0600 and secure the directory. Use `--email-to recipient@example.com --smtp-config /etc/wp-integrity-audit/smtp.cfg` during a normal read-only audit. This sends only `management-report.pdf`; it never attaches `technical-report.md` or the private case bundle. The receiver must be authorized before executing. A failed SMTP operation produces exit 30; always inspect `report.json` separately to determine the actual audit findings. Avoid configuring plaintext SMTP or putting authentication secrets into the .cfg itself.
-## Auditoria de exposição lateral (0.37.0)
-
-A opção `--sc-authorized-root` habilita uma coleta restrita de risco estrutural entre instalações WordPress. Informe apenas raízes previamente autorizadas e repita a opção para incluir mais de uma raiz. A coleta não percorre o servidor de forma irrestrita, não segue links simbólicos, não executa PHP, não testa escrita e não modifica Apache, PHP-FPM, cron, banco ou permissões.
-
-```bash
-python3 bin/wp-integrity-audit.py \
-  /usr/local/www/data/site/html \
-  --domain-label exemplo.com.br \
-  --sc-authorized-root /usr/local/www/data/conta
-```
-
-O resultado privado `sc403-lateral-exposure.json` distingue:
-
-- instalações localizadas por marcadores WordPress;
-- proprietário UID/GID e permissões dos diretórios sensíveis;
-- `uploads` sem bloqueio de execução PHP confirmado;
-- compartilhamento de UID entre instalações;
-- processos associados por referência explícita ao caminho;
-- pools PHP-FPM associados somente quando o caminho aparece no arquivo de configuração.
-
-Compartilhar UID, possuir diretório gravável ou não localizar um pool associado não prova comprometimento. Riscos estruturais ou cobertura incompleta mantêm a auditoria em revisão e não autorizam liberação. O relatório técnico preserva a distinção entre fatos observados e inferências; a opção não substitui auditoria de banco, cron, Apache, PHP-FPM, processos, memória compartilhada ou logs.

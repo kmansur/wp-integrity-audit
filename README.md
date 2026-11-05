@@ -1,5 +1,9 @@
 # Auditoria de Integridade WordPress — branch Python
 
+## Versão 0.42.1 — validação de caminhos e validade
+
+Manifestos com componentes de caminho `..` ou expirados são recusados também durante a geração do grafo. Isso impede que uma futura etapa operacional interprete um alvo fora do escopo autorizado.
+
 ## Versão 0.42.0 — manifesto e simulação de remediação SC403
 
 Gere e valide um escopo granular sem executar remediação:
