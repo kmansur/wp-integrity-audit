@@ -1,5 +1,9 @@
 # Python Operator Handbook
 
+## Auto-verificação e dependências (0.41.3)
+
+O resultado do `--self-check` separa requisitos obrigatórios de avisos. Ferramentas MySQL ausentes impedem auditoria de banco, mas não invalidam uma coleta exclusivamente de arquivos; a cobertura efetivamente usada deve continuar explícita no relatório.
+
 ## Limites do inventário de persistência (0.41.2)
 
 O inventário de persistência aceita apenas raízes absolutas e específicas. Ele cobre cron, systemd, PHP, Apache, `rc.local` e `ld.so.preload`, sem seguir links simbólicos e com limite de 20.000 arquivos. Uma cobertura incompleta deve ser tratada como falha de escopo, não como ausência de persistência.

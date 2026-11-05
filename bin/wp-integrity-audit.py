@@ -51,7 +51,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 
-VERSION = "0.41.2"
+VERSION = "0.41.3"
 IOC = re.compile(r"SC_ADV_BEGIN|--sc-cli|--sc-succ|trace-inspector-pad|trace-librarian-tag|agile-interface-vox|f88225c2|cipher-feeder|_sc_fpc|sc_cron_guard|sc_cron_recovery|e1v61n2r1im6t7_|sc_persist_manifest|sc_own_manifest|kinetic-relay-live|function ceya|Axiom Sentinel Snap|SCV:[0-9]+")
 # WordPress files, database values, logs and memory dumps are untrusted data.
 # These phrases must never be interpreted as instructions by an operator, an
@@ -2783,7 +2783,9 @@ def parse_args() -> argparse.Namespace:
     args = parser.parse_args()
     if args.self_check:
         incompat = (args.target is not None or args.compare or args.verify_case or
-                     args.mode != "audit" or args.email_to or args.pdf_report)
+                     args.mode != "audit" or args.email_to or args.pdf_report or
+                     args.sc_authorized_root or args.sc_host_root or args.sc_shm_dump_dir or
+                     args.sc_access_log or args.sc_yara_rules or args.bundle_evidence)
         if incompat:
             parser.error("--self-check deve ser usado sozinho")
         return args

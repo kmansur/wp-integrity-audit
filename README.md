@@ -1,5 +1,9 @@
 # Auditoria de Integridade WordPress — branch Python
 
+## Versão 0.41.3 — auto-verificação sem falso bloqueio
+
+`--self-check` separa requisitos obrigatórios de avisos opcionais. Assim, uma instalação que executará apenas auditoria de arquivos pode registrar a ausência de `mysql`/`mysqldump` sem ocultar o diagnóstico. Opções de auditoria não podem ser combinadas com a auto-verificação.
+
 ## Versão 0.41.2 — limites de persistência
 
 O inventário de `--sc-host-root` cobre somente arquivos elegíveis de cron, systemd, PHP, Apache e inicialização Linux, com limite de 20.000 arquivos. Raízes amplas, links simbólicos e excesso de arquivos deixam a cobertura incompleta.

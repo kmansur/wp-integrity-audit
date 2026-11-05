@@ -4,6 +4,12 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 
 ## [Não publicado]
 
+## [0.41.3] - 2026-11-04
+
+### Corrigido
+- `--self-check` agora rejeita opções de auditoria incompatíveis em vez de ignorá-las.
+- Clientes MySQL ausentes aparecem como aviso opcional; módulos Python, Python e o script principal continuam sendo requisitos obrigatórios.
+
 ## [0.41.2] - 2026-11-04
 
 ### Corrigido

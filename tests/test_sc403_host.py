@@ -45,6 +45,7 @@ class TestHostAudit(unittest.TestCase):
         resultado = sc403_selfcheck.verificar(Path(__file__).parents[1] / "bin")
         self.assertIn(resultado["status"], {"OK", "REVISAO_NECESSARIA"})
         self.assertTrue(resultado["somente_leitura"])
+        self.assertIn("avisos", resultado)
 
 
 if __name__ == "__main__":
