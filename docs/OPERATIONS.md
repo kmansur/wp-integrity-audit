@@ -1,5 +1,11 @@
 # Python Operator Handbook
 
+## Monitoramento comparativo (0.40.0)
+
+Use `bin/sc403_monitor.py` com dois casos íntegros e privados. O monitoramento reutiliza a validação de manifesto e ABSPATH, não executa PHP e não modifica os casos. Código de saída 40 indica novos indicadores, mudanças de hash ou cobertura incompleta; código 0 significa somente que não houve mudança nos indicadores comparados, nunca que o site está liberado.
+
+Não agende o comando automaticamente sem autorização operacional. Para integração com Zabbix, consuma o JSON estável e mantenha o diretório de casos com permissões restritas. Compare os eventos com logs e aprovações de mudança, pois hashes podem mudar legitimamente.
+
 ## Homologação sintética (0.39.0)
 
 `python3 bin/sc403_homologacao.py` executa somente uma fixture temporária criada pelo próprio teste. O código não acessa WordPress real, não conecta a banco, não executa PHP, não reinicia serviço e verifica que o hash do artefato permanece igual. O resultado `APROVADA_COM_BLOQUEIOS` significa que as barreiras sintéticas funcionaram; não significa que a recuperação foi homologada para produção nem que um site está limpo.

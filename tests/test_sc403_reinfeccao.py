@@ -9,6 +9,7 @@ import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "bin"))
 import sc403_reinfeccao as sc
+import sc403_monitor as monitor
 
 
 def escrever(pasta, nome, obj):
@@ -38,6 +39,19 @@ def caso(pasta, *, raiz="/var/www/site/", arquivo="wp-content/a.php", digest="a"
 
 
 class TestReinfeccao(unittest.TestCase):
+    def test_monitoramento_tem_json_estavel_e_nunca_libera(self):
+        with tempfile.TemporaryDirectory() as temp:
+            raiz = Path(temp)
+            a, b = raiz / "a", raiz / "b"
+            caso(a)
+            caso(b, arquivo="wp-content/b.php")
+            resultado = monitor.monitorar(a, b)
+            self.assertEqual(resultado["schema_version"], 1)
+            self.assertIn("wp-content/b.php", resultado["novos_arquivos"])
+            self.assertEqual(resultado["estado"], "MUDANCA_REQUER_REVISAO")
+            self.assertFalse(resultado["liberacao_autorizada"])
+            self.assertFalse(resultado["agendamento_automatico"])
+
     def test_indicador_novo_exige_revisao(self):
         with tempfile.TemporaryDirectory() as temp:
             raiz = Path(temp)

@@ -1,5 +1,18 @@
 # Auditoria de Integridade WordPress — branch Python
 
+## Versão 0.40.0 — monitoramento comparativo
+
+Compare dois casos preservados sem alterar os casos ou o WordPress:
+
+```bash
+python3 bin/sc403_monitor.py \
+  --anterior /var/lib/wp-integrity-audit/cases/site-ANTES \
+  --atual /var/lib/wp-integrity-audit/cases/site-AGORA \
+  --output /root/monitoramento-site.json
+```
+
+O JSON informa novos arquivos/opções, hashes alterados, processos, ZIPs e cobertura incompleta, com código 40 quando há revisão. Não há agendamento automático, exclusão ou autorização de liberação.
+
 ## Versão 0.39.0 — homologação sintética
 
 Execute a homologação sem informar um domínio real:

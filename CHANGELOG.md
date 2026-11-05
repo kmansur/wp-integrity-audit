@@ -4,6 +4,13 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 
 ## [Não publicado]
 
+## [0.40.0] - 2026-11-04
+
+### Monitoramento
+- Adicionado `bin/sc403_monitor.py` para comparação recorrente de casos já preservados, com JSON estável para integração futura.
+- O monitoramento identifica novos arquivos, novas opções SQL, hashes alterados, processos suspeitos, ZIPs com indicadores e cobertura incompleta.
+- Nenhum agendamento é criado automaticamente e a saída nunca autoriza liberação.
+
 ## [0.39.0] - 2026-11-04
 
 ### Homologação
