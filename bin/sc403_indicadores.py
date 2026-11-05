@@ -197,14 +197,15 @@ def linhas_opcoes(rows: list[list[str]], dados: dict) -> list[dict]:
     inverso[dados["opcao_payload"]] = "payload"
     findings = []
     for row in rows:
-        if len(row) != 4 or row[0] not in inverso:
+        if len(row) not in (4, 5) or row[0] not in inverso:
             raise ValueError("Consulta de opções privadas retornou linha inesperada")
-        nome, comprimento, sha_sql, hex_parcial = row
+        nome, comprimento, sha_sql, hex_parcial = row[:4]
+        valor_completo = row[4] != "0" if len(row) == 5 else True
         if (not comprimento.isdigit() or not re.fullmatch(r"[0-9a-fA-F]{64}", sha_sql)
                 or not re.fullmatch(r"[0-9a-fA-F]*", hex_parcial)):
             raise ValueError("Metadados inválidos de opção privada")
         bruto = bytes.fromhex(hex_parcial)
-        valor_inteiro = len(bruto) == int(comprimento)
+        valor_inteiro = valor_completo and len(bruto) == int(comprimento)
         decodificado = (decodificar_opcao(bruto) if valor_inteiro
                         else {"estado": "VALOR_TRUNCADO_REQUER_REVISAO"})
         findings.append({

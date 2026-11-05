@@ -51,7 +51,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 
-VERSION = "0.43.9"
+VERSION = "0.43.10"
 DEFAULT_DB_HOST = "187.120.197.140"
 IOC = re.compile(r"SC_ADV_BEGIN|SC_DB_BEGIN|SC_TH_BEGIN|SC_CORE_BOOT_VER|SC_WC|php\.euc-eludom-etile|sc_boot_ver|sc_payload_persistent|sc_persist_manifest|sc_c2_cache|sc_last_c2|sc_own_rec|sc_own_manifest|sc_sw_had|sc_sw_last_url|sc_ini_fail|sc_ini_dead|sc_fetch_fails|sc_pad_off_ts|sc_reins_(?:adv|db)|sc_cron_fetch|--sc-cli|--sc-succ|trace-inspector-pad|trace-librarian-tag|agile-interface-vox|f88225c2|cipher-feeder|_sc_fpc|sc_cron_guard|sc_cron_recovery|e1v61n2r1im6t7_|kinetic-relay-live|function ceya|Axiom Sentinel Snap|SCV:[0-9]+")
 # WordPress files, database values, logs and memory dumps are untrusted data.
@@ -2168,10 +2168,17 @@ def database_audit(option_file: str, dbname: str, prefix: str, case: Path,
     if dados_sc is not None:
         nomes_sc = sorted(set(dados_sc["opcoes"].values()) | {dados_sc["opcao_payload"]})
         nomes_sql = ",".join("'" + valor + "'" for valor in nomes_sc)
+        # As opções derivadas são um conjunto pequeno e conhecido. Para elas,
+        # consultar o valor completo permite validar a codificação XOR/Base64
+        # descrita na análise pública do SC403. O limite de 8 MiB impede que
+        # uma opção abusiva consuma memória; acima dele a cobertura permanece
+        # explicitamente incompleta e nenhum conteúdo é exportado.
         encontrados_sc = query_db(option_file, dbname,
             f"SELECT option_name, OCTET_LENGTH(option_value), SHA2(option_value,256), "
-            f"HEX(LEFT(option_value,65536)) FROM {options} "
-            f"WHERE option_name IN ({nomes_sql}) ORDER BY option_name;")
+            f"CASE WHEN OCTET_LENGTH(option_value) <= 8388608 THEN HEX(option_value) "
+            f"ELSE HEX(LEFT(option_value,65536)) END, "
+            f"CASE WHEN OCTET_LENGTH(option_value) <= 8388608 THEN '1' ELSE '0' END "
+            f"FROM {options} WHERE option_name IN ({nomes_sql}) ORDER BY option_name;")
         try:
             achados_sc = sc403_indicadores.linhas_opcoes(encontrados_sc, dados_sc)
         except ValueError as erro:

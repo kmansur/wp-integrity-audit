@@ -4,6 +4,14 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 
 ## [Não publicado]
 
+## [0.43.10] - 2026-11-05
+
+### Auditoria SQL SC403
+- A consulta das opções derivadas do `ABSPATH` passou a solicitar o valor completo somente para as chaves exatas calculadas pelo detector.
+- Valores até 8 MiB podem ser validados com a decodificação XOR/Base64 em memória, sem persistir o conteúdo.
+- Valores acima do limite continuam classificados como truncados e exigem revisão; não são tratados como limpos.
+- Mantida compatibilidade com o formato anterior de evidência e adicionados testes para cobertura incompleta.
+
 ## [0.43.9] - 2026-11-05
 
 ### Escalabilidade e cobertura

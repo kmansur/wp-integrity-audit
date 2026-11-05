@@ -76,6 +76,16 @@ class TestIndicadoresSC403(unittest.TestCase):
         with self.assertRaises(ValueError):
             sc.linhas_opcoes([[chave, "8", "errado", "zz"]], dados)
 
+    def test_opcao_derivada_truncada_e_reconhecida_sem_decodificar(self):
+        dados = sc.identificadores("/var/www/site")
+        chave = dados["opcoes"]["sw_url"]
+        valor = b"A" * 70000
+        linha = [chave, str(len(valor)), hashlib.sha256(valor).hexdigest(),
+                 valor[:65536].hex(), "0"]
+        achado = sc.linhas_opcoes([linha], dados)[0]
+        self.assertEqual(achado["decodificacao"]["estado"], "VALOR_TRUNCADO_REQUER_REVISAO")
+        self.assertEqual(achado["value_length_bytes"], len(valor))
+
 
 if __name__ == "__main__":
     unittest.main()

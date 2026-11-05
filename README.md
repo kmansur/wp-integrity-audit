@@ -4,6 +4,10 @@
 
 Os comandos principais, exemplos de auditoria, comparação, memória, persistência e simulação estão em [`docs/USO.md`](docs/USO.md).
 
+## Versão 0.43.10 — opções SC403 derivadas
+
+As opções privadas calculadas a partir do `ABSPATH` são consultadas com o valor completo somente para as chaves exatas da variante conhecida, limitado a 8 MiB. A ferramenta tenta validar a codificação XOR/Base64 em memória, sem executar ou exportar o payload. Valores maiores permanecem como cobertura incompleta e exigem revisão.
+
 ## Versão 0.43.6 — cobertura adicional do catálogo SC403
 
 O detector incorpora indicadores de alta confiança do catálogo público `iocs.csv`, sempre como evidência para correlação. Padrões de nome e opções sem confirmação independente permanecem em revisão e não autorizam limpeza.

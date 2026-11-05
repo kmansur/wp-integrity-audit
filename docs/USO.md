@@ -16,6 +16,12 @@ O núcleo de remediação exige uma aprovação Ed25519 externa e uma política 
 
 O host MySQL padrão é `187.120.197.140`. Substitua-o com `--db-host mysql.exemplo` quando o banco estiver em outro endereço.
 
+Para as opções privadas derivadas do `ABSPATH`, a auditoria consulta o valor
+completo apenas das chaves calculadas pelo detector, com limite de 8 MiB. A
+decodificação XOR/Base64 ocorre somente em memória; o conteúdo não é gravado
+no relatório. Valores acima do limite aparecem como truncados e mantêm a
+auditoria incompleta.
+
 ## 1. Verificar versão e dependências
 
 ```bash
