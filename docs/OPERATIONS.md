@@ -1,5 +1,11 @@
 # Python Operator Handbook
 
+## Manifesto de remediação SC403 (0.42.0)
+
+Use `bin/sc403_escopo.py` para gerar proposta, validar identidade, construir dependências e simular o estado atual. O manifesto deve permanecer fora do document root e protegido contra alterações. PID, SHMID, banco, arquivo, cron, systemd e pool PHP não podem ser representados por curingas. A simulação bloqueia boot ID, namespace, banco, caminho ou hash de evidência divergentes.
+
+Esta versão não executa nenhuma operação destrutiva; `operations` descreve intenção futura e não autorização operacional suficiente.
+
 ## Auto-verificação e dependências (0.41.3)
 
 O resultado do `--self-check` separa requisitos obrigatórios de avisos. Ferramentas MySQL ausentes impedem auditoria de banco, mas não invalidam uma coleta exclusivamente de arquivos; a cobertura efetivamente usada deve continuar explícita no relatório.

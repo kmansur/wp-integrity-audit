@@ -4,6 +4,17 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 
 ## [Não publicado]
 
+## [0.42.0] - 2026-11-04
+
+### Escopo de remediação
+- Adicionado `bin/sc403_escopo.py` para gerar propostas, validar manifestos, construir grafo de dependências e simular autorização.
+- Criado `sc403-remediation-scope.json` como contrato de identidade e autorização granular.
+- Integrado o estado do manifesto ao `sc403-recovery-plan.json`; manifesto inválido ou ausente não habilita execução.
+- Adicionados testes para expiração, curingas, boot ID divergente, propostas sem autorização e simulação sem alterações.
+
+### Segurança
+- Nenhuma operação destrutiva foi habilitada. O módulo não executa kill, ipcrm, SQL, cron, systemd, Apache, PHP-FPM ou PHP.
+
 ## [0.41.3] - 2026-11-04
 
 ### Corrigido

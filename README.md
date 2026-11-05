@@ -1,5 +1,18 @@
 # Auditoria de Integridade WordPress — branch Python
 
+## Versão 0.42.0 — manifesto e simulação de remediação SC403
+
+Gere e valide um escopo granular sem executar remediação:
+
+```bash
+python3 bin/sc403_escopo.py gerar /var/lib/wp-integrity-audit/cases/CASE
+python3 bin/sc403_escopo.py validar sc403-remediation-scope.json
+python3 bin/sc403_escopo.py grafo sc403-remediation-scope.json
+python3 bin/sc403_escopo.py simular sc403-remediation-scope.json estado-atual.json
+```
+
+Cada alvo precisa de identidade e operação explícitas. A versão atual somente gera, valida e simula; nenhum recurso do servidor é alterado.
+
 ## Versão 0.41.3 — auto-verificação sem falso bloqueio
 
 `--self-check` separa requisitos obrigatórios de avisos opcionais. Assim, uma instalação que executará apenas auditoria de arquivos pode registrar a ausência de `mysql`/`mysqldump` sem ocultar o diagnóstico. Opções de auditoria não podem ser combinadas com a auto-verificação.

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import sc403_escopo
 
 
 def _ler(caso: Path, nome: str, padrao):
@@ -95,6 +96,15 @@ def gerar_plano(caso: Path) -> dict:
         }
         if shm.get("dumps", {}).get("status") not in (None, "COMPLETA"):
             bloqueios.append("MEMORIA_SYSTEMV_REQUER_VALIDACAO")
+    escopo_path = caso / "sc403-remediation-scope.json"
+    escopo_resultado = {"presente": False, "valido": False, "execucao_habilitada": False}
+    if escopo_path.is_file() and not escopo_path.is_symlink():
+        escopo_resultado["presente"] = True
+        try:
+            escopo_resultado.update(sc403_escopo.validar(json.loads(escopo_path.read_text(encoding="utf-8"))))
+        except (OSError, ValueError, json.JSONDecodeError) as erro:
+            escopo_resultado["erro"] = type(erro).__name__
+            bloqueios.append("ESCOPO_REMEDIACAO_INVALIDO")
     etapas = [
         {"ordem": 1, "nome": "preservar_evidencias", "responsavel": "equipe_forense",
          "precondicoes": ["manifesto e hashes preservados", "cadeia de custódia registrada"],
@@ -140,6 +150,7 @@ def gerar_plano(caso: Path) -> dict:
         "etapas_preparatorias": pendencias,
         "etapas_coordenadas": etapas,
         "condicoes_de_interrupcao": sorted(set(bloqueios)) or ["COBERTURA_COMPLETA_AINDA_EXIGE_APROVACAO"],
+        "escopo_remediacao": escopo_resultado,
         "observacao": "Este plano não contém comandos destrutivos e não substitui análise humana.",
     }
     return plano
