@@ -1,5 +1,15 @@
 # Auditoria de Integridade WordPress — branch Python
 
+## Versão 0.39.0 — homologação sintética
+
+Execute a homologação sem informar um domínio real:
+
+```bash
+python3 bin/sc403_homologacao.py
+```
+
+Ela cria uma instalação WordPress sintética em diretório temporário, preserva o hash de um artefato de teste, gera o plano de recuperação e verifica que PHP, banco real e serviços nunca são executados ou alterados. O resultado aprovado ainda contém bloqueios e não autoriza liberação; a fixture não substitui ensaio restaurável com MySQL, Apache/Nginx e PHP-FPM.
+
 ## Versão 0.38.0 — coordenador de recuperação não executável
 
 Cada auditoria gera, em área privada, `sc403-recovery-plan.json`. O plano organiza preservação, validação de backup, contenção por domínio, revisão de persistência, quarentena, banco/credenciais e verificação pós-recuperação. Ele registra pré-condições, responsável sugerido e condições de interrupção, mas não contém comandos destrutivos e não autoriza liberação.

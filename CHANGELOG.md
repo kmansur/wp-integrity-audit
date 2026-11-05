@@ -4,6 +4,12 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 
 ## [Não publicado]
 
+## [0.39.0] - 2026-11-04
+
+### Homologação
+- Adicionado `bin/sc403_homologacao.py`, que cria uma fixture sintética descartável e verifica preservação de evidência, recusa de execução PHP, ausência de acesso a banco real e plano não executável.
+- O teste não simula malware funcional nem declara erradicação; seus bloqueios e limitações são reportados explicitamente.
+
 ## [0.38.0] - 2026-11-04
 
 ### Recuperação assistida como plano

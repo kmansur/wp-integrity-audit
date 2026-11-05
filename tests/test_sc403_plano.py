@@ -7,9 +7,19 @@ import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "bin"))
 import sc403_plano
+import sc403_homologacao
 
 
 class TestPlanoSC(unittest.TestCase):
+    def test_homologacao_sintetica_preserva_fixture_e_bloqueia_liberacao(self):
+        resultado = sc403_homologacao.executar()
+        self.assertEqual(resultado["status"], "APROVADA_COM_BLOQUEIOS")
+        self.assertTrue(resultado["fixture_descartavel"])
+        self.assertTrue(resultado["evidencia_preservada"])
+        self.assertTrue(resultado["plano_nao_executavel"])
+        self.assertTrue(resultado["liberacao_nao_autorizada"])
+        self.assertFalse(resultado["php_executado"])
+
     def test_gera_plano_bloqueado_e_nao_executavel(self):
         with tempfile.TemporaryDirectory() as tmp:
             caso = Path(tmp)

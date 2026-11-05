@@ -1,5 +1,9 @@
 # Python Operator Handbook
 
+## Homologação sintética (0.39.0)
+
+`python3 bin/sc403_homologacao.py` executa somente uma fixture temporária criada pelo próprio teste. O código não acessa WordPress real, não conecta a banco, não executa PHP, não reinicia serviço e verifica que o hash do artefato permanece igual. O resultado `APROVADA_COM_BLOQUEIOS` significa que as barreiras sintéticas funcionaram; não significa que a recuperação foi homologada para produção nem que um site está limpo.
+
 ## Coordenador de recuperação (0.38.0)
 
 O arquivo privado `sc403-recovery-plan.json` é um plano técnico não executável. Ele não encerra processos, não remove segmentos SHM, não altera cron, Apache, PHP-FPM, arquivos ou banco. O plano organiza as etapas em ordem, informa pré-condições e registra condições que exigem interrupção e revisão humana.
