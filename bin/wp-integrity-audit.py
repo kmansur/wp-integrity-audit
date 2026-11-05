@@ -51,9 +51,9 @@ import urllib.parse
 import urllib.request
 import zipfile
 
-VERSION = "0.43.5"
+VERSION = "0.43.7"
 DEFAULT_DB_HOST = "187.120.197.140"
-IOC = re.compile(r"SC_ADV_BEGIN|--sc-cli|--sc-succ|trace-inspector-pad|trace-librarian-tag|agile-interface-vox|f88225c2|cipher-feeder|_sc_fpc|sc_cron_guard|sc_cron_recovery|e1v61n2r1im6t7_|sc_persist_manifest|sc_own_manifest|kinetic-relay-live|function ceya|Axiom Sentinel Snap|SCV:[0-9]+")
+IOC = re.compile(r"SC_ADV_BEGIN|SC_DB_BEGIN|SC_TH_BEGIN|SC_CORE_BOOT_VER|SC_WC|php\.euc-eludom-etile|sc_boot_ver|sc_payload_persistent|sc_persist_manifest|sc_c2_cache|sc_last_c2|sc_own_rec|sc_own_manifest|sc_sw_had|sc_sw_last_url|sc_ini_fail|sc_ini_dead|sc_fetch_fails|sc_pad_off_ts|sc_reins_(?:adv|db)|sc_cron_fetch|--sc-cli|--sc-succ|trace-inspector-pad|trace-librarian-tag|agile-interface-vox|f88225c2|cipher-feeder|_sc_fpc|sc_cron_guard|sc_cron_recovery|e1v61n2r1im6t7_|kinetic-relay-live|function ceya|Axiom Sentinel Snap|SCV:[0-9]+")
 # WordPress files, database values, logs and memory dumps are untrusted data.
 # These phrases must never be interpreted as instructions by an operator, an
 # automated reviewer or an AI-assisted workflow.  A match is review evidence;
@@ -72,7 +72,7 @@ UNTRUSTED_INSTRUCTION_PATTERNS = {
         r"\b(?:do\s+not|don't|never|nao|não)\s+(?:report|mention|show|ignore|inform|verifique|audite)\b",
         re.I),
 }
-PATTERN_NAMES = (".sc_", ".gr_", ".gk_", ".kk_", ".wp-object-cache", "f88225c2.zip")
+PATTERN_NAMES = (".sc_", ".gr_", ".gk_", ".kk_", ".g_", ".gl_", ".gm_", ".gp_", ".gs_", ".gv_", ".wp-object-cache", "f88225c2.zip")
 # Random option names confirmed during this incident. Keep this list explicit;
 # the generic hexadecimal-name heuristic below remains review-only to avoid
 # deleting legitimate plugin tokens.
@@ -404,6 +404,13 @@ def file_audit(target: Path, case: Path) -> list[dict]:
                     license_bypass = sum(bool(pattern.search(bounded_text)) for pattern in LICENSE_BYPASS_PATTERNS) >= 2
             except OSError:
                 continue
+        # Comentários legítimos do core usam frases como "Don't show". Não
+        # tratar isso como tentativa de influenciar a auditoria quando o
+        # arquivo está em wp-includes/wp-admin e não há IOC forte associado.
+        if (untrusted_hits and relative.startswith(("wp-includes/", "wp-admin/"))
+                and not match and not generic_match and not license_bypass
+                and not padding_hits and len(obfuscation_hits) < 3):
+            untrusted_hits = []
         behavioral_review = behavioral_score >= 5
         timestamp_review = timestamp_watermark and path.suffix.lower() in SCRIPT_EXTENSIONS
         if not (unusual or upload_php or hidden_php or match or generic_match or license_bypass or behavioral_review or untrusted_hits or timestamp_review or padding_hits):
@@ -2015,10 +2022,10 @@ def database_audit(option_file: str, dbname: str, prefix: str, case: Path,
     statements = [
         ("suspicious_users", f"SELECT user_login, LENGTH(user_login) FROM {users} WHERE user_login REGEXP '^(admin|administrator|backup)_[0-9a-f]{{6}}$'"),
         ("family_option", f"SELECT option_name, LENGTH(option_value) FROM {options} WHERE option_name LIKE 'sc#_%' ESCAPE '#' OR option_name LIKE '_transient_sc#_%' ESCAPE '#' OR option_name LIKE '_transient_timeout_sc#_%' ESCAPE '#'"),
-        ("marker_option", f"SELECT option_name, LENGTH(option_value) FROM {options} WHERE option_name NOT IN ('cron','active_plugins','SimplePluginLogger_plugin_info_before_update') AND (option_value LIKE '%cipher-feeder%' OR option_value LIKE '%sc_cron_guard%' OR option_value LIKE '%sc_cron_recovery%' OR option_value LIKE '%e1v61n2r1im6t7_%' OR option_value LIKE '%sc_persist_manifest%' OR option_value LIKE '%trace-inspector-pad%' OR option_value LIKE '%kinetic-relay-live%')"),
+        ("marker_option", f"SELECT option_name, LENGTH(option_value) FROM {options} WHERE option_name NOT IN ('cron','active_plugins','SimplePluginLogger_plugin_info_before_update') AND (option_value LIKE '%cipher-feeder%' OR option_value LIKE '%sc_cron_guard%' OR option_value LIKE '%sc_cron_recovery%' OR option_value LIKE '%e1v61n2r1im6t7_%' OR option_value LIKE '%sc_persist_manifest%' OR option_value LIKE '%sc_payload_persistent%' OR option_value LIKE '%sc_c2_cache%' OR option_value LIKE '%sc_last_c2%' OR option_value LIKE '%sc_own_manifest%' OR option_value LIKE '%sc_sw_last_url%' OR option_value LIKE '%trace-inspector-pad%' OR option_value LIKE '%kinetic-relay-live%')"),
         ("historical_cache", f"SELECT option_name, LENGTH(option_value) FROM {options} WHERE option_name='SimplePluginLogger_plugin_info_before_update' AND option_value LIKE '%trace-inspector-pad%'"),
-        ("cron_marker", f"SELECT option_name, LENGTH(option_value) FROM {options} WHERE option_name='cron' AND (option_value LIKE '%cipher-feeder%' OR option_value LIKE '%sc_cron_guard%' OR option_value LIKE '%sc_cron_recovery%' OR option_value LIKE '%e1v61n2r1im6t7_%' OR option_value LIKE '%sc_cron_fetch%' OR option_value LIKE '%sc_persist_manifest%')"),
-        ("active_plugins_marker", f"SELECT option_name, LENGTH(option_value) FROM {options} WHERE option_name='active_plugins' AND (option_value LIKE '%trace-inspector-pad%' OR option_value LIKE '%cipher-feeder%' OR option_value LIKE '%sc_cron_guard%' OR option_value LIKE '%kinetic-relay-live%')"),
+        ("cron_marker", f"SELECT option_name, LENGTH(option_value) FROM {options} WHERE option_name='cron' AND (option_value LIKE '%cipher-feeder%' OR option_value LIKE '%sc_cron_guard%' OR option_value LIKE '%sc_cron_recovery%' OR option_value LIKE '%e1v61n2r1im6t7_%' OR option_value LIKE '%sc_cron_fetch%' OR option_value LIKE '%sc_persist_manifest%' OR option_value LIKE '%sc_payload_persistent%')"),
+        ("active_plugins_marker", f"SELECT option_name, LENGTH(option_value) FROM {options} WHERE option_name='active_plugins' AND (option_value LIKE '%trace-inspector-pad%' OR option_value LIKE '%cipher-feeder%' OR option_value LIKE '%sc_cron_guard%' OR option_value LIKE '%kinetic-relay-live%' OR option_value LIKE '%php.euc-eludom-etile%')"),
         ("session_rows", f"SELECT 'session_tokens', COUNT(*) FROM {meta} WHERE meta_key='session_tokens'"),
         ("application_password_rows", f"SELECT 'application_passwords', COUNT(*) FROM {meta} WHERE meta_key LIKE '%application_passwords'"),
     ]

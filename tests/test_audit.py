@@ -199,6 +199,17 @@ class PythonAuditTests(unittest.TestCase):
         self.assertFalse(audit.is_reviewed_official_file(caminho, "0" * 64))
         self.assertFalse(audit.is_reviewed_official_file("outro.php", digest))
 
+    def test_comentario_legitimo_do_core_nao_vira_instrucao_de_supressao(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            arquivo = root / "wp-includes" / "admin-bar.php"
+            arquivo.parent.mkdir()
+            arquivo.write_text("<?php // Don't show for logged out users.\nfunction wp_admin_bar_render() {}\n")
+            case = root / "case"
+            case.mkdir()
+            findings = audit.file_audit(root, case)
+            self.assertFalse(any(item["path"] == "wp-includes/admin-bar.php" for item in findings))
+
     def test_subprocesso_nao_utf8_preserva_octetos_sem_travar(self):
         """Saída Latin-1 de ferramenta externa não pode derrubar a auditoria."""
         import sys

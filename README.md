@@ -4,6 +4,14 @@
 
 Os comandos principais, exemplos de auditoria, comparação, memória, persistência e simulação estão em [`docs/USO.md`](docs/USO.md).
 
+## Versão 0.43.6 — cobertura adicional do catálogo SC403
+
+O detector incorpora indicadores de alta confiança do catálogo público `iocs.csv`, sempre como evidência para correlação. Padrões de nome e opções sem confirmação independente permanecem em revisão e não autorizam limpeza.
+
+## Versão 0.43.7 — comentários legítimos do core
+
+Comentários normais do WordPress, como `Don't show`, não são tratados como instruções para suprimir auditoria em arquivos do core sem outros indicadores fortes.
+
 ## Versão 0.43.5 — validação exata do Wordfence
 
 O detector reconhece o `wp-content/plugins/wordfence/lib/wordfenceClass.php` somente quando o SHA-256 coincide com a cópia oficial revisada da versão 9.0.2. Essa validação reduz falso positivo de heurísticas, mas não valida proprietário, permissões, timestamps ou a instalação inteira.

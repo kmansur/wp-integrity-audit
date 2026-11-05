@@ -15,6 +15,24 @@ import re
 from pathlib import Path
 
 SAL = "93819"
+# Indicadores de alta confiança catalogados no iocs.csv público do projeto
+# de referência. Nomes genéricos e padrões de caminho continuam exigindo
+# correlação; esta lista não autoriza limpeza automática.
+CSV_MARCADORES_ALTA_CONFIANCA = (
+    "SC_ADV_BEGIN", "SC_DB_BEGIN", "SC_TH_BEGIN", "SC_CORE_BOOT_VER",
+    "SC_WC", "php.euc-eludom-etile", "sc_boot_ver", "sc_payload_persistent",
+    "sc_persist_manifest", "sc_c2_cache", "sc_last_c2", "sc_own_rec",
+    "sc_own_manifest", "sc_sw_had", "sc_sw_last_url", "sc_ini_fail",
+    "sc_ini_dead", "sc_fetch_fails", "sc_pad_off_ts", "sc_reins_adv",
+    "sc_reins_db", "sc_cron_fetch",
+)
+CSV_OPCOES_ALTA_CONFIANCA = frozenset({
+    "sc_payload_persistent", "sc_persist_manifest", "sc_initialized",
+    "sc_last_recovery_check", "sc_last_rpc", "sc_last_fetch_ts",
+    "sc_c2_cache", "sc_last_c2", "sc_own_rec", "sc_own_manifest",
+    "sc_sw_had", "sc_sw_last_url", "sc_ini_fail", "sc_ini_dead",
+    "sc_fetch_fails", "sc_pad_off_ts", "sc_reins_adv", "sc_reins_db",
+})
 PAPEIS = {
     "loader_visivel": ("htl", 8),
     "loader_oculto": ("ldr", 8),
@@ -35,8 +53,11 @@ OPCOES_PRIVADAS = (
     "errors", "",
 )
 MARCADOR_FORTE = re.compile(
-    rb"SC_ADV_BEGIN|SC_DB_BEGIN|SC_TH_BEGIN|SC_CORE_BOOT_VER|"
-    rb"sc_payload_persistent|sc_own_manifest|SCV:[0-9]",
+    rb"SC_ADV_BEGIN|SC_DB_BEGIN|SC_TH_BEGIN|SC_CORE_BOOT_VER|SC_WC|"
+    rb"php\.euc-eludom-etile|sc_boot_ver|sc_payload_persistent|"
+    rb"sc_persist_manifest|sc_c2_cache|sc_last_c2|sc_own_rec|"
+    rb"sc_own_manifest|sc_sw_had|sc_sw_last_url|sc_ini_fail|sc_ini_dead|"
+    rb"sc_fetch_fails|sc_pad_off_ts|sc_reins_(?:adv|db)|sc_cron_fetch|SCV:[0-9]",
     re.I,
 )
 

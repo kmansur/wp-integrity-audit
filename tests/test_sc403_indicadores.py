@@ -11,6 +11,10 @@ import sc403_indicadores as sc
 
 
 class TestIndicadoresSC403(unittest.TestCase):
+    def test_iocs_csv_alta_confianca_tem_marcadores_e_opcoes_relevantes(self):
+        self.assertIn("SC_TH_BEGIN", sc.CSV_MARCADORES_ALTA_CONFIANCA)
+        self.assertIn("sc_payload_persistent", sc.CSV_OPCOES_ALTA_CONFIANCA)
+        self.assertTrue(sc.MARCADOR_FORTE.search(b"SC_WC sc_c2_cache"))
     def test_derivacao_abspath_e_endpoints(self):
         raiz = "/var/www/site/"
         dados = sc.identificadores(raiz)

@@ -4,6 +4,10 @@ Este guia descreve os principais comandos da versão atual. O comportamento padr
 
 Componentes oficiais revisados, como o `wordfenceClass.php` da versão 9.0.2, só recebem validação de conteúdo quando o SHA-256 completo coincide com a fonte registrada. Proprietário, grupo, permissões, timestamps, banco, cron e processos continuam sendo avaliados separadamente.
 
+O catálogo público SC403 é usado apenas para ampliar a coleta de indicadores estáticos e consultas direcionadas. Um nome, opção ou marcador isolado continua exigindo correlação e revisão; nenhuma limpeza é executada automaticamente.
+
+Comentários de documentação do core (`wp-includes` e `wp-admin`) são contextualizados para reduzir falsos positivos; um IOC forte ainda prevalece e exige revisão.
+
 O núcleo de remediação exige uma aprovação Ed25519 externa e uma política de chaves confiáveis para simulação autorizada. A versão atual ainda não executa remediação real.
 
 O host MySQL padrão é `187.120.197.140`. Substitua-o com `--db-host mysql.exemplo` quando o banco estiver em outro endereço.

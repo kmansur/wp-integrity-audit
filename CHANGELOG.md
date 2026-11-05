@@ -4,6 +4,18 @@ O projeto utiliza versionamento semântico. As mensagens e a documentação dest
 
 ## [Não publicado]
 
+## [0.43.7] - 2026-11-05
+
+### Correções
+- Comentários legítimos do core WordPress em `wp-includes` e `wp-admin` (por exemplo, `Don't show`) não são mais classificados como tentativa de suprimir a auditoria quando não há IOC forte associado.
+
+## [0.43.6] - 2026-11-05
+
+### Detecção SC403
+- Incorporados ao detector somente indicadores de alta confiança documentados no `iocs.csv`, incluindo `SC_TH_BEGIN`, `SC_WC`, marcadores de inicialização, recuperação e cache C2.
+- Ampliada a cobertura de nomes de guardas `.g_`, `.gl_`, `.gm_`, `.gp_`, `.gs_` e `.gv_` como revisão contextual; nomes isolados não confirmam comprometimento.
+- Consultas SQL passaram a procurar alguns marcadores SC403 adicionais em opções, cron e `active_plugins`, mantendo o comportamento somente leitura.
+
 ## [0.43.5] - 2026-11-05
 
 ### Correções
